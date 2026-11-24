@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
-import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.DurationParser;
+import net.leaf.units.TemporalUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

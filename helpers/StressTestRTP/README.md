@@ -12,7 +12,7 @@ command, listen for `PlayerTeleportEvent`, record latency.
 
 ---
 
-## Why this exists
+## Purpose
 
 The RTP front-page table compares RTP / RTP-Pro across five performance
 columns. The default `target-commands` set ships the three competitors

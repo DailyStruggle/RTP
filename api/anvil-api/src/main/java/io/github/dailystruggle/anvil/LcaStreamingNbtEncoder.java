@@ -292,7 +292,8 @@ public final class LcaStreamingNbtEncoder {
                     secTmplIdx,
                     formatVersion,
                     secLightV1,
-                    modeBLitLen);
+                    modeBLitLen,
+                    archive.isDirectFlatBitPack());
             encodedSections[i] = enc;
             if (enc.inlineEntry16 == 0 && enc.frameBytes.length > 0) {
                 totalSectionPayloadBytes += enc.frameBytes.length;

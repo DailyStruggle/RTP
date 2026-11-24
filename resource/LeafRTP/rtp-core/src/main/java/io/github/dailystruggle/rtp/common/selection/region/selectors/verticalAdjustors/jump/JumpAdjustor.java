@@ -3,14 +3,14 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
-import io.github.dailystruggle.rtp.api.safety.SafetyToken;
-import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
+import net.leaf.tags.safety.SafetyToken;
+import net.leaf.tags.safety.SafetyTokenParser;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;

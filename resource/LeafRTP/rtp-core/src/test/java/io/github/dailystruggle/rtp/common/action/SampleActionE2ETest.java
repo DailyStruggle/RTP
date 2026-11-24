@@ -129,8 +129,8 @@ class SampleActionE2ETest {
   @DisplayName("MultiConfigParser unpacks bundled definitions to plugin directory if empty")
   void testUnpackBundledDefinitionsToPluginDir(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
     ActionManager m = new ActionManager();
-    io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> actions =
-        new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+    net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> actions =
+        new net.leaf.yaml.configuration.MultiConfigParser<>(
             io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
     ActionConfigLoader.loadActions(actions, m);
 

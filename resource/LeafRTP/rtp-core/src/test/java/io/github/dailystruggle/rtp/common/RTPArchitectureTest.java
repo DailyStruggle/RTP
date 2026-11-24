@@ -233,9 +233,9 @@ public class RTPArchitectureTest {
      * Rule 7 - Thread Management / Carve-Outs.
      *
      * <p>Backend plugin JVMs must schedule all periodic, delayed, or async work through
-     * {@link RTPScheduler}. Raw threads and thread pools (e.g. {@code new Thread()},
-     * {@code Executors.new*}) must not be created outside documented carve-outs
-     * (e.g. {@code AnvilIoPool}, test harnesses).
+     * {@link RTPScheduler} or {@code ServerAccessor#blockingIoExecutor()}. Raw threads and thread
+     * pools (e.g. {@code new Thread()}, {@code Executors.new*}) must not be created outside
+     * documented carve-outs (e.g. test harnesses).
      */
     @ArchTest
     static final ArchRule no_thread_instantiation_or_executors_outside_carveouts =

@@ -213,7 +213,7 @@ public CompletableFuture<Boolean> onCommand(UUID callerId,
 }
 ```
 
-**Why it breaks:** `TreeCommand`'s parser routes any bare token through sub-command lookup. An unknown bare token (e.g. a hyphenated id like `low-performance`) hits `msgInvalidCommand` and never reaches your map-form `onCommand`. Overriding the `args[]`-form to recover the positional re-implements parsing for one verb, diverges from every other verb in the tree, and breaks tab-completion (Brigadier walks `CommandParameter`s, not your custom override).
+**Failure mode:** `TreeCommand`'s parser routes any bare token through sub-command lookup. An unknown bare token (e.g. a hyphenated id like `low-performance`) hits `msgInvalidCommand` and never reaches your map-form `onCommand`. Overriding the `args[]`-form to recover the positional re-implements parsing for one verb, diverges from every other verb in the tree, and breaks tab-completion (Brigadier walks `CommandParameter`s, not your custom override).
 
 **Right:** Register the input as a typed `CommandParameter` with `addParameter("id", new FooIdParameter(...))` and use `name=value` on the wire (`apply id=<id>`).
 
@@ -225,7 +225,7 @@ public CompletableFuture<Boolean> onCommand(UUID callerId,
 if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 ```
 
-**Why it breaks:** The dispatcher already enqueued the child via `CommandExecutor` (see `TreeCommand.java` lines ~246-272). Invoking it yourself runs it twice (or on the wrong thread, defeating the deliberate `whenComplete`-on-completing-thread choice that protects the Folia menu-redeem path).
+**Failure mode:** The dispatcher already enqueued the child via `CommandExecutor` (see `TreeCommand.java` lines ~246-272). Invoking it yourself runs it twice (or on the wrong thread, defeating the deliberate `whenComplete`-on-completing-thread choice that protects the Folia menu-redeem path).
 
 **Right:** `if (nextCommand != null) return true;`  -  let the dispatcher's `cont.whenComplete` invoke the child.
 
@@ -241,7 +241,7 @@ public boolean onCommand(UUID callerId, Map<String,List<String>> parameterValues
 }
 ```
 
-**Why it breaks:** When `nextCommand != null`, this `onCommand` is the **pre-pass** for the chain  -  `parameterValues` is the parent's parsed args, and the child has not run yet. Returning `false` short-circuits the chain before the child can read its own args.
+**Failure mode:** When `nextCommand != null`, this `onCommand` is the **pre-pass** for the chain  -  `parameterValues` is the parent's parsed args, and the child has not run yet. Returning `false` short-circuits the chain before the child can read its own args.
 
 **Right:** Distinguish the two cases explicitly with the `if (nextCommand != null) return true;` guard above.
 
@@ -253,7 +253,7 @@ public boolean onCommand(UUID callerId, Map<String,List<String>> parameterValues
 messageMethod.accept("Unknown command, type /rtp help");
 ```
 
-**Why it breaks:** S-007 requires "busy" and "invalid command" messages to be configurable. Hardcoded strings ship under every locale without translation and cannot be overridden by server admins.
+**Failure mode:** S-007 requires "busy" and "invalid command" messages to be configurable. Hardcoded strings ship under every locale without translation and cannot be overridden by server admins.
 
 **Right:** Route through `msgInvalidCommand(callerId, arg, messageMethod)`, which the platform adapter wires to the configured `messages.yml` key.
 
@@ -269,7 +269,7 @@ public Set<String> values() {
 }
 ```
 
-**Why it breaks:** Brigadier silently swallows exceptions from suggestion futures. A throwing `values()` deletes the suggestion list with no diagnostic, and on Bukkit it can abort the whole `toBrigadier` traversal (see ADR-001 addendum "Silent failure isolation"). The bridge now isolates per-attach failures, but you should still null-guard.
+**Failure mode:** Brigadier silently swallows exceptions from suggestion futures. A throwing `values()` deletes the suggestion list with no diagnostic, and on Bukkit it can abort the whole `toBrigadier` traversal (see ADR-001 addendum "Silent failure isolation"). The bridge now isolates per-attach failures, but you should still null-guard.
 
 **Right:** Defensive null checks; return `Collections.emptySet()` if the backing registry is not yet bound; throw `IllegalStateException` (not a silent null) from public `rtp-api` entry points per S-006.
 

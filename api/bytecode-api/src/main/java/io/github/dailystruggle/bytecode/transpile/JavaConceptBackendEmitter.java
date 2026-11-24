@@ -465,7 +465,142 @@ public final class JavaConceptBackendEmitter implements ConceptBackendEmitter {
             case SECTION_4096_VOXEL -> emitJavaSection4096VoxelFunction(sb, spec, options, q32Plan);
             case SECTION_4096_LCA_NIBBLE_PACKED, CORNER_SLICE_5X49_PACKED ->
                     emitJavaLcaPackedBatchFunction(sb, spec, options, q32Plan);
+            case DENSITY_VOLUME_BATCH_F32 -> emitJavaDensityVolumeBatchFunction(sb, spec, options, q32Plan);
+            case SECTION_PALETTE_FILL_U2 -> emitJavaSectionPaletteFillU2Function(sb, spec, options, q32Plan);
         }
+    }
+
+    private static void emitJavaDensityVolumeBatchFunction(
+            StringBuilder sb,
+            ConceptBatchSpec spec,
+            EmitOptions options,
+            Q32LoweringPlan q32Plan) {
+        ConceptFunction target = spec.targetFunction();
+        boolean q32Ret = options.gpuExactArithmeticMode().usesInt64Q32()
+                && q32Plan.isQ32Return(target);
+        sb.append("    public static void ")
+                .append(spec.kernelName())
+                .append("(\n")
+                .append("            float[] outValues,\n")
+                .append("            int[] batchOriginsXyz,\n")
+                .append("            int batchCount,\n")
+                .append("            int sizeX,\n")
+                .append("            int sizeY,\n")
+                .append("            int sizeZ,\n")
+                .append("            int stepX,\n")
+                .append("            int stepY,\n")
+                .append("            int stepZ");
+        for (ConceptParam extra : spec.extraUniformParams()) {
+            sb.append(",\n            ")
+                    .append(mapExtraUniformType(target, extra, options, q32Plan))
+                    .append(' ')
+                    .append(extra.name());
+        }
+        sb.append(") {\n")
+                .append("        int volumeSize = sizeX * sizeY * sizeZ;\n")
+                .append("        for (int b = 0; b < batchCount; b++) {\n")
+                .append("            int ox = batchOriginsXyz[b * 3];\n")
+                .append("            int oy = batchOriginsXyz[b * 3 + 1];\n")
+                .append("            int oz = batchOriginsXyz[b * 3 + 2];\n")
+                .append("            int base = b * volumeSize;\n")
+                .append("            for (int lz = 0; lz < sizeZ; lz++) {\n")
+                .append("                int bz = oz + lz * stepZ;\n")
+                .append("                for (int lx = 0; lx < sizeX; lx++) {\n")
+                .append("                    int bx = ox + lx * stepX;\n")
+                .append("                    int colBase = base + (lx + lz * sizeX) * sizeY;\n")
+                .append("                    for (int ly = 0; ly < sizeY; ly++) {\n")
+                .append("                        int by = oy + ly * stepY;\n");
+        String callExpr = buildIntCoordTargetCall(target, "bx", "by", "bz", options, q32Plan);
+        if (q32Ret) {
+            sb.append("                        outValues[colBase + ly] = q32_to_f32(").append(callExpr).append(");\n");
+        } else {
+            sb.append("                        outValues[colBase + ly] = (float) (").append(callExpr).append(");\n");
+        }
+        sb.append("                    }\n")
+                .append("                }\n")
+                .append("            }\n")
+                .append("        }\n")
+                .append("    }\n");
+    }
+
+    private static void emitJavaSectionPaletteFillU2Function(
+            StringBuilder sb,
+            ConceptBatchSpec spec,
+            EmitOptions options,
+            Q32LoweringPlan q32Plan) {
+        ConceptFunction target = spec.targetFunction();
+        boolean q32Ret = options.gpuExactArithmeticMode().usesInt64Q32()
+                && q32Plan.isQ32Return(target);
+        sb.append("    public static void ")
+                .append(spec.kernelName())
+                .append("(\n")
+                .append("            int[] outSectionWords,\n")
+                .append("            short[] outSectionMeta,\n")
+                .append("            int[] batchOriginsXyz,\n")
+                .append("            int batchCount,\n")
+                .append("            int sectionCount,\n")
+                .append("            int seaLevel,\n")
+                .append("            int deepFluidY");
+        for (ConceptParam extra : spec.extraUniformParams()) {
+            sb.append(",\n            ")
+                    .append(mapExtraUniformType(target, extra, options, q32Plan))
+                    .append(' ')
+                    .append(extra.name());
+        }
+        sb.append(") {\n")
+                .append("        for (int b = 0; b < batchCount; b++) {\n")
+                .append("            int ox = batchOriginsXyz[b * 3];\n")
+                .append("            int oy = batchOriginsXyz[b * 3 + 1];\n")
+                .append("            int oz = batchOriginsXyz[b * 3 + 2];\n")
+                .append("            for (int s = 0; s < sectionCount; s++) {\n")
+                .append("                int wgId = b * sectionCount + s;\n")
+                .append("                int wordBase = wgId << 8;\n")
+                .append("                int baseY = oy + (s << 4);\n")
+                .append("                int nonEmpty = 0;\n")
+                .append("                int fluid = 0;\n")
+                .append("                int mask = 0;\n")
+                .append("                for (int ly = 0; ly < 16; ly++) {\n")
+                .append("                    int by = baseY + ly;\n")
+                .append("                    for (int lz = 0; lz < 16; lz++) {\n")
+                .append("                        int bz = oz + lz;\n")
+                .append("                        int packed = 0;\n")
+                .append("                        for (int lx = 0; lx < 16; lx++) {\n")
+                .append("                            int bx = ox + lx;\n");
+        String callExpr = buildIntCoordTargetCall(target, "bx", "by", "bz", options, q32Plan);
+        if (q32Ret) {
+            sb.append("                            float d = q32_to_f32(").append(callExpr).append(");\n");
+        } else {
+            sb.append("                            float d = (float) (").append(callExpr).append(");\n");
+        }
+        sb.append("                            int code;\n")
+                .append("                            if (d > 0.0f) {\n")
+                .append("                                code = 1;\n")
+                .append("                                nonEmpty++;\n")
+                .append("                            } else if (by < deepFluidY) {\n")
+                .append("                                code = 3;\n")
+                .append("                                nonEmpty++;\n")
+                .append("                                fluid++;\n")
+                .append("                            } else if (by < seaLevel) {\n")
+                .append("                                code = 2;\n")
+                .append("                                nonEmpty++;\n")
+                .append("                                fluid++;\n")
+                .append("                            } else {\n")
+                .append("                                code = 0;\n")
+                .append("                            }\n")
+                .append("                            mask |= (1 << code);\n")
+                .append("                            packed |= (code << (lx << 1));\n")
+                .append("                        }\n")
+                .append("                        outSectionWords[wordBase + (ly << 4) + lz] = packed;\n")
+                .append("                    }\n")
+                .append("                }\n")
+                .append("                int metaBase = wgId << 2;\n")
+                .append("                outSectionMeta[metaBase] = (short) nonEmpty;\n")
+                .append("                outSectionMeta[metaBase + 1] = (short) fluid;\n")
+                .append("                outSectionMeta[metaBase + 2] = (short) mask;\n")
+                .append("                outSectionMeta[metaBase + 3] = 0;\n")
+                .append("            }\n")
+                .append("        }\n")
+                .append("    }\n");
     }
 
     private static void emitJavaGrid3DFunction(

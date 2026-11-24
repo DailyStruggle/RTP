@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.bit.config;
 
+import net.leaf.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitCodes;
 import io.github.dailystruggle.bit.BitComponent;

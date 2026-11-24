@@ -16,7 +16,7 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.System.Logger.Level;

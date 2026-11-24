@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
 import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
-import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import net.leaf.predict.EwmaEstimator;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;

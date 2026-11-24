@@ -2,12 +2,15 @@ package io.github.dailystruggle.server.api;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -163,6 +166,41 @@ public interface ServerAccessor
    */
   default Optional<TaskScheduler> scheduler() {
     return Optional.empty();
+  }
+
+  /**
+   * Returns the lifecycle-managed {@link Executor} for blocking world/disk I/O (e.g. Anvil/LCA
+   * region reads and writes). Implementations own the backing threads and reject new submissions
+   * once {@link #shutdownBlockingIo(Duration)} is invoked so disk I/O cannot race with world unload
+   * or server shutdown ({@code S-002}, {@code S-005}).
+   *
+   * <p>The default delegates to {@link #scheduler()}'s {@link TaskScheduler#runAsync(Runnable)}
+   * when a scheduler is attached, or throws {@link IllegalStateException} when neither a blocking
+   * I/O executor nor a scheduler is available ({@code S-006}).
+   *
+   * @return lifecycle-managed blocking I/O executor; never {@code null}
+   */
+  default Executor blockingIoExecutor() {
+    TaskScheduler sched =
+        scheduler()
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "ServerAccessor has no blockingIoExecutor or TaskScheduler attached"));
+    return task -> sched.runAsync(Objects.requireNonNull(task, "task"));
+  }
+
+  /**
+   * Rejects new submissions to {@link #blockingIoExecutor()} and awaits completion of in-flight
+   * blocking I/O tasks up to {@code timeout} before world unload or plugin/server shutdown
+   * ({@code S-002}, {@code S-005}).
+   *
+   * @param timeout maximum duration to wait for in-flight tasks; {@code null} or non-positive
+   *     performs an immediate shutdown without waiting
+   * @return {@code true} if all in-flight tasks drained cleanly within {@code timeout}
+   */
+  default boolean shutdownBlockingIo(Duration timeout) {
+    return true;
   }
 
   /**

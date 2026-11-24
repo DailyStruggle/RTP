@@ -257,6 +257,7 @@ class RegionFileResolverTest {
         byte[] lcaBytes = Files.readAllBytes(lcaRegionDir.resolve("r.0.0.lca"));
         try (LcaRegionFileStorage cleanLca = new LcaRegionFileStorage(tmp.resolve("clean-lca"))) {
             cleanLca.writeChunkNbtBytes(0, 0, rawNbt);
+            cleanLca.flush();
             lcaBytes = Files.readAllBytes(tmp.resolve("clean-lca").resolve("r.0.0.lca"));
         }
         Files.write(mcaRegionDir.resolve("r.0.0.mca"), LcaRegionWriter.transcodeToMca(lcaBytes));

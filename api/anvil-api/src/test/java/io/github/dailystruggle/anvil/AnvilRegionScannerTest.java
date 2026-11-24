@@ -253,12 +253,11 @@ class AnvilRegionScannerTest {
         writeSingleChunkRegionFile(region.resolve("r.0.0.mca"),
                 List.of("minecraft:plains", "iris:volcanic_ash_plains"));
 
-        CompletableFuture<Set<String>> future = AnvilRegionScanner.scanBiomesAsync(world, "");
+        CompletableFuture<Set<String>> future = AnvilRegionScanner.scanBiomesAsync(world, "", Runnable::run);
         Set<String> asyncResult = future.get();
 
-        // Parity: the async entry point is the supported caller contract (section 6.1 dispatches
-        // the scan on commonPool); the sync entry point is a test/verification shim.
-        // Both must see the same bytes on disk and return the same union.
+        // Parity: the async entry point dispatches on the caller-supplied executor; the sync entry
+        // point is a test/off-tick shim. Both must see the same bytes on disk and return the same union.
         Set<String> syncResult = AnvilRegionScanner.scanBiomes(world, "");
         assertEquals(syncResult, asyncResult);
         assertFalse(asyncResult.isEmpty());

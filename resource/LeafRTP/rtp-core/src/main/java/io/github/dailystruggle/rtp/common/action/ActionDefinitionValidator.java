@@ -12,7 +12,7 @@ import io.github.dailystruggle.bit.Vocabulary;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.io.File;

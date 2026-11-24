@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
-import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
-import io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit;
+import net.leaf.units.DistanceParser;
+import net.leaf.units.SpatialUnit;
 
 import java.util.ArrayList;
 import java.util.Collections;

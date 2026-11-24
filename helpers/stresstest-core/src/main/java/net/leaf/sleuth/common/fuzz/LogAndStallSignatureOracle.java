@@ -189,13 +189,23 @@ public final class LogAndStallSignatureOracle {
     private volatile double slowTickThresholdMs = DEFAULT_SLOW_TICK_THRESHOLD_MS;
     private final Map<String, FaultSignature> signaturesById = new ConcurrentHashMap<>();
     private final Map<Long, ParkedWorkerSighting> parkedWorkersByThreadId = new ConcurrentHashMap<>();
+    private final List<ThreadGrowthCheckpoint> threadGrowthCheckpoints = new ArrayList<>();
     private final AtomicLong totalExceptionsRecorded = new AtomicLong();
     private final AtomicLong totalStallsRecorded = new AtomicLong();
     private final AtomicLong totalHazardsRecorded = new AtomicLong();
     private final AtomicBoolean handlerInstalled = new AtomicBoolean(false);
     private volatile Handler rootLoggerHandler;
 
+    private static final int MIN_THREAD_GROWTH_CHECKPOINTS = 4;
+    private static final long MIN_THREAD_CHECKPOINT_INTERVAL_MS = 500L;
+    private static final int MIN_TOTAL_THREAD_GROWTH_DELTA = 10;
+    private static final int MIN_NON_DAEMON_THREAD_GROWTH_DELTA = 6;
+    private static final double MIN_THREAD_GROWTH_RATE_PER_EPISODE = 0.10;
+
     private record ParkedWorkerSighting(String normalizedPluginFrame, String suspectJar, long firstSeenEpochMs) {
+    }
+
+    private record ThreadGrowthCheckpoint(int episodeCount, int liveThreadCount, int nonDaemonCount, long timestampMs) {
     }
 
     public LogAndStallSignatureOracle() {
@@ -638,6 +648,9 @@ public final class LogAndStallSignatureOracle {
     public void clear() {
         signaturesById.clear();
         parkedWorkersByThreadId.clear();
+        synchronized (threadGrowthCheckpoints) {
+            threadGrowthCheckpoints.clear();
+        }
         totalExceptionsRecorded.set(0L);
         totalStallsRecorded.set(0L);
         totalHazardsRecorded.set(0L);
@@ -1058,6 +1071,165 @@ public final class LogAndStallSignatureOracle {
                 jar
         );
         return Optional.of(recordCustomHazard("task-creep", frame, jar, deltaMs, msg));
+    }
+
+    /**
+     * Samples live JVM threads (filtering transient JVM/GC/JIT/Netty system threads) and records
+     * a thread-growth checkpoint for monotonic thread-leak detection ({@code hazard:thread-leak},
+     * {@code Rule F-001}, {@code S-002}).
+     *
+     * @param suspectJar   target plugin/mod identifier
+     * @param episodeCount cumulative fuzz episodes completed at this checkpoint
+     * @return recorded {@code hazard:thread-leak} signature if sustained thread growth was proven
+     */
+    public Optional<FaultSignature> sampleLiveThreadGrowth(String suspectJar, int episodeCount) {
+        int liveCount = 0;
+        int nonDaemonCount = 0;
+        try {
+            for (Thread t : Thread.getAllStackTraces().keySet()) {
+                if (t == null) {
+                    continue;
+                }
+                Thread.State st = t.getState();
+                if (st == Thread.State.NEW || st == Thread.State.TERMINATED) {
+                    continue;
+                }
+                if (isTransientJvmSystemThread(t.getName())) {
+                    continue;
+                }
+                liveCount++;
+                if (!t.isDaemon()) {
+                    nonDaemonCount++;
+                }
+            }
+        } catch (SecurityException ex) {
+            ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+            liveCount = Math.max(0, bean.getThreadCount());
+            nonDaemonCount = Math.max(0, liveCount - Math.max(0, bean.getDaemonThreadCount()));
+        }
+        return recordThreadGrowthCheckpoint(
+                suspectJar,
+                liveCount,
+                nonDaemonCount,
+                episodeCount,
+                System.currentTimeMillis()
+        );
+    }
+
+    /**
+     * Records a thread-count checkpoint and emits {@code hazard:thread-leak} when sustained,
+     * non-decreasing thread growth is observed across at least {@value #MIN_THREAD_GROWTH_CHECKPOINTS}
+     * time-separated checkpoints ({@code >= 500 ms} apart).
+     *
+     * @param suspectJar      target plugin/mod identifier
+     * @param liveThreadCount filtered live thread count at this checkpoint
+     * @param nonDaemonCount  filtered non-daemon thread count at this checkpoint
+     * @param episodeCount    cumulative episodes executed
+     * @param timestampMs     epoch milliseconds of the sample
+     * @return recorded {@code hazard:thread-leak} signature when sustained leak criteria are met
+     */
+    public Optional<FaultSignature> recordThreadGrowthCheckpoint(
+            String suspectJar,
+            int liveThreadCount,
+            int nonDaemonCount,
+            int episodeCount,
+            long timestampMs
+    ) {
+        if (liveThreadCount < 0 || nonDaemonCount < 0 || episodeCount < 0) {
+            return Optional.empty();
+        }
+        List<ThreadGrowthCheckpoint> snapshot;
+        synchronized (threadGrowthCheckpoints) {
+            if (!threadGrowthCheckpoints.isEmpty()) {
+                ThreadGrowthCheckpoint last = threadGrowthCheckpoints.get(threadGrowthCheckpoints.size() - 1);
+                if (timestampMs - last.timestampMs() < MIN_THREAD_CHECKPOINT_INTERVAL_MS
+                        && episodeCount >= last.episodeCount()) {
+                    return Optional.empty();
+                }
+            }
+            threadGrowthCheckpoints.add(new ThreadGrowthCheckpoint(
+                    episodeCount, liveThreadCount, nonDaemonCount, timestampMs
+            ));
+            if (threadGrowthCheckpoints.size() < MIN_THREAD_GROWTH_CHECKPOINTS) {
+                return Optional.empty();
+            }
+            snapshot = new ArrayList<>(threadGrowthCheckpoints);
+        }
+
+        int n = snapshot.size();
+        ThreadGrowthCheckpoint first = snapshot.get(0);
+        ThreadGrowthCheckpoint c1 = snapshot.get(n - 3);
+        ThreadGrowthCheckpoint c2 = snapshot.get(n - 2);
+        ThreadGrowthCheckpoint c3 = snapshot.get(n - 1);
+
+        int episodeDelta = c3.episodeCount() - first.episodeCount();
+        if (episodeDelta <= 0) {
+            return Optional.empty();
+        }
+
+        int liveDelta = c3.liveThreadCount() - first.liveThreadCount();
+        int nonDaemonDelta = c3.nonDaemonCount() - first.nonDaemonCount();
+
+        boolean sustainedLiveGrowth = liveDelta >= MIN_TOTAL_THREAD_GROWTH_DELTA
+                && c1.liveThreadCount() <= c2.liveThreadCount()
+                && c2.liveThreadCount() <= c3.liveThreadCount()
+                && c3.liveThreadCount() > c1.liveThreadCount()
+                && ((double) liveDelta / (double) episodeDelta) >= MIN_THREAD_GROWTH_RATE_PER_EPISODE;
+
+        boolean sustainedNonDaemonGrowth = nonDaemonDelta >= MIN_NON_DAEMON_THREAD_GROWTH_DELTA
+                && c1.nonDaemonCount() <= c2.nonDaemonCount()
+                && c2.nonDaemonCount() <= c3.nonDaemonCount()
+                && c3.nonDaemonCount() > c1.nonDaemonCount()
+                && ((double) nonDaemonDelta / (double) episodeDelta) >= MIN_THREAD_GROWTH_RATE_PER_EPISODE;
+
+        if (!sustainedLiveGrowth && !sustainedNonDaemonGrowth) {
+            return Optional.empty();
+        }
+
+        String jar = (suspectJar == null || suspectJar.isBlank() || "all".equalsIgnoreCase(suspectJar))
+                ? "plugin"
+                : suspectJar.trim();
+        String frame = jar + ".UnmanagedThreadLeak";
+        int reportedDelta = Math.max(liveDelta, nonDaemonDelta);
+        double rate = (double) reportedDelta / (double) episodeDelta;
+        String msg = String.format(
+                Locale.ROOT,
+                "Sustained thread-count growth detected across %d checkpoints: live %d -> %d (+%d), non-daemon %d -> %d (+%d) over %d episodes (%.2f threads/ep) [%s]",
+                n,
+                first.liveThreadCount(),
+                c3.liveThreadCount(),
+                liveDelta,
+                first.nonDaemonCount(),
+                c3.nonDaemonCount(),
+                nonDaemonDelta,
+                episodeDelta,
+                rate,
+                jar
+        );
+        return Optional.of(recordCustomHazard("thread-leak", frame, jar, reportedDelta, msg));
+    }
+
+    private static boolean isTransientJvmSystemThread(String threadName) {
+        if (threadName == null || threadName.isEmpty()) {
+            return false;
+        }
+        String lower = threadName.toLowerCase(Locale.ROOT);
+        return lower.startsWith("reference handler")
+                || lower.startsWith("finalizer")
+                || lower.startsWith("signal dispatcher")
+                || lower.startsWith("common-cleaner")
+                || lower.startsWith("notification thread")
+                || lower.startsWith("attach listener")
+                || lower.contains("compilerthread")
+                || lower.contains("c1 compiler")
+                || lower.contains("c2 compiler")
+                || lower.contains("gc thread")
+                || lower.startsWith("g1 ")
+                || lower.startsWith("zworker")
+                || lower.contains("shenandoah")
+                || lower.contains("netty")
+                || lower.contains("forkjoinpool.commonpool")
+                || lower.contains("jfr");
     }
 
     private static boolean isSyncChunkHazardFrame(String cls, String method, double tickDurationMs) {

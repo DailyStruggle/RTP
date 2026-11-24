@@ -6,10 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,8 +20,8 @@ import java.util.regex.Pattern;
  * dimension's {@code region/} folder and returns the union of every decodable namespaced biome id.
  * Consumed by the platform's {@code setBiomesGetter} tab-completion hook.
  *
- * <p>Threading: {@link #scanBiomesAsync(Path, String)} dispatches on
- * {@link ForkJoinPool#commonPool()} and is the intended entry point;
+ * <p>Threading: {@link #scanBiomesAsync(Path, String, Executor)} dispatches on the
+ * caller-supplied {@link Executor} and is the intended entry point;
  * {@link #scanBiomes(Path, String)} runs inline and must already be off-tick.
  *
  * <p>Cache key is {@code (regionFolder, mtimeSignature)} where the signature is
@@ -48,22 +49,24 @@ public final class AnvilRegionScanner {
 
     /**
      * Scan the dimension rooted at {@code worldFolder/dimensionSubpath/region/} on
-     * {@link ForkJoinPool#commonPool()} and return the union of every decodable
+     * the caller-supplied {@link Executor} and return the union of every decodable
      * namespaced biome identifier. See the class Javadoc for caching and failure
      * semantics.
      *
      * @param worldFolder      the world folder (e.g. {@code <server>/world})
      * @param dimensionSubpath {@code ""} for overworld, {@code "DIM-1"} for nether,
      *                         {@code "DIM1"} for end, or any datapack-dimension subpath
+     * @param executor         lifecycle-managed blocking-I/O executor; must not be {@code null}
      * @return a future that completes with the insertion-ordered union of biome ids
      */
-    public static CompletableFuture<Set<String>> scanBiomesAsync(Path worldFolder, String dimensionSubpath) {
-        return CompletableFuture.supplyAsync(() -> scanBiomes(worldFolder, dimensionSubpath),
-                ForkJoinPool.commonPool());
+    public static CompletableFuture<Set<String>> scanBiomesAsync(
+            Path worldFolder, String dimensionSubpath, Executor executor) {
+        Objects.requireNonNull(executor, "executor");
+        return CompletableFuture.supplyAsync(() -> scanBiomes(worldFolder, dimensionSubpath), executor);
     }
 
     /**
-     * Synchronous scan. Prefer {@link #scanBiomesAsync(Path, String)} from any
+     * Synchronous scan. Prefer {@link #scanBiomesAsync(Path, String, Executor)} from any
      * thread that may be tick-affine; this variant exists for tests and for callers
      * that have already dispatched off-tick.
      */

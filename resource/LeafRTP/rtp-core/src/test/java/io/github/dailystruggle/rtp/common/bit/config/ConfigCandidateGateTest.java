@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.bit.config;
 
+import net.leaf.bit.config.ConfigSnapshot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;

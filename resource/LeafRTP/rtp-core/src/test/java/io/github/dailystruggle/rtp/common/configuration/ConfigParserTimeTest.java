@@ -1,12 +1,13 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import net.leaf.yaml.configuration.ConfigParser;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.TemporalUnit;
 import java.io.File;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;

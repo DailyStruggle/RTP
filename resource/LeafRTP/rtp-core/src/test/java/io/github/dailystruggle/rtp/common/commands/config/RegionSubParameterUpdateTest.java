@@ -9,10 +9,10 @@ import static org.mockito.Mockito.*;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -44,7 +44,7 @@ public class RegionSubParameterUpdateTest {
     private ConfigParser<RegionKeys> regionConfig;
     private EnumMap<RegionKeys, Object> regionData;
     private ConfigParser lang;
-    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
+    private net.leaf.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -53,8 +53,8 @@ public class RegionSubParameterUpdateTest {
 
         Configs configs = ActiveConfigs.get();
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class
+        mockDb = mock(net.leaf.yaml.YamlFileCache.class);
+        Field cachedLookupField = net.leaf.yaml.YamlFileCache.class
                 .getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
@@ -64,7 +64,7 @@ public class RegionSubParameterUpdateTest {
         regionConfig.reverse_language_mapping = new ConcurrentHashMap<>();
         regionConfig.name = "default.yml";
 
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class
+        Field myClassField = net.leaf.yaml.factory.FactoryValue.class
                 .getDeclaredField("myClass");
         myClassField.setAccessible(true);
         myClassField.set(regionConfig, RegionKeys.class);
@@ -238,8 +238,8 @@ public class RegionSubParameterUpdateTest {
         // discarding SQUARE so the value reverted to the global default (CIRCLE)
         // on the next reload. The explicit override must instead materialize the
         // chosen block onto disk (materialize-only-changed-keys).
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
-                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+        net.leaf.yaml.RtpYamlConfig yaml =
+                net.leaf.yaml.RtpYamlConfig.parse(
                         "shape: \"@config\"\n");
         mockDb.cachedLookup.get().put("default.yml", yaml);
 
@@ -255,16 +255,16 @@ public class RegionSubParameterUpdateTest {
         Object parent = null;
         while (System.currentTimeMillis() < deadline) {
             parent = yaml.get("shape");
-            if (parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
+            if (parent instanceof net.leaf.yaml.RtpYamlSection) {
                 break;
             }
             Thread.sleep(25);
         }
 
-        assertTrue(parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection,
+        assertTrue(parent instanceof net.leaf.yaml.RtpYamlSection,
                 "explicit shape override must materialize a nested section, not preserve the @config token");
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section =
-                (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) parent;
+        net.leaf.yaml.RtpYamlSection section =
+                (net.leaf.yaml.RtpYamlSection) parent;
         assertEquals("SQUARE", String.valueOf(section.get("name")).toUpperCase(),
                 "the operator's chosen shape type must be saved, not reverted to the default");
     }
@@ -279,8 +279,8 @@ public class RegionSubParameterUpdateTest {
         // its old value), and the edit would appear to vanish on reload. The
         // write must instead restore the canonical leaf case and overwrite the
         // real `centerZ`.
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
-                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+        net.leaf.yaml.RtpYamlConfig yaml =
+                net.leaf.yaml.RtpYamlConfig.parse(
                         "shape: \"@config\"\n");
         mockDb.cachedLookup.get().put("default.yml", yaml);
 
@@ -292,11 +292,11 @@ public class RegionSubParameterUpdateTest {
         cmd.onCommand(UUID.randomUUID(), params, null);
 
         long deadline = System.currentTimeMillis() + 2_000;
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section = null;
+        net.leaf.yaml.RtpYamlSection section = null;
         while (System.currentTimeMillis() < deadline) {
             Object parent = yaml.get("shape");
-            if (parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
-                section = (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) parent;
+            if (parent instanceof net.leaf.yaml.RtpYamlSection) {
+                section = (net.leaf.yaml.RtpYamlSection) parent;
                 if (section.getKeys(false).contains("centerZ")
                         && "512".equals(String.valueOf(section.get("centerZ")))) {
                     break;

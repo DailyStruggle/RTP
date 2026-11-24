@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;

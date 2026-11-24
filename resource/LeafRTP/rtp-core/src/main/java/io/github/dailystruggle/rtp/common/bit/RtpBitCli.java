@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionConfigLoader;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.action.ActionSimulator;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.FileInputStream;

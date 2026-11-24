@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration.yaml;
 
+import net.leaf.yaml.RtpYamlMapping;
+import net.leaf.yaml.RtpYamlReader;
+import net.leaf.yaml.RtpYamlScalar;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;

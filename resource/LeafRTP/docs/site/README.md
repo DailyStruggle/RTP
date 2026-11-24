@@ -5,7 +5,7 @@ Source content for the **non-functional** pages of the generated documentation s
 material). These are the pages a static-site generator (MkDocs Material or similar)
 renders around the reference documentation.
 
-## Why this folder exists
+## Background
 
 The user-facing reference pages historically lived in the detached GitHub Wiki repo
 (`<repo>.wiki.git`, cloned into the top-level `wiki/` working copy). That wiki repo is

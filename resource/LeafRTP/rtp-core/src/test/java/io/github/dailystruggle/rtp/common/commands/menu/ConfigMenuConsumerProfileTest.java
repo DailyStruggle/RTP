@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

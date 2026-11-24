@@ -150,12 +150,12 @@ class QueueTaskTest {
         RTPLocation keptLoc = new RTPLocation(new RTPCoords("queue_world", (cx << 4) + 4, 64, (cz << 4) + 4), 1, reservation);
         region.queueManager.keptLocations.offer(keptLoc);
 
-        io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache.clear();
+        net.leaf.tags.safety.SafetyCompilationCache.clear();
         LocationGenerator.lastUpdate.set(0L);
         accessor.logMessages.clear();
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys> blocksParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys> blocksParser =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.class);
         if (blocksParser != null) {
             blocksParser.set(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.unsafeBlocks,
@@ -530,8 +530,8 @@ class QueueTaskTest {
 
         // Configure safety radius = 1
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<SafetyKeys> safetyParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+        net.leaf.yaml.configuration.ConfigParser<SafetyKeys> safetyParser =
+                (net.leaf.yaml.configuration.ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         if (safetyParser != null) {
             safetyParser.set(SafetyKeys.safetyRadius, 1);
         }

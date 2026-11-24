@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CurveHash;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
-import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
+import net.leaf.units.DistanceParser;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 import java.io.ByteArrayOutputStream;

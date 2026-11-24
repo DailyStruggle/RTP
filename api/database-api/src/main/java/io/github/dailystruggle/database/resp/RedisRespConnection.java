@@ -1,7 +1,7 @@
 package io.github.dailystruggle.database.resp;
 
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespEndpoint;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;

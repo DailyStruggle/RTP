@@ -12,7 +12,7 @@ import java.util.List;
  * @trace REQ-CFG-ATLAS-003, REQ-SLEUTH-LAG-001, S-004, S-005
  */
 public interface SleuthDiagnosticSnapshotSource
-        extends io.github.dailystruggle.rtp.common.bit.config.SleuthDiagnosticSnapshotSource {
+        extends net.leaf.bit.config.SleuthDiagnosticSnapshotSource {
 
     @Override
     default List<ChunkHotspotRecord> diagnosticHotspots() {

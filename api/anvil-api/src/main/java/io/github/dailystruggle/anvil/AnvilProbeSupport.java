@@ -1,10 +1,12 @@
 package io.github.dailystruggle.anvil;
 
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Executor;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -75,14 +77,16 @@ public final class AnvilProbeSupport {
       int cz,
       long key,
       Set<String> rawUnsafe,
-      UnaryOperator<String> reconciler) {
+      UnaryOperator<String> reconciler,
+      Executor executor) {
+    Objects.requireNonNull(executor, "executor");
     AnvilChunkView cached = cache.get(key);
     if (cached != null) {
       return CompletableFuture.completedFuture(
           new AnvilPrefilter.ProbeResult(Verdict.ACCEPT, cached));
     }
     return AnvilPrefilter
-        .probeDetailed(worldFolder, dimSubpath, cx, cz, rawUnsafe, reconciler)
+        .probeDetailed(worldFolder, dimSubpath, cx, cz, rawUnsafe, reconciler, executor)
         .thenApply(result -> {
           if (result != null && result.view() != null) {
             publish(key, result.view());

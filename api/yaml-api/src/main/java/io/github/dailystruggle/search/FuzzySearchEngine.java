@@ -11,13 +11,13 @@ import java.util.List;
 public final class FuzzySearchEngine {
 
     public static final int MAX_EDIT_DISTANCE =
-            io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.MAX_EDIT_DISTANCE;
+            net.leaf.yaml.search.FuzzySearchEngine.MAX_EDIT_DISTANCE;
     public static final int MIN_FUZZY_LENGTH =
-            io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.MIN_FUZZY_LENGTH;
+            net.leaf.yaml.search.FuzzySearchEngine.MIN_FUZZY_LENGTH;
     public static final int LENGTH_THRESHOLD_TWO_EDITS =
-            io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.LENGTH_THRESHOLD_TWO_EDITS;
+            net.leaf.yaml.search.FuzzySearchEngine.LENGTH_THRESHOLD_TWO_EDITS;
     public static final int MIN_CONTAINMENT_LENGTH =
-            io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.MIN_CONTAINMENT_LENGTH;
+            net.leaf.yaml.search.FuzzySearchEngine.MIN_CONTAINMENT_LENGTH;
 
     public record MatchReason(String type, String text) {}
 
@@ -38,19 +38,19 @@ public final class FuzzySearchEngine {
     private FuzzySearchEngine() {}
 
     public static String normalize(String input) {
-        return io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.normalize(input);
+        return net.leaf.yaml.search.FuzzySearchEngine.normalize(input);
     }
 
     public static int levenshtein(String a, String b) {
-        return io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.levenshtein(a, b);
+        return net.leaf.yaml.search.FuzzySearchEngine.levenshtein(a, b);
     }
 
     public static int levenshtein(String a, String b, int maxDist) {
-        return io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.levenshtein(a, b, maxDist);
+        return net.leaf.yaml.search.FuzzySearchEngine.levenshtein(a, b, maxDist);
     }
 
     public static boolean isFuzzyMatch(String query, String candidate) {
-        return io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.isFuzzyMatch(query, candidate);
+        return net.leaf.yaml.search.FuzzySearchEngine.isFuzzyMatch(query, candidate);
     }
 
     public static ScoredCandidate scoreCandidateCascade(
@@ -60,7 +60,7 @@ public final class FuzzySearchEngine {
             String valueText,
             OnlineQueryExpander onlineExpander,
             long nowEpochMs) {
-        var res = io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.scoreCandidateCascade(
+        var res = net.leaf.yaml.search.FuzzySearchEngine.scoreCandidateCascade(
                 query,
                 filePath,
                 leafName,
@@ -77,7 +77,7 @@ public final class FuzzySearchEngine {
             String query,
             Collection<String> candidates,
             int maxDistance) {
-        var res = io.github.dailystruggle.rtp.common.search.FuzzySearchEngine.resolveCandidate(
+        var res = net.leaf.yaml.search.FuzzySearchEngine.resolveCandidate(
                 query, candidates, maxDistance);
         return new FuzzyLookupResult<>(
                 res.match(),

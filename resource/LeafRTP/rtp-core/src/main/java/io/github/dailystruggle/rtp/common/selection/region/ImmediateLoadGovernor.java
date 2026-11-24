@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
 import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
-import io.github.dailystruggle.rtp.common.predict.BernoulliEstimator;
-import io.github.dailystruggle.rtp.common.predict.ComparativeCostGovernor;
-import io.github.dailystruggle.rtp.common.predict.CostContext;
-import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import net.leaf.predict.BernoulliEstimator;
+import net.leaf.predict.ComparativeCostGovernor;
+import net.leaf.predict.CostContext;
+import net.leaf.predict.EwmaEstimator;
 import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 

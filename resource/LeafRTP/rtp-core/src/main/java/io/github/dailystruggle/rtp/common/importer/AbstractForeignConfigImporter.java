@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.importer;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
+import net.leaf.yaml.search.FuzzySearchEngine;
 import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 
 import java.io.IOException;

@@ -24,8 +24,7 @@ import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
  *       and no {@code EntityScheduler} hop is required.</li>
  * </ul>
  *
- * <p>Why this class exists at all if it currently delegates: the
- * {@code MapBinding} installed in {@code RTPBukkitPlugin#onEnable} is keyed
+ * <p>The {@code MapBinding} installed in {@code RTPBukkitPlugin#onEnable} is keyed
  * off {@code isFolia()}. Centralising the Folia variant here (rather than
  * branching inside {@code BukkitMapBinding}) follows the existing
  * {@code rtp-folia-common} convention of giving every Bukkit surface that

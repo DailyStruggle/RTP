@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import net.leaf.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;

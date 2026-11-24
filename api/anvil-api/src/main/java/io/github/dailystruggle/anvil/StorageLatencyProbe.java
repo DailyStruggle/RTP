@@ -7,10 +7,10 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * Observe-only storage-latency accumulator for cold region-file reads.
  *
  * <p>Purely passive: it performs no I/O of its own and issues no synthetic probes. Every sample
- * comes from a read the prefilter was going to perform anyway, on {@link AnvilIoPool} threads, so
- * instrumenting it adds no syscalls and no main-thread exposure (S-005).</p>
+ * comes from a read the prefilter was going to perform anyway, on the server's blocking-I/O
+ * threads, so instrumenting it adds no syscalls and no main-thread exposure (S-005).</p>
  *
- * <p>Why this exists: a memory-versus-storage cost model cannot be calibrated from a constant. The
+ * <p>A memory-versus-storage cost model cannot be calibrated from a constant. The
  * price of spilling state to disk instead of holding it resident differs by more than an order of
  * magnitude between a spinning disk and an NVMe device, so the resident budget is only defensible
  * if the storage side of the trade is measured on the machine that has to pay it.</p>
@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * <ul>
  *   <li>Reads served by the OS page cache look like RAM, not like the device. Observed throughput
  *       is therefore an upper bound on device capability, and {@link #classify()} is advisory.
- *   <li>Concurrency inflates per-read latency: {@link AnvilIoPool} runs up to {@code 2 * cpus}
+ *   <li>Concurrency inflates per-read latency: the server's blocking-I/O pool runs concurrent
  *       readers, so queueing is included in the sample. That is deliberate - the cost model wants
  *       the latency a caller actually waits, not an idealized device figure.
  *   <li>Percentiles come from power-of-two buckets, so they are accurate to a factor of two. That

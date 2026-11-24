@@ -324,6 +324,12 @@ public final class ConceptOptimizerPass {
                     remainingCalls.add(st.name());
                 }
             }
+            for (ConceptFunction helper : rawHelpers) {
+                if (helper.name().startsWith("gl_coarse_ch")) {
+                    remainingCalls.add(helper.key());
+                    remainingCalls.add(helper.name());
+                }
+            }
             // Transitively retain helpers called by retained helpers.
             boolean grew = true;
             while (grew) {
@@ -2503,6 +2509,24 @@ public final class ConceptOptimizerPass {
                     8,
                     4,
                     245,
+                    extraUniforms);
+            case DENSITY_VOLUME_BATCH_F32 -> new ConceptBatchSpec(
+                    BatchLayout.DENSITY_VOLUME_BATCH_F32,
+                    "evaluate_density_volume_batch_f32",
+                    target,
+                    1,
+                    1,
+                    1,
+                    0,
+                    extraUniforms);
+            case SECTION_PALETTE_FILL_U2 -> new ConceptBatchSpec(
+                    BatchLayout.SECTION_PALETTE_FILL_U2,
+                    "fill_section_palette_batch_u2",
+                    target,
+                    1,
+                    1,
+                    1,
+                    4096,
                     extraUniforms);
         };
     }

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.yaml;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlMapping;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlReader;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlMapping;
+import net.leaf.yaml.RtpYamlReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;

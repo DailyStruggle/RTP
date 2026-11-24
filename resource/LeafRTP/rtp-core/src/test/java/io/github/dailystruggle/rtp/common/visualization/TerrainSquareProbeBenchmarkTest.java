@@ -77,49 +77,53 @@ class TerrainSquareProbeBenchmarkTest {
     Random rnd = new Random(120);
     long nanos = 0, candidates = 0, passed = 0, rejected = 0;
     long decodes0 = 0;
-    for (int round = 0; round < WARMUP + ROUNDS; round++) {
-      Path file = files.get(rnd.nextInt(files.size()));
-      String[] parts = file.getFileName().toString().split("\\.");
-      int rx = Integer.parseInt(parts[1]), rz = Integer.parseInt(parts[2]);
-      AnvilRegionHeaderCache.Header hdr = AnvilRegionHeaderCache.get(file);
-      if (hdr == null) continue;
-      List<int[]> picks = new ArrayList<>();
-      for (int tries = 0; picks.size() < GROUP && tries < 400; tries++) {
-        int lx = rnd.nextInt(32), lz = rnd.nextInt(32);
-        if (hdr.isOccupied(lx + lz * 32)) picks.add(new int[] {rx * 32 + lx, rz * 32 + lz});
+    long decodes = 0;
+    try (io.github.dailystruggle.anvil.ColumnProbeCoalescer coalescer =
+        AnvilPrefilter.createColumnProbeCoalescer(Runnable::run)) {
+      for (int round = 0; round < WARMUP + ROUNDS; round++) {
+        Path file = files.get(rnd.nextInt(files.size()));
+        String[] parts = file.getFileName().toString().split("\\.");
+        int rx = Integer.parseInt(parts[1]), rz = Integer.parseInt(parts[2]);
+        AnvilRegionHeaderCache.Header hdr = AnvilRegionHeaderCache.get(file);
+        if (hdr == null) continue;
+        List<int[]> picks = new ArrayList<>();
+        for (int tries = 0; picks.size() < GROUP && tries < 400; tries++) {
+          int lx = rnd.nextInt(32), lz = rnd.nextInt(32);
+          if (hdr.isOccupied(lx + lz * 32)) picks.add(new int[] {rx * 32 + lx, rz * 32 + lz});
+        }
+        if (round == WARMUP) decodes0 = coalescer.squareDecodes();
+        long s = System.nanoTime();
+        List<CompletableFuture<ColumnProbe>> probes = new ArrayList<>();
+        for (int[] p : picks) probes.add(AnvilPrefilter.probeColumnAsync(coalescer, world, "", p[0], p[1], MIN_Y - 1, MAX_Y));
+        List<CompletableFuture<?>> jobs = new ArrayList<>();
+        int pass = 0;
+        for (int i = 0; i < picks.size(); i++) {
+          ColumnProbe cp = probes.get(i).join();
+          if (cp == null) continue;
+          ChunkColumnProbe probe = new AnvilColumnProbeAdapter(cp, picks.get(i)[0], picks.get(i)[1]);
+          int y = landing(probe);
+          if (y == Integer.MIN_VALUE) continue; // stand-in prefilter reject: no square
+          pass++;
+          if (mode.deg() < 0) continue;
+          jobs.add(AnvilPrefilter.squareJobAsync(coalescer, world, "", picks.get(i)[0], picks.get(i)[1],
+              Math.max(MIN_Y - 1, y - TerrainShapeCheck.LAYER_WINDOW - 1),
+              Math.min(MAX_Y, y + TerrainShapeCheck.LAYER_WINDOW), job(mode, probe, y)));
+        }
+        long rej = 0;
+        for (CompletableFuture<?> j : jobs) if (Boolean.TRUE.equals(j.join())) rej++;
+        long d = System.nanoTime() - s;
+        if (round >= WARMUP) {
+          nanos += d;
+          candidates += picks.size();
+          passed += pass;
+          rejected += rej;
+        }
       }
-      if (round == WARMUP) decodes0 = AnvilPrefilter.squareJobDecodes();
-      long s = System.nanoTime();
-      List<CompletableFuture<ColumnProbe>> probes = new ArrayList<>();
-      for (int[] p : picks) probes.add(AnvilPrefilter.probeColumnAsync(world, "", p[0], p[1], MIN_Y - 1, MAX_Y));
-      List<CompletableFuture<?>> jobs = new ArrayList<>();
-      int pass = 0;
-      for (int i = 0; i < picks.size(); i++) {
-        ColumnProbe cp = probes.get(i).join();
-        if (cp == null) continue;
-        ChunkColumnProbe probe = new AnvilColumnProbeAdapter(cp, picks.get(i)[0], picks.get(i)[1]);
-        int y = landing(probe);
-        if (y == Integer.MIN_VALUE) continue; // stand-in prefilter reject: no square
-        pass++;
-        if (mode.deg() < 0) continue;
-        jobs.add(AnvilPrefilter.squareJobAsync(world, "", picks.get(i)[0], picks.get(i)[1],
-            Math.max(MIN_Y - 1, y - TerrainShapeCheck.LAYER_WINDOW - 1),
-            Math.min(MAX_Y, y + TerrainShapeCheck.LAYER_WINDOW), job(mode, probe, y)));
-      }
-      long rej = 0;
-      for (CompletableFuture<?> j : jobs) if (Boolean.TRUE.equals(j.join())) rej++;
-      long d = System.nanoTime() - s;
-      if (round >= WARMUP) {
-        nanos += d;
-        candidates += picks.size();
-        passed += pass;
-        rejected += rej;
-      }
+      decodes = coalescer.squareDecodes() - decodes0;
     }
     assertTrue(candidates > 0, "benchmark must process candidates");
     assertTrue(passed <= candidates, "prefilter passes cannot exceed candidates");
     assertTrue(rejected <= passed, "terrain rejects cannot exceed prefilter passes");
-    long decodes = AnvilPrefilter.squareJobDecodes() - decodes0;
     if (!print) return;
     System.out.printf("[DEBUG_LOG] %-13s %8.1f us/candidate | square decodes %5.2f/candidate %5.2f/square job"
             + " | passed prefilter %5.1f%% | terrain reject %5.1f%% of passed%n", mode.name(),

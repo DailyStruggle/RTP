@@ -213,7 +213,7 @@ The two modes handle known-bad ground differently:
 
 The ready cache is filled from the same draw order as live searches, so mixing cached and live answers adds no repeats and keeps back-to-back spacing.
 
-**Why `ACCUMULATE` can repeat.** It numbers only the good chunks. Every newly learned rejection renumbers them, so a chunk a player already used can land on a number that hasn't been drawn yet. Landings are marked as used only with `uniquePlacements` and `expand: true`. Marking them with `expand: false` isn't an option: the region never grows back, so the marks would use it up until searches stop finding locations.
+**`ACCUMULATE` repeats.** It numbers only the good chunks. Every newly learned rejection renumbers them, so a chunk a player already used can land on a number that hasn't been drawn yet. Landings are marked as used only with `uniquePlacements` and `expand: true`. Marking them with `expand: false` isn't an option: the region never grows back, so the marks would use it up until searches stop finding locations.
 
 **`REROLL` limits.**
 

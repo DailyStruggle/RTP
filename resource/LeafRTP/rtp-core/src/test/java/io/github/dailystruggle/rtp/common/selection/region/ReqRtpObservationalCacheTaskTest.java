@@ -63,8 +63,8 @@ public class ReqRtpObservationalCacheTaskTest {
         region = new Region("observational_region", settings);
 
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0);

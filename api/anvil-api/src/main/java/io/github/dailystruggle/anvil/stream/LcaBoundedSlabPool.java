@@ -821,7 +821,27 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         if (raw == null || raw.isBlank()) {
             return "default";
         }
-        return raw.replaceAll("[^a-zA-Z0-9._-]", "_");
+        int len = raw.length();
+        StringBuilder sb = null;
+        for (int i = 0; i < len; i++) {
+            char c = raw.charAt(i);
+            boolean valid = (c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '.'
+                    || c == '_'
+                    || c == '-';
+            if (!valid) {
+                if (sb == null) {
+                    sb = new StringBuilder(len);
+                    sb.append(raw, 0, i);
+                }
+                sb.append('_');
+            } else if (sb != null) {
+                sb.append(c);
+            }
+        }
+        return sb == null ? raw : sb.toString();
     }
 
     /**

@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.api.schematic.LoadedSchematic;
-import io.github.dailystruggle.rtp.api.schematic.PasteOptions;
-import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import org.junit.jupiter.api.AfterEach;

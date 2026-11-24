@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,7 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -66,7 +68,7 @@ public final class LcaRegionWriter {
     }
 
     /**
-     * Transcodes a vanilla `.mca` region buffer into `.lca` (`Mode A: Pure 0-LZ` when
+     * Transcodes a vanilla `.mca` region buffer into `.lca` (`Mode A: Uncompressed direct random access` when
      * `modeBLcd2 == false`, or `Mode B: + LCD2 0x4C44` when `modeBLcd2 == true`).
      */
     public static byte[] transcodeFromMca(byte[] mcaBytes, int regionX, int regionZ, boolean modeBLcd2) throws IOException {
@@ -75,7 +77,7 @@ public final class LcaRegionWriter {
     }
 
     /**
-     * Transcodes a vanilla `.mca` region buffer into `.lca` at the specified `lcd2Level` (`0` for Mode A `0-LZ`, `>= 1` for Mode B `LCD2` `0x4C44`; `ADR-115`, `S-005` off-thread).
+     * Transcodes a vanilla `.mca` region buffer into `.lca` at the specified `lcd2Level` (`0` for Mode A uncompressed direct random access, `>= 1` for Mode B `LCD2` `0x4C44`; `ADR-115`, `S-005` off-thread).
      */
     public static byte[] transcodeFromMca(byte[] mcaBytes, int regionX, int regionZ, int lcd2Level) throws IOException {
         return transcodeFromReader(AnvilReader.INSTANCE, mcaBytes, regionX, regionZ, lcd2Level);
@@ -467,10 +469,12 @@ public final class LcaRegionWriter {
     }
 
     /**
-     * Off-thread crash-durable atomic region file writer (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     * Synchronous crash-durable atomic region file writer (`REQ-RTP-S-005`).
      * Writes `bytes` to `tmpFile`, forces `tmpFile` to stable storage, atomically renames over
-     * `targetFile`, and syncs the parent directory entry on POSIX filesystems. Offloads onto
-     * {@link AnvilIoPool} if invoked from a Minecraft primary or Folia region thread.
+     * `targetFile`, and syncs the parent directory entry on POSIX filesystems.
+     *
+     * <p>Callers must already be off any Minecraft primary or Folia region thread, or use
+     * {@link #writeBytesAtomicallyDurableAsync(Path, Path, byte[], java.util.concurrent.Executor)}.
      */
     public static void writeBytesAtomicallyDurable(
             Path targetFile, Path tmpFile, byte[] bytes
@@ -478,35 +482,29 @@ public final class LcaRegionWriter {
         java.util.Objects.requireNonNull(targetFile, "targetFile");
         java.util.Objects.requireNonNull(tmpFile, "tmpFile");
         java.util.Objects.requireNonNull(bytes, "bytes");
-        if (isMinecraftPrimaryOrRegionThread()) {
-            java.util.concurrent.ExecutorService ioPool = AnvilIoPool.get();
-            try {
-                java.util.concurrent.CompletableFuture.runAsync(() -> {
-                    try {
-                        writeBytesAtomicallyDurableOnWorker(targetFile, tmpFile, bytes);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }, ioPool).join();
-                return;
-            } catch (java.util.concurrent.CompletionException ce) {
-                if (ce.getCause() instanceof UncheckedIOException uio && uio.getCause() != null) {
-                    throw uio.getCause();
-                }
-                if (ce.getCause() instanceof IOException ioe) {
-                    throw ioe;
-                }
-                throw ce;
-            }
-        }
         writeBytesAtomicallyDurableOnWorker(targetFile, tmpFile, bytes);
     }
 
-    private static boolean isMinecraftPrimaryOrRegionThread() {
-        String name = Thread.currentThread().getName();
-        return "Server thread".equals(name)
-                || "Render thread".equals(name)
-                || name.startsWith("Region Scheduler");
+    /**
+     * Asynchronous crash-durable atomic region file writer (`REQ-RTP-S-005`). Dispatches
+     * {@link #writeBytesAtomicallyDurable(Path, Path, byte[])} onto the caller-supplied
+     * lifecycle-managed blocking-I/O {@link java.util.concurrent.Executor} without blocking the
+     * calling thread.
+     */
+    public static java.util.concurrent.CompletableFuture<Void> writeBytesAtomicallyDurableAsync(
+            Path targetFile, Path tmpFile, byte[] bytes, java.util.concurrent.Executor executor
+    ) {
+        java.util.Objects.requireNonNull(targetFile, "targetFile");
+        java.util.Objects.requireNonNull(tmpFile, "tmpFile");
+        java.util.Objects.requireNonNull(bytes, "bytes");
+        java.util.Objects.requireNonNull(executor, "executor");
+        return java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                writeBytesAtomicallyDurableOnWorker(targetFile, tmpFile, bytes);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, executor);
     }
 
     private static void writeBytesAtomicallyDurableOnWorker(
@@ -893,6 +891,40 @@ public final class LcaRegionWriter {
 
         private Path backingFile;
         private FileChannel channel;
+        /** Default chunk-count threshold before write-back staging flushes a sequential batch. */
+        public static final int DEFAULT_WRITE_BACK_MAX_CHUNKS = 64;
+
+        /** Default byte-size threshold (`512 KiB`) before write-back staging flushes a sequential batch. */
+        public static final int DEFAULT_WRITE_BACK_MAX_BYTES = 512 * 1024;
+
+        /** Default cold positional reads per archive before triggering sequential slab-pool read-ahead. */
+        public static final int DEFAULT_READ_AHEAD_TRIGGER_READS = 4;
+
+        /** Maximum slab-pool byte size (`16 MiB`) eligible for sequential read-ahead intake. */
+        public static final int DEFAULT_READ_AHEAD_MAX_BYTES = 16 * 1024 * 1024;
+
+        private static final class SlabReadAheadSnapshot {
+            final int compactionEpoch;
+            final long baseFileOffset;
+            final byte[] bytes;
+
+            SlabReadAheadSnapshot(int compactionEpoch, long baseFileOffset, byte[] bytes) {
+                this.compactionEpoch = compactionEpoch;
+                this.baseFileOffset = baseFileOffset;
+                this.bytes = bytes;
+            }
+        }
+
+        private static final class PendingChunkSnapshot {
+            final byte[] payload;
+            final boolean modeB;
+
+            PendingChunkSnapshot(byte[] payload, boolean modeB) {
+                this.payload = payload;
+                this.modeB = modeB;
+            }
+        }
+
         private volatile boolean headerOnlyChannelMode = false;
         private volatile boolean dictModifiedSinceSync = false;
         private volatile LcaSectionCodec.ParsedHeaderAndDict cachedParsedDict;
@@ -900,6 +932,24 @@ public final class LcaRegionWriter {
         private long diskChannelWriteCount = 0;
         private long diskChannelBytesWritten = 0;
         private volatile boolean dirty = false;
+        private volatile int compactionEpoch = 0;
+
+        // BufferedLinear-inspired write-back staging & adaptive sequential read-ahead state
+        private volatile boolean bufferedWritesEnabled = false;
+        private int writeBackMaxChunks = DEFAULT_WRITE_BACK_MAX_CHUNKS;
+        private int writeBackMaxBytes = DEFAULT_WRITE_BACK_MAX_BYTES;
+        private byte[][] pendingPayloads;
+        private boolean[] pendingPayloadModeB;
+        private volatile int pendingWriteCount = 0;
+        private int pendingWriteBytes = 0;
+        private long coalescedWriteCount = 0;
+
+        private volatile boolean readAheadEnabled = false;
+        private volatile int readAheadTriggerReads = DEFAULT_READ_AHEAD_TRIGGER_READS;
+        private volatile int readAheadMaxBytes = DEFAULT_READ_AHEAD_MAX_BYTES;
+        private final AtomicInteger coldPositionalReadCount = new AtomicInteger(0);
+        private volatile SoftReference<SlabReadAheadSnapshot> readAheadRef;
+        private long sequentialReadAheadCount = 0;
 
         private final Map<String, Integer> blockStateToId = new ConcurrentHashMap<>();
         private final List<String> idToBlockState = Collections.synchronizedList(new ArrayList<>());
@@ -1665,6 +1715,13 @@ public final class LcaRegionWriter {
             if (!headerOnlyChannelMode) {
                 return;
             }
+            if (pendingWriteCount > 0) {
+                try {
+                    flushPendingWrites();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
             int fullLen = activeByteLength();
             byte[] full = new byte[fullLen + 65536];
             if (channel != null && channel.isOpen()) {
@@ -1950,6 +2007,13 @@ public final class LcaRegionWriter {
          * Off-thread full archive byte snapshot (`REQ-RTP-S-005`, `@scheduler_dispatch`).
          */
         public synchronized byte[] toByteArray() {
+            if (pendingWriteCount > 0) {
+                try {
+                    flushPendingWrites();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
             writeFooterCanary();
             if (headerOnlyChannelMode) {
                 int fullLen = activeByteLength();
@@ -2058,12 +2122,362 @@ public final class LcaRegionWriter {
          * $O(1)$ volatile check for whether chunk `(rx, rz)` is allocated (`RegionFile#doesChunkExist`
          * / `RegionFile#hasChunk` equivalent).
          */
+        /**
+         * Configures coalesced write-back staging for this archive. Disabling while dirty chunks
+         * are staged flushes them to disk immediately.
+         */
+        public synchronized void configureBufferedWriteBack(
+                boolean enabled, int maxPendingChunks, int maxPendingBytes
+        ) throws IOException {
+            if (!enabled && pendingWriteCount > 0) {
+                flushPendingWrites();
+            }
+            this.bufferedWritesEnabled = enabled;
+            this.writeBackMaxChunks = Math.max(1, maxPendingChunks);
+            this.writeBackMaxBytes = Math.max(4096, maxPendingBytes);
+        }
+
+        /**
+         * Configures adaptive sequential slab-pool read-ahead intake for cold-cache reads.
+         */
+        public synchronized void configureSequentialReadAhead(
+                boolean enabled, int triggerReads, int maxBytes
+        ) {
+            this.readAheadEnabled = enabled;
+            this.readAheadTriggerReads = Math.max(1, triggerReads);
+            this.readAheadMaxBytes = Math.max(65536, maxBytes);
+            if (!enabled) {
+                this.readAheadRef = null;
+            }
+        }
+
+        public boolean isBufferedWriteBackEnabled() {
+            return bufferedWritesEnabled;
+        }
+
+        private volatile boolean directFlatBitPack;
+        private String[] boundWorldgenCanonicalPalette;
+        private int[] boundWorldgenDictIds;
+        private boolean worldgenDictDirectMatch;
+
+        public boolean isSequentialReadAheadEnabled() {
+            return readAheadEnabled;
+        }
+
+        /**
+         * Binds and pre-registers a deterministic worldgen block-state dictionary on this region
+         * archive, enabling O(1) GPU-resolved dictionary IDs on {@link #saveFreshChunkDirectModeA}.
+         */
+        public synchronized int[] bindWorldgenBlockDictionary(String[] canonicalStates) {
+            if (canonicalStates == null || canonicalStates.length == 0) {
+                this.boundWorldgenCanonicalPalette = null;
+                this.boundWorldgenDictIds = null;
+                this.worldgenDictDirectMatch = false;
+                return new int[0];
+            }
+            if (this.boundWorldgenCanonicalPalette != null
+                    && this.boundWorldgenCanonicalPalette.length == canonicalStates.length
+                    && Arrays.equals(this.boundWorldgenCanonicalPalette, canonicalStates)
+                    && this.boundWorldgenDictIds != null) {
+                return this.boundWorldgenDictIds.clone();
+            }
+            int[] ids = preRegisterBlockStates(canonicalStates);
+            boolean direct = true;
+            for (int i = 0; i < ids.length; i++) {
+                if (ids[i] != i) {
+                    direct = false;
+                    break;
+                }
+            }
+            this.boundWorldgenCanonicalPalette = canonicalStates.clone();
+            this.boundWorldgenDictIds = ids;
+            this.worldgenDictDirectMatch = direct;
+            return ids.clone();
+        }
+
+        public synchronized boolean isWorldgenDictDirectMatch() {
+            return this.worldgenDictDirectMatch;
+        }
+
+        /**
+         * Enables or disables direct {@code BLOCK_MODE_FLAT_BITPACK} ({@code mode 10}, YZX) section
+         * emission for unified Disk = Memory = GPU parity (zero Hilbert curve search or
+         * Delta-Roaring containers).
+         */
+        public void setDirectFlatBitPack(boolean enabled) {
+            this.directFlatBitPack = enabled;
+        }
+
+        public boolean isDirectFlatBitPack() {
+            return this.directFlatBitPack;
+        }
+
+        public int pendingWriteCount() {
+            return pendingWriteCount;
+        }
+
+        public synchronized long coalescedWriteCount() {
+            return coalescedWriteCount;
+        }
+
+        public synchronized long sequentialReadAheadCount() {
+            return sequentialReadAheadCount;
+        }
+
+        private synchronized boolean hasPendingPayload(int chunkIdx) {
+            return pendingPayloads != null && pendingPayloads[chunkIdx] != null;
+        }
+
+        private synchronized PendingChunkSnapshot getPendingPayload(int chunkIdx) {
+            if (pendingPayloads == null) {
+                return null;
+            }
+            byte[] pay = pendingPayloads[chunkIdx];
+            if (pay == null) {
+                return null;
+            }
+            return new PendingChunkSnapshot(pay, pendingPayloadModeB[chunkIdx]);
+        }
+
+        /**
+         * Flushes all staged write-back chunk payloads in one contiguous sequential slab write
+         * plus coalesced pointer/SEC-DED header writes (`REQ-RTP-S-004`, `REQ-RTP-S-005`).
+         *
+         * @return number of staged chunks committed to disk
+         */
+        public synchronized int flushPendingWrites() throws IOException {
+            if (pendingWriteCount == 0 || pendingPayloads == null) {
+                return 0;
+            }
+            if (channel == null || !channel.isOpen()) {
+                if (headerOnlyChannelMode) {
+                    throw new java.nio.channels.ClosedChannelException();
+                }
+            }
+
+            int count = pendingWriteCount;
+            int[] dirtyIndices = new int[count];
+            byte[][] payloads = new byte[count][];
+            boolean[] modeBs = new boolean[count];
+            int[] slabsNeeded = new int[count];
+            long[] oldPtrs = new long[count];
+            int[] oldSlabStarts = new int[count];
+            int[] oldByteLens = new int[count];
+            int[] oldGens = new int[count];
+
+            int cursor = 0;
+            int totalBatchSlabs = 0;
+            for (int idx = 0; idx < 1024; idx++) {
+                byte[] pay = pendingPayloads[idx];
+                if (pay != null) {
+                    dirtyIndices[cursor] = idx;
+                    payloads[cursor] = pay;
+                    modeBs[cursor] = pendingPayloadModeB[idx];
+                    int s = Math.max(1, (pay.length + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    slabsNeeded[cursor] = s;
+                    totalBatchSlabs += s;
+                    int ptrByteOff = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idx << 3);
+                    long oldPtr = LcaRegionReader.getVolatileLongBE(buffer, ptrByteOff);
+                    oldPtrs[cursor] = oldPtr;
+                    oldSlabStarts[cursor] = (int) (oldPtr >>> 29);
+                    oldByteLens[cursor] = (int) ((oldPtr >>> 8) & 0xFFFFFL);
+                    oldGens[cursor] = (int) (oldPtr & 0xFFL);
+                    cursor++;
+                }
+            }
+            if (cursor == 0) {
+                pendingWriteCount = 0;
+                pendingWriteBytes = 0;
+                return 0;
+            }
+
+            // Reclaim any unpinned deferred slabs before contiguous batch allocation
+            if (!deferredRetireSlabs.isEmpty()) {
+                for (int i = deferredRetireSlabs.size() - 1; i >= 0; i--) {
+                    long[] item = deferredRetireSlabs.get(i);
+                    int defStart = (int) item[0];
+                    int defCount = (int) item[1];
+                    if (!LcaRegionReader.isSlabRangePinned(defStart, defCount)) {
+                        returnFreeSlabs(defStart, defCount);
+                        deferredRetireSlabs.remove(i);
+                    }
+                }
+            }
+            for (int k = 0; k < cursor; k++) {
+                if (oldSlabStarts[k] > 0 && oldByteLens[k] > 0) {
+                    int evictedStart = graceSlabStarts[graceCursor];
+                    int evictedCount = graceSlabCounts[graceCursor];
+                    if (evictedStart > 0 && evictedCount > 0) {
+                        graceSlabStarts[graceCursor] = 0;
+                        graceSlabCounts[graceCursor] = 0;
+                        if (!LcaRegionReader.isSlabRangePinned(evictedStart, evictedCount)) {
+                            returnFreeSlabs(evictedStart, evictedCount);
+                        } else {
+                            deferredRetireSlabs.add(new long[] {evictedStart, evictedCount, 0L});
+                        }
+                    }
+                }
+            }
+
+            int prevActiveEndSlab = this.activeEndSlab;
+            int prevLastSyncedFooter = this.lastSyncedFooterOffset;
+            int batchStartSlab = allocateSlabs(totalBatchSlabs, true);
+            int batchStartOffset = batchStartSlab << LcaRegionReader.SLAB_SHIFT;
+            int batchPaddedBytes = totalBatchSlabs << LcaRegionReader.SLAB_SHIFT;
+            int footerOffset = this.activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+            boolean coalesceFooter = headerOnlyChannelMode
+                    && channel != null
+                    && channel.isOpen()
+                    && this.activeEndSlab >= slabPoolBaseSlab
+                    && slabPoolBaseSlab > 0
+                    && batchStartOffset + batchPaddedBytes == footerOffset
+                    && footerOffset != lastSyncedFooterOffset;
+
+            byte[] batchBuf = new byte[batchPaddedBytes + (coalesceFooter ? LcaRegionReader.FOOTER_SIZE : 0)];
+            int[] assignedStarts = new int[cursor];
+            int relSlab = 0;
+            for (int k = 0; k < cursor; k++) {
+                assignedStarts[k] = batchStartSlab + relSlab;
+                System.arraycopy(payloads[k], 0, batchBuf, relSlab << LcaRegionReader.SLAB_SHIFT, payloads[k].length);
+                relSlab += slabsNeeded[k];
+            }
+            if (coalesceFooter) {
+                LcaRegionReader.setVolatileLongBE(batchBuf, batchPaddedBytes, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+            }
+
+            try {
+                if (headerOnlyChannelMode) {
+                    if (!coalesceFooter) {
+                        writeFooterCanary();
+                    }
+                    writeChannelRange(batchStartOffset, batchBuf, 0, batchBuf.length);
+                    if (coalesceFooter) {
+                        lastSyncedFooterOffset = footerOffset;
+                    }
+                } else {
+                    ensureBufferCapacity(Math.max(batchStartOffset + batchPaddedBytes, footerOffset) + LcaRegionReader.FOOTER_SIZE);
+                    System.arraycopy(batchBuf, 0, buffer, batchStartOffset, batchPaddedBytes);
+                    if (this.activeEndSlab >= slabPoolBaseSlab && slabPoolBaseSlab > 0) {
+                        LcaRegionReader.setVolatileLongBE(buffer, footerOffset, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                    }
+                    if (channel != null && channel.isOpen()) {
+                        writeChannelRange(batchStartOffset, batchBuf, 0, batchBuf.length);
+                        if (coalesceFooter) {
+                            lastSyncedFooterOffset = footerOffset;
+                        } else {
+                            writeFooterCanary();
+                        }
+                    }
+                }
+            } catch (IOException | RuntimeException | Error e) {
+                rollbackAllocatedSlabs(batchStartSlab, totalBatchSlabs, prevActiveEndSlab, prevLastSyncedFooter, true);
+                if (e instanceof UncheckedIOException uio) {
+                    throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
+                }
+                throw e;
+            }
+
+            // Commit pointers & SEC-DED syndromes in memory, then persist contiguously
+            long[] newPtrs = new long[cursor];
+            for (int k = 0; k < cursor; k++) {
+                int idx = dirtyIndices[k];
+                int nextGen = (oldGens[k] + 1) & 0xFF;
+                long newPtr = packChunkPointer64(assignedStarts[k], modeBs[k], payloads[k].length, nextGen);
+                newPtrs[k] = newPtr;
+                buffer[secDedTableOffset + idx] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
+                LcaRegionReader.setVolatileLongBE(buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idx << 3), newPtr);
+            }
+            VarHandle.releaseFence();
+
+            if (channel != null && channel.isOpen()) {
+                boolean dictMod = this.dictModifiedSinceSync;
+                if (dictMod) {
+                    for (int s = 0; s < dictSegments.size(); s++) {
+                        DictSegmentMeta seg = dictSegments.get(s);
+                        if (seg.channelDirty) {
+                            byte[] staged = (seg.stagedScratch != null && seg.stagedScratch.length == seg.capacityBytes())
+                                    ? seg.stagedScratch
+                                    : stageDictSegmentInBuffer(seg);
+                            writeChannelRange(seg.byteOffset(), staged, 0, seg.capacityBytes());
+                            seg.channelDirty = false;
+                        }
+                    }
+                    this.dictModifiedSinceSync = false;
+                }
+                int minIdx = dirtyIndices[0];
+                int maxIdx = dirtyIndices[cursor - 1];
+                int secStart = secDedTableOffset + minIdx;
+                int secLen = (maxIdx - minIdx) + 1;
+                writeChannelRange(secStart, buffer, secStart, secLen);
+                int ptrStart = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (minIdx << 3);
+                int ptrLen = ((maxIdx - minIdx) + 1) << 3;
+                writeChannelRange(ptrStart, buffer, ptrStart, ptrLen);
+                if (backingFile != null) {
+                    int activeLen = activeByteLength();
+                    for (int k = 0; k < cursor; k++) {
+                        LcaRegionReader.updateCachedPointer(
+                                backingFile, dirtyIndices[k], newPtrs[k], activeLen, dictMod && k == 0);
+                    }
+                }
+            }
+
+            for (int k = 0; k < cursor; k++) {
+                int idx = dirtyIndices[k];
+                if (oldSlabStarts[k] > 0 && oldByteLens[k] > 0) {
+                    prevChunkPointers[idx] = oldPtrs[k];
+                    int oldSlabs = (oldByteLens[k] + 255) >>> LcaRegionReader.SLAB_SHIFT;
+                    graceSlabStarts[graceCursor] = oldSlabStarts[k];
+                    graceSlabCounts[graceCursor] = oldSlabs;
+                    graceCursor = (graceCursor + 1) & (COW_GRACE_EPOCHS - 1);
+                }
+                pendingPayloads[idx] = null;
+            }
+            pendingWriteCount = 0;
+            pendingWriteBytes = 0;
+            this.readAheadRef = null;
+            return cursor;
+        }
+
+        private SlabReadAheadSnapshot tryLoadSequentialReadAhead(FileChannel ch, Path bf) throws IOException {
+            if (!readAheadEnabled || ch == null || !ch.isOpen()) {
+                return null;
+            }
+            synchronized (this) {
+                SoftReference<SlabReadAheadSnapshot> existingRef = this.readAheadRef;
+                if (existingRef != null) {
+                    SlabReadAheadSnapshot existing = existingRef.get();
+                    if (existing != null && existing.compactionEpoch == this.compactionEpoch) {
+                        return existing;
+                    }
+                }
+                if (!headerOnlyChannelMode || channel == null || !channel.isOpen() || ch != channel) {
+                    return null;
+                }
+                long poolBase = (long) slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT;
+                long poolEnd = (long) activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+                long len = poolEnd - poolBase;
+                if (len <= 0L || len > readAheadMaxBytes) {
+                    return null;
+                }
+                byte[] poolBytes = new byte[(int) len];
+                readChannelRangeStatic(ch, poolBase, poolBytes, 0, (int) len, bf);
+                SlabReadAheadSnapshot snap = new SlabReadAheadSnapshot(this.compactionEpoch, poolBase, poolBytes);
+                this.readAheadRef = new SoftReference<>(snap);
+                this.coldPositionalReadCount.set(0);
+                this.sequentialReadAheadCount++;
+                return snap;
+            }
+        }
+
         public boolean hasChunk(int rx, int rz) {
             if ((rx | rz | (31 - rx) | (31 - rz)) < 0) {
                 return false;
             }
+            int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            if (pendingWriteCount > 0 && hasPendingPayload(chunkIdx)) {
+                return true;
+            }
             if (headerOnlyChannelMode) {
-                int chunkIdx = (rx & 31) | ((rz & 31) << 5);
                 long ptr = resolveAndHealLivePointer(chunkIdx);
                 long byteOffset = (ptr >>> 29) << LcaRegionReader.SLAB_SHIFT;
                 int exactByteLen20 = (int) ((ptr >>> 8) & 0xFFFFFL);
@@ -2072,7 +2486,6 @@ public final class LcaRegionWriter {
                         && exactByteLen20 > 0
                         && byteOffset + exactByteLen20 <= maxEnd;
             }
-            int chunkIdx = (rx & 31) | ((rz & 31) << 5);
             resolveAndHealLivePointer(chunkIdx);
             byte[] buf = this.buffer;
             int len = Math.min(buf.length, (this.activeEndSlab << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE);
@@ -2179,8 +2592,34 @@ public final class LcaRegionWriter {
         private byte[] readAndHealChannelSlab(
                 FileChannel ch, Path bf, int rx, int rz, long payloadStartOffset, int codec1, int exactByteLen20
         ) throws IOException {
-            byte[] rawSlab = new byte[exactByteLen20];
-            readChannelRangeStatic(ch, payloadStartOffset, rawSlab, 0, exactByteLen20, bf);
+            byte[] rawSlab = null;
+            SoftReference<SlabReadAheadSnapshot> ref = this.readAheadRef;
+            if (ref != null) {
+                SlabReadAheadSnapshot snap = ref.get();
+                if (snap != null
+                        && snap.compactionEpoch == this.compactionEpoch
+                        && payloadStartOffset >= snap.baseFileOffset
+                        && (payloadStartOffset - snap.baseFileOffset) + exactByteLen20 <= snap.bytes.length) {
+                    int rel = (int) (payloadStartOffset - snap.baseFileOffset);
+                    rawSlab = Arrays.copyOfRange(snap.bytes, rel, rel + exactByteLen20);
+                }
+            }
+            if (rawSlab == null && readAheadEnabled && ch != null && ch.isOpen()) {
+                int misses = coldPositionalReadCount.incrementAndGet();
+                if (misses >= readAheadTriggerReads) {
+                    SlabReadAheadSnapshot snap = tryLoadSequentialReadAhead(ch, bf);
+                    if (snap != null
+                            && payloadStartOffset >= snap.baseFileOffset
+                            && (payloadStartOffset - snap.baseFileOffset) + exactByteLen20 <= snap.bytes.length) {
+                        int rel = (int) (payloadStartOffset - snap.baseFileOffset);
+                        rawSlab = Arrays.copyOfRange(snap.bytes, rel, rel + exactByteLen20);
+                    }
+                }
+            }
+            if (rawSlab == null) {
+                rawSlab = new byte[exactByteLen20];
+                readChannelRangeStatic(ch, payloadStartOffset, rawSlab, 0, exactByteLen20, bf);
+            }
             if (codec1 == 1) {
                 int headerLen = 24 + (this.sectionCount << 1);
                 int headerWords = (headerLen + 7) >>> 3;
@@ -2294,6 +2733,16 @@ public final class LcaRegionWriter {
                 throw new IllegalArgumentException("Region-local coordinates out of range: (" + rx + "," + rz + ")");
             }
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            if (pendingWriteCount > 0) {
+                PendingChunkSnapshot pending = getPendingPayload(chunkIdx);
+                if (pending != null) {
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+                    int codec1 = pending.modeB ? 1 : 0;
+                    return LcaRegionReader.decodeChunkFromRawSlab(
+                            getOrBuildParsedHeaderAndDict(),
+                            rx, rz, ptrByteOffset, 0L, codec1, pending.payload.length, 0, pending.payload);
+                }
+            }
             if (headerOnlyChannelMode) {
                 FileChannel ch = this.channel;
                 if (ch == null || !ch.isOpen()) {
@@ -2303,6 +2752,12 @@ public final class LcaRegionWriter {
                     return null;
                 }
                 for (int attempt = 0; attempt < 2; attempt++) {
+                    int epochBefore = this.compactionEpoch;
+                    if ((epochBefore & 1) != 0) {
+                        synchronized (this) {
+                            epochBefore = this.compactionEpoch;
+                        }
+                    }
                     int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
                     long ptr = resolveAndHealLivePointer(chunkIdx);
                     long slabOffset35 = ptr >>> 29;
@@ -2310,6 +2765,10 @@ public final class LcaRegionWriter {
                     int exactByteLen20 = (int) ((ptr >>> 8) & 0xFFFFFL);
                     int generation8 = (int) (ptr & 0xFFL);
                     if (slabOffset35 == 0 || exactByteLen20 == 0) {
+                        if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                            synchronized (this) {}
+                            continue;
+                        }
                         return null;
                     }
                     long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
@@ -2325,7 +2784,11 @@ public final class LcaRegionWriter {
                                 ch, backingFile, rx, rz, payloadStartOffset, codec1, exactByteLen20);
                         VarHandle.loadLoadFence();
                         long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
-                        if (ptrAfter != ptr && attempt == 0) {
+                        int epochAfter = this.compactionEpoch;
+                        if ((ptrAfter != ptr || epochAfter != epochBefore) && attempt == 0) {
+                            if (epochAfter != epochBefore) {
+                                synchronized (this) {}
+                            }
                             continue;
                         }
                         return LcaRegionReader.decodeChunkFromRawSlab(
@@ -2340,6 +2803,11 @@ public final class LcaRegionWriter {
                         if (!ch.isOpen() && backingFile != null) {
                             return LcaRegionReader.readChunkFromFile(backingFile, rx, rz);
                         }
+                        int epochNow = this.compactionEpoch;
+                        if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                            synchronized (this) {}
+                            continue;
+                        }
                         long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
                         if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
                             continue;
@@ -2351,12 +2819,29 @@ public final class LcaRegionWriter {
                 }
             }
             for (int attempt = 0; attempt < 2; attempt++) {
+                int epochBefore = this.compactionEpoch;
+                if ((epochBefore & 1) != 0) {
+                    synchronized (this) {
+                        epochBefore = this.compactionEpoch;
+                    }
+                }
                 resolveAndHealLivePointer(chunkIdx);
                 byte[] buf = this.buffer;
                 int len = Math.min(buf.length, (this.activeEndSlab << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE);
                 try {
-                    return LcaRegionReader.INSTANCE.readChunk(buf, len, rx, rz);
+                    AnvilReader.ChunkEntry decoded = LcaRegionReader.INSTANCE.readChunk(buf, len, rx, rz);
+                    VarHandle.loadLoadFence();
+                    if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                        synchronized (this) {}
+                        continue;
+                    }
+                    return decoded;
                 } catch (CorruptRegionEntryException e) {
+                    int epochNow = this.compactionEpoch;
+                    if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                        synchronized (this) {}
+                        continue;
+                    }
                     if (attempt == 0 && tryRecoverLiveChunkPointer(rx, rz, chunkIdx, null)) {
                         continue;
                     }
@@ -2376,6 +2861,16 @@ public final class LcaRegionWriter {
                 throw new IllegalArgumentException("Region-local coordinates out of range: (" + rx + "," + rz + ")");
             }
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            if (pendingWriteCount > 0) {
+                PendingChunkSnapshot pending = getPendingPayload(chunkIdx);
+                if (pending != null) {
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+                    int codec1 = pending.modeB ? 1 : 0;
+                    return LcaRegionReader.decodeChunkNbtBytesFromRawSlab(
+                            getOrBuildParsedHeaderAndDict(),
+                            rx, rz, ptrByteOffset, 0L, codec1, pending.payload.length, 0, pending.payload);
+                }
+            }
             FileChannel ch;
             Path bf;
             synchronized (this) {
@@ -2390,6 +2885,12 @@ public final class LcaRegionWriter {
                     return null;
                 }
                 for (int attempt = 0; attempt < 2; attempt++) {
+                    int epochBefore = this.compactionEpoch;
+                    if ((epochBefore & 1) != 0) {
+                        synchronized (this) {
+                            epochBefore = this.compactionEpoch;
+                        }
+                    }
                     int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
                     long ptr = resolveAndHealLivePointer(chunkIdx);
                     long slabOffset35 = ptr >>> 29;
@@ -2397,6 +2898,10 @@ public final class LcaRegionWriter {
                     int exactByteLen20 = (int) ((ptr >>> 8) & 0xFFFFFL);
                     int generation8 = (int) (ptr & 0xFFL);
                     if (slabOffset35 == 0 || exactByteLen20 == 0) {
+                        if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                            synchronized (this) {}
+                            continue;
+                        }
                         return null;
                     }
                     long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
@@ -2412,7 +2917,11 @@ public final class LcaRegionWriter {
                                 ch, bf, rx, rz, payloadStartOffset, codec1, exactByteLen20);
                         VarHandle.loadLoadFence();
                         long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
-                        if (ptrAfter != ptr && attempt == 0) {
+                        int epochAfter = this.compactionEpoch;
+                        if ((ptrAfter != ptr || epochAfter != epochBefore) && attempt == 0) {
+                            if (epochAfter != epochBefore) {
+                                synchronized (this) {}
+                            }
                             continue;
                         }
                         return LcaRegionReader.decodeChunkNbtBytesFromRawSlab(
@@ -2427,6 +2936,11 @@ public final class LcaRegionWriter {
                         if (!ch.isOpen() && bf != null) {
                             return LcaRegionReader.readChunkNbtBytesFromFile(bf, rx, rz);
                         }
+                        int epochNow = this.compactionEpoch;
+                        if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                            synchronized (this) {}
+                            continue;
+                        }
                         long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
                         if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
                             continue;
@@ -2438,13 +2952,30 @@ public final class LcaRegionWriter {
                 }
             }
             for (int attempt = 0; attempt < 2; attempt++) {
+                int epochBefore = this.compactionEpoch;
+                if ((epochBefore & 1) != 0) {
+                    synchronized (this) {
+                        epochBefore = this.compactionEpoch;
+                    }
+                }
                 resolveAndHealLivePointer(chunkIdx);
                 byte[] buf = this.buffer;
                 int endSlab = this.activeEndSlab;
                 int len = Math.min(buf.length, (endSlab << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE);
                 try {
-                    return LcaRegionReader.INSTANCE.readChunkNbtBytes(buf, len, rx, rz);
+                    byte[] decoded = LcaRegionReader.INSTANCE.readChunkNbtBytes(buf, len, rx, rz);
+                    VarHandle.loadLoadFence();
+                    if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                        synchronized (this) {}
+                        continue;
+                    }
+                    return decoded;
                 } catch (CorruptRegionEntryException e) {
+                    int epochNow = this.compactionEpoch;
+                    if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                        synchronized (this) {}
+                        continue;
+                    }
                     if (attempt == 0 && tryRecoverLiveChunkPointer(rx, rz, chunkIdx, null)) {
                         continue;
                     }
@@ -2470,6 +3001,33 @@ public final class LcaRegionWriter {
                 throw new IllegalArgumentException("Region-local coordinates out of range: (" + rx + "," + rz + ")");
             }
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            if (pendingWriteCount > 0) {
+                PendingChunkSnapshot pending = getPendingPayload(chunkIdx);
+                if (pending != null) {
+                    LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+                    int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
+                    byte[] rawSlab = pending.payload;
+                    if (!pending.modeB) {
+                        int rawDvWord = LcaSectionCodec.readIntBE(rawSlab, 0);
+                        int dv = LcaRegionReader.decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
+                        int resRel = LcaSectionCodec.readUint16BE(rawSlab, 22);
+                        return new RawChunkFrameSnapshot(
+                                rawSlab, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
+                    }
+                    int headerLen = 24 + (sectionCount << 1);
+                    int headerWords = (headerLen + 7) >>> 3;
+                    int compStart = headerLen + headerWords;
+                    int compLen = rawSlab.length - compStart;
+                    byte[] fullFrame = compLen <= 0
+                            ? Arrays.copyOf(rawSlab, headerLen)
+                            : LcaSectionCodec.decodeModeBBodyToFullFrame(rawSlab, 0, headerLen, compStart, compLen, meta);
+                    int rawDvWord = LcaSectionCodec.readIntBE(fullFrame, 0);
+                    int dv = LcaRegionReader.decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
+                    int resRel = LcaSectionCodec.readUint16BE(fullFrame, 22);
+                    return new RawChunkFrameSnapshot(
+                            fullFrame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
+                }
+            }
             FileChannel ch = this.channel;
             Path bf = this.backingFile;
             if (headerOnlyChannelMode) {
@@ -2480,6 +3038,12 @@ public final class LcaRegionWriter {
                     return null;
                 }
                 for (int attempt = 0; attempt < 2; attempt++) {
+                    int epochBefore = this.compactionEpoch;
+                    if ((epochBefore & 1) != 0) {
+                        synchronized (this) {
+                            epochBefore = this.compactionEpoch;
+                        }
+                    }
                     int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
                     long ptr = resolveAndHealLivePointer(chunkIdx);
                     long slabOffset35 = ptr >>> 29;
@@ -2487,6 +3051,10 @@ public final class LcaRegionWriter {
                     int exactByteLen20 = (int) ((ptr >>> 8) & 0xFFFFFL);
                     int generation8 = (int) (ptr & 0xFFL);
                     if (slabOffset35 == 0 || exactByteLen20 == 0) {
+                        if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                            synchronized (this) {}
+                            continue;
+                        }
                         return null;
                     }
                     long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
@@ -2502,7 +3070,11 @@ public final class LcaRegionWriter {
                                 ch, bf, rx, rz, payloadStartOffset, codec1, exactByteLen20);
                         VarHandle.loadLoadFence();
                         long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
-                        if (ptrAfter != ptr && attempt == 0) {
+                        int epochAfter = this.compactionEpoch;
+                        if ((ptrAfter != ptr || epochAfter != epochBefore) && attempt == 0) {
+                            if (epochAfter != epochBefore) {
+                                synchronized (this) {}
+                            }
                             continue;
                         }
                         LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
@@ -2526,6 +3098,25 @@ public final class LcaRegionWriter {
                         int resRel = LcaSectionCodec.readUint16BE(fullFrame, 22);
                         return new RawChunkFrameSnapshot(
                                 fullFrame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
+                    } catch (java.nio.channels.ClosedChannelException e) {
+                        if (bf != null) {
+                            return LcaRegionReader.readRawChunkFrameFromFile(bf, rx, rz, runtimeStateLookup);
+                        }
+                        throw e;
+                    } catch (CorruptRegionEntryException e) {
+                        if (!ch.isOpen() && bf != null) {
+                            return LcaRegionReader.readRawChunkFrameFromFile(bf, rx, rz, runtimeStateLookup);
+                        }
+                        int epochNow = this.compactionEpoch;
+                        if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                            synchronized (this) {}
+                            continue;
+                        }
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
+                            continue;
+                        }
+                        throw e;
                     } finally {
                         LcaRegionReader.unpinHazardSlab(hazardSlot);
                     }
@@ -2546,6 +3137,167 @@ public final class LcaRegionWriter {
             int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
             return new RawChunkFrameSnapshot(
                     frame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
+        }
+
+        /**
+         * Reads the raw uncompressed `.lca` `ChunkFrame` at `(rx, rz)` together with lightweight
+         * metadata-only Mojang NBT bytes (omitting section {@code block_states}) in a single slab
+         * decompression pass (`REQ-RTP-S-005`).
+         */
+        @SuppressWarnings("java:S1168")
+        public LcaRegionReader.RawChunkFrameWithMetadata readRawChunkFrameWithMetadata(
+                int rx,
+                int rz,
+                java.util.function.Function<String, Integer> runtimeStateLookup
+        ) throws IOException {
+            RawChunkFrameSnapshot frame = readRawChunkFrame(rx, rz, runtimeStateLookup);
+            if (frame == null) {
+                return null;
+            }
+            LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+            byte[] metadataNbt = LcaRegionReader.encodeChunkMetadataNbtBytesFromSnapshot(meta, frame, rx, rz, true);
+            return new LcaRegionReader.RawChunkFrameWithMetadata(frame, metadataNbt);
+        }
+
+        /**
+         * Reads the raw uncompressed `.lca` `ChunkFrame` at `(rx, rz)` together with zero-NBT
+         * decoded chunk metadata ({@link LcaDecodedChunkMeta}) in a single slab decompression pass
+         * (`REQ-RTP-S-005`).
+         */
+        @SuppressWarnings("java:S1168")
+        public LcaRegionReader.RawChunkFrameWithDirectMeta readRawChunkFrameWithDirectMeta(
+                int rx,
+                int rz,
+                java.util.function.Function<String, Integer> runtimeStateLookup
+        ) throws IOException {
+            RawChunkFrameSnapshot frame = readRawChunkFrame(rx, rz, runtimeStateLookup);
+            if (frame == null) {
+                return null;
+            }
+            LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+            LcaDecodedChunkMeta directMeta =
+                    LcaRegionReader.decodeChunkMetadataDirectFromSnapshot(meta, frame, rx, rz);
+            return new LcaRegionReader.RawChunkFrameWithDirectMeta(frame, directMeta);
+        }
+
+        /**
+         * Reads the raw `.lca` chunk slab at `(rx, rz)` with full hazard-pin and compaction-epoch
+         * tear-free validation, deferring Mode B decompression and zero-NBT metadata decoding to
+         * worker threads (`REQ-RTP-S-005`).
+         */
+        @SuppressWarnings("java:S1168")
+        public LcaRegionReader.DeferredChunkSlab readDeferredChunkSlab(
+                int rx,
+                int rz,
+                java.util.function.Function<String, Integer> runtimeStateLookup
+        ) throws IOException {
+            if ((rx & ~31) != 0 || (rz & ~31) != 0) {
+                throw new IllegalArgumentException("Chunk coordinates out of 0..31 range: (" + rx + "," + rz + ")");
+            }
+            int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            if (pendingWriteCount > 0) {
+                PendingChunkSnapshot pending = getPendingPayload(chunkIdx);
+                if (pending != null) {
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+                    int codec1 = pending.modeB ? 1 : 0;
+                    LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+                    int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
+                    return new LcaRegionReader.DeferredChunkSlab(
+                            rx, rz, ptrByteOffset, 0L, codec1, 0, pending.payload, meta, dictIdToRuntime);
+                }
+            }
+            FileChannel ch = this.channel;
+            Path bf = this.backingFile;
+            if (headerOnlyChannelMode) {
+                if (ch == null || !ch.isOpen()) {
+                    if (bf != null) {
+                        return LcaRegionReader.readDeferredChunkSlabFromFile(bf, rx, rz, runtimeStateLookup);
+                    }
+                    return null;
+                }
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    int epochBefore = this.compactionEpoch;
+                    if ((epochBefore & 1) != 0) {
+                        synchronized (this) {
+                            epochBefore = this.compactionEpoch;
+                        }
+                    }
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+                    long ptr = resolveAndHealLivePointer(chunkIdx);
+                    long slabOffset35 = ptr >>> 29;
+                    int codec1 = (int) ((ptr >>> 28) & 1L);
+                    int exactByteLen20 = (int) ((ptr >>> 8) & 0xFFFFFL);
+                    int generation8 = (int) (ptr & 0xFFL);
+                    if (slabOffset35 == 0 || exactByteLen20 == 0) {
+                        if (attempt == 0 && this.compactionEpoch != epochBefore) {
+                            synchronized (this) {}
+                            continue;
+                        }
+                        return null;
+                    }
+                    long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
+                    long maxEnd = (long) this.activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+                    int hazardSlot = LcaRegionReader.pinHazardSlab((int) slabOffset35);
+                    try {
+                        if (payloadStartOffset < LcaRegionReader.DICT_ROOT_OFFSET
+                                || exactByteLen20 > LcaRegionReader.MAX_CHUNK_UNCOMPRESSED_BYTES
+                                || payloadStartOffset + exactByteLen20 > maxEnd) {
+                            throw new CorruptRegionEntryException(
+                                    "CBIT T3/T4: Chunk pointer (" + rx + "," + rz + ") out of bounds");
+                        }
+                        byte[] rawSlab = readAndHealChannelSlab(
+                                ch, bf, rx, rz, payloadStartOffset, codec1, exactByteLen20);
+                        VarHandle.loadLoadFence();
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        int epochAfter = this.compactionEpoch;
+                        if ((ptrAfter != ptr || epochAfter != epochBefore) && attempt == 0) {
+                            if (epochAfter != epochBefore) {
+                                synchronized (this) {}
+                            }
+                            continue;
+                        }
+                        LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+                        int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
+                        return new LcaRegionReader.DeferredChunkSlab(
+                                rx, rz, ptrByteOffset, ptr, codec1, generation8, rawSlab, meta, dictIdToRuntime);
+                    } catch (java.nio.channels.ClosedChannelException e) {
+                        if (bf != null) {
+                            return LcaRegionReader.readDeferredChunkSlabFromFile(bf, rx, rz, runtimeStateLookup);
+                        }
+                        throw e;
+                    } catch (CorruptRegionEntryException e) {
+                        if (!ch.isOpen() && bf != null) {
+                            return LcaRegionReader.readDeferredChunkSlabFromFile(bf, rx, rz, runtimeStateLookup);
+                        }
+                        int epochNow = this.compactionEpoch;
+                        if (attempt == 0 && (epochNow != epochBefore || (epochNow & 1) != 0)) {
+                            synchronized (this) {}
+                            continue;
+                        }
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
+                            continue;
+                        }
+                        throw e;
+                    } finally {
+                        LcaRegionReader.unpinHazardSlab(hazardSlot);
+                    }
+                }
+                return null;
+            }
+            byte[] frame;
+            synchronized (this) {
+                resolveAndHealLivePointer(chunkIdx);
+                frame = readUncompressedChunkFrame(rx, rz);
+            }
+            if (frame == null) {
+                return null;
+            }
+            LcaSectionCodec.ParsedHeaderAndDict meta = getOrBuildParsedHeaderAndDict();
+            int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
+            int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+            return new LcaRegionReader.DeferredChunkSlab(
+                    rx, rz, ptrByteOffset, 0L, 0, 0, frame, meta, dictIdToRuntime);
         }
 
         /**
@@ -2617,6 +3369,48 @@ public final class LcaRegionWriter {
             int[] oldRelStarts = LcaRegionReader.computeSectionRelStarts(
                     coldChunkFrame, 0, coldChunkFrame.length, sectionCount,
                     sectionDirEnd, oldResidualRelStart, oldScale4B, oldEntries);
+
+            if (dirtySectionMask == 0) {
+                int oldResidualRelEnd = oldHasResidual
+                        ? LcaSectionCodec.findResidualRelEnd(
+                                oldRelStarts, sectionCount, oldResidualRelStart, coldChunkFrame.length)
+                        : coldChunkFrame.length;
+                if (oldResidualRelEnd == coldChunkFrame.length) {
+                    if (hasChunk(rx, rz)
+                            && oldHasResidual
+                            && Arrays.equals(
+                                    coldChunkFrame, oldResidualRelStart, coldChunkFrame.length,
+                                    updatedResidualNbtOrNull, 0, updatedResidualNbtOrNull.length)) {
+                        return coldChunkFrame;
+                    }
+                    int paddedPrefixLen = oldHasResidual
+                            ? oldResidualRelStart
+                            : (oldScale4B ? ((oldResidualRelStart + 3) & ~3) : oldResidualRelStart);
+                    int newResidualRelOffset = (paddedPrefixLen - sectionDirEnd) >>> oldUnitShift;
+                    if (newResidualRelOffset <= 0xFFFF) {
+                        boolean newHasResidual = updatedResidualNbtOrNull.length > 0;
+                        byte[] newChunkFrame = new byte[paddedPrefixLen + updatedResidualNbtOrNull.length];
+                        System.arraycopy(coldChunkFrame, 0, newChunkFrame, 0, oldResidualRelStart);
+                        patchChunkFrameSelfTag(newChunkFrame, chunkIdx);
+                        ByteBuffer hdrBuf = ByteBuffer.wrap(newChunkFrame, 0, sectionDirEnd);
+                        hdrBuf.putLong(4, hdrBuf.getLong(4) + 1L);
+                        newChunkFrame[21] = (byte) (newHasResidual ? (chunkFlags | 1) : (chunkFlags & ~1));
+                        hdrBuf.putShort(22, (short) newResidualRelOffset);
+                        if (newHasResidual) {
+                            System.arraycopy(
+                                    updatedResidualNbtOrNull, 0,
+                                    newChunkFrame, paddedPrefixLen, updatedResidualNbtOrNull.length);
+                        }
+                        byte[] finalPayload = writeModeBLcd2
+                                ? encodeModeBWithAtomicDict(newChunkFrame, sectionDirEnd, Math.max(1, lcd2Level))
+                                : newChunkFrame;
+                        commitPreEncodedChunkCoW(rx, rz, finalPayload);
+                        cachedHeightmapRef[chunkIdx] = null;
+                        cachedResidualBytes[chunkIdx] = null;
+                        return newChunkFrame;
+                    }
+                }
+            }
 
             Map<String, Integer> localStateMap = null;
             List<String> localStateList = null;
@@ -2902,7 +3696,8 @@ public final class LcaRegionWriter {
                 LcaSectionCodec.EncodedSection enc = LcaSectionCodec.encodeSection(
                         rawBlockPalIds, packedBlockData, biomeIds, dec.packedBiomeLongs,
                         effectiveSkyLight, effectiveBlkLight, defaultBiomeDictId, secBiomeTmplIdx,
-                        this.formatVersion, secLightV1, writeModeBLcd2 ? atomicDictLitLen() : null);
+                        this.formatVersion, secLightV1, writeModeBLcd2 ? atomicDictLitLen() : null,
+                        this.directFlatBitPack);
                 if (enc.inlineEntry16 != 0) {
                     newInlineEntries[s] = enc.inlineEntry16;
                 } else {
@@ -3167,13 +3962,21 @@ public final class LcaRegionWriter {
          */
         public synchronized boolean removeChunk(int rx, int rz) {
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            boolean removedPending = false;
+            if (pendingPayloads != null && pendingPayloads[chunkIdx] != null) {
+                pendingWriteBytes -= pendingPayloads[chunkIdx].length;
+                pendingPayloads[chunkIdx] = null;
+                pendingWriteCount = Math.max(0, pendingWriteCount - 1);
+                removedPending = true;
+            }
             int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
             long oldPtr = LcaRegionReader.getVolatileLongBE(buffer, ptrByteOffset);
             int oldSlabStart = (int) (oldPtr >>> 29);
             int oldByteLen = (int) ((oldPtr >>> 8) & 0xFFFFFL);
             if (oldSlabStart == 0 || oldByteLen == 0) {
-                return false;
+                return removedPending;
             }
+            ensureFreeSlabPoolInitialized();
             dirty = true;
             prevChunkPointers[chunkIdx] = oldPtr;
             buffer[secDedTableOffset + chunkIdx] = (byte) LcaSectionCodec.computeHammingSecDed8(0L);
@@ -3217,6 +4020,10 @@ public final class LcaRegionWriter {
          * eliminating free-list holes and truncating the backing file to the compacted EOF.
          */
         public synchronized void compact() throws IOException {
+            if (pendingWriteCount > 0) {
+                flushPendingWrites();
+            }
+            this.readAheadRef = null;
             dirty = true;
             // Reclaim all grace-ring and unpinned deferred slabs first
             Arrays.fill(graceSlabStarts, 0);
@@ -3286,98 +4093,104 @@ public final class LcaRegionWriter {
                 }
             }
 
-            if (headerOnlyChannelMode && channel != null && channel.isOpen()) {
+            if (backingFile != null) {
+                LcaRegionReader.invalidateFileCache(backingFile);
+            }
+            compactionEpoch++;
+            try {
+                if (headerOnlyChannelMode && channel != null && channel.isOpen()) {
+                    for (int s = 0; s < dictSegments.size(); s++) {
+                        flushDictSegment(dictSegments.get(s));
+                    }
+                    int chunkStartSlab = cursorSlab;
+                    int chunkStartByteOff = chunkStartSlab << LcaRegionReader.SLAB_SHIFT;
+                    int totalChunkPoolBytes = (totalLiveSlabCount << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE;
+                    byte[] packedChunkPool = new byte[totalChunkPoolBytes];
+                    long[] newPtrs = new long[1024];
+                    for (int i = 0; i < 1024; i++) {
+                        byte[] payload = liveChunkPayloads[i];
+                        if (payload == null) {
+                            newPtrs[i] = 0L;
+                            continue;
+                        }
+                        int slabs = (payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
+                        int targetSlab = cursorSlab;
+                        cursorSlab += slabs;
+                        int relDst = (targetSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
+                        System.arraycopy(payload, 0, packedChunkPool, relDst, payload.length);
+                        newPtrs[i] = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
+                    }
+                    int newEndSlab = cursorSlab;
+                    int footerRelOff = (newEndSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
+                    LcaRegionReader.setVolatileLongBE(packedChunkPool, footerRelOff, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                    // Write compacted slabs to disk BEFORE publishing new pointers to lock-free readers
+                    writeChannelRange(chunkStartByteOff, packedChunkPool, 0, packedChunkPool.length);
+                    VarHandle.releaseFence();
+                    Arrays.fill(prevChunkPointers, 0L);
+                    for (int i = 0; i < 1024; i++) {
+                        int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
+                        long newPtr = newPtrs[i];
+                        buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
+                        LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
+                    }
+                    activeEndSlab = newEndSlab;
+                    lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+                    writeChannelRange(
+                            LcaRegionReader.POINTER_DIRECTORY_OFFSET,
+                            buffer,
+                            LcaRegionReader.POINTER_DIRECTORY_OFFSET,
+                            LcaRegionReader.POINTER_DIRECTORY_SIZE);
+                    writeChannelRange(
+                            secDedTableOffset,
+                            buffer,
+                            secDedTableOffset,
+                            LcaRegionReader.SECDED_TABLE_SIZE);
+                    channel.truncate(activeByteLength());
+                    return;
+                }
+
+                ensureBufferCapacity(((cursorSlab + totalLiveSlabCount) << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE + 4096);
                 for (int s = 0; s < dictSegments.size(); s++) {
                     flushDictSegment(dictSegments.get(s));
                 }
-                int chunkStartSlab = cursorSlab;
-                int chunkStartByteOff = chunkStartSlab << LcaRegionReader.SLAB_SHIFT;
-                int totalChunkPoolBytes = (totalLiveSlabCount << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE;
-                byte[] packedChunkPool = new byte[totalChunkPoolBytes];
-                long[] newPtrs = new long[1024];
+                Arrays.fill(prevChunkPointers, 0L);
                 for (int i = 0; i < 1024; i++) {
                     byte[] payload = liveChunkPayloads[i];
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
                     if (payload == null) {
-                        newPtrs[i] = 0L;
+                        buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(0L);
+                        LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, 0L);
                         continue;
                     }
                     int slabs = (payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
                     int targetSlab = cursorSlab;
                     cursorSlab += slabs;
-                    int relDst = (targetSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
-                    System.arraycopy(payload, 0, packedChunkPool, relDst, payload.length);
-                    newPtrs[i] = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
-                }
-                int newEndSlab = cursorSlab;
-                int footerRelOff = (newEndSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
-                LcaRegionReader.setVolatileLongBE(packedChunkPool, footerRelOff, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
-                // Write compacted slabs to disk BEFORE publishing new pointers to lock-free readers
-                writeChannelRange(chunkStartByteOff, packedChunkPool, 0, packedChunkPool.length);
-                VarHandle.releaseFence();
-                Arrays.fill(prevChunkPointers, 0L);
-                for (int i = 0; i < 1024; i++) {
-                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
-                    long newPtr = newPtrs[i];
+                    int dstOff = targetSlab << LcaRegionReader.SLAB_SHIFT;
+                    int padded = slabs << LcaRegionReader.SLAB_SHIFT;
+                    System.arraycopy(payload, 0, buffer, dstOff, payload.length);
+                    if (padded > payload.length) {
+                        Arrays.fill(buffer, dstOff + payload.length, dstOff + padded, (byte) 0);
+                    }
+                    VarHandle.releaseFence();
+                    long newPtr = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
                     buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
                     LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
                 }
-                activeEndSlab = newEndSlab;
-                lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
-                writeChannelRange(
-                        LcaRegionReader.POINTER_DIRECTORY_OFFSET,
-                        buffer,
-                        LcaRegionReader.POINTER_DIRECTORY_OFFSET,
-                        LcaRegionReader.POINTER_DIRECTORY_SIZE);
-                writeChannelRange(
-                        secDedTableOffset,
-                        buffer,
-                        secDedTableOffset,
-                        LcaRegionReader.SECDED_TABLE_SIZE);
-                channel.truncate(activeByteLength());
+
+                activeEndSlab = cursorSlab;
+                lastSyncedFooterOffset = -1;
+                writeFooterCanary();
+                if (channel != null && channel.isOpen()) {
+                    int newLen = activeByteLength();
+                    writeChannelRange(0L, buffer, 0, newLen);
+                    channel.truncate(newLen);
+                }
+            } finally {
+                VarHandle.releaseFence();
+                compactionEpoch++;
                 if (backingFile != null) {
                     LcaRegionReader.invalidateFileCache(backingFile);
                 }
-                return;
-            }
-
-            ensureBufferCapacity(((cursorSlab + totalLiveSlabCount) << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE + 4096);
-            for (int s = 0; s < dictSegments.size(); s++) {
-                flushDictSegment(dictSegments.get(s));
-            }
-            Arrays.fill(prevChunkPointers, 0L);
-            for (int i = 0; i < 1024; i++) {
-                byte[] payload = liveChunkPayloads[i];
-                int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
-                if (payload == null) {
-                    buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(0L);
-                    LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, 0L);
-                    continue;
-                }
-                int slabs = (payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                int targetSlab = cursorSlab;
-                cursorSlab += slabs;
-                int dstOff = targetSlab << LcaRegionReader.SLAB_SHIFT;
-                int padded = slabs << LcaRegionReader.SLAB_SHIFT;
-                System.arraycopy(payload, 0, buffer, dstOff, payload.length);
-                if (padded > payload.length) {
-                    Arrays.fill(buffer, dstOff + payload.length, dstOff + padded, (byte) 0);
-                }
-                VarHandle.releaseFence();
-                long newPtr = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
-                buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
-                LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
-            }
-
-            activeEndSlab = cursorSlab;
-            lastSyncedFooterOffset = -1;
-            writeFooterCanary();
-            if (channel != null && channel.isOpen()) {
-                int newLen = activeByteLength();
-                writeChannelRange(0L, buffer, 0, newLen);
-                channel.truncate(newLen);
-            }
-            if (backingFile != null) {
-                LcaRegionReader.invalidateFileCache(backingFile);
             }
         }
 
@@ -3387,6 +4200,9 @@ public final class LcaRegionWriter {
          * `channel.force(false)` barrier when `-Dleafanvil.fsync=true` is enabled).
          */
         public synchronized void flush() throws IOException {
+            if (pendingWriteCount > 0) {
+                flushPendingWrites();
+            }
             if (!dirty) {
                 return;
             }
@@ -3411,6 +4227,9 @@ public final class LcaRegionWriter {
          */
         public synchronized void closeWithoutForce() throws IOException {
             try {
+                if (pendingWriteCount > 0) {
+                    flushPendingWrites();
+                }
                 if (dirty) {
                     writeFooterCanary();
                     if (backingFile != null) {
@@ -3419,6 +4238,7 @@ public final class LcaRegionWriter {
                     dirty = false;
                 }
             } finally {
+                this.readAheadRef = null;
                 unregisterOpenLiveArchive(backingFile, this);
                 if (channel != null) {
                     try {
@@ -3438,7 +4258,7 @@ public final class LcaRegionWriter {
         @Override
         public synchronized void close() throws IOException {
             try {
-                boolean wasDirty = dirty;
+                boolean wasDirty = dirty || pendingWriteCount > 0;
                 if (wasDirty) {
                     flush();
                 }
@@ -3451,6 +4271,7 @@ public final class LcaRegionWriter {
                     lastForcedWriteCount = diskChannelWriteCount;
                 }
             } finally {
+                this.readAheadRef = null;
                 unregisterOpenLiveArchive(backingFile, this);
                 if (channel != null) {
                     try {
@@ -3539,8 +4360,27 @@ public final class LcaRegionWriter {
         public synchronized boolean rollbackCorruptChunkToPriorCoW(int rx, int rz) {
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
             long prevPtr = prevChunkPointers[chunkIdx];
-            if ((prevPtr >>> 29) == 0 || ((prevPtr >>> 8) & 0xFFFFFL) == 0) {
+            int prevStart = (int) (prevPtr >>> 29);
+            int prevByteLen = (int) ((prevPtr >>> 8) & 0xFFFFFL);
+            if (prevStart == 0 || prevByteLen == 0) {
                 return false;
+            }
+            int prevEnd = prevStart + ((prevByteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+            for (int g = 0; g < COW_GRACE_EPOCHS; g++) {
+                int gStart = graceSlabStarts[g];
+                int gCount = graceSlabCounts[g];
+                if (gStart > 0 && gCount > 0 && gStart < prevEnd && (gStart + gCount) > prevStart) {
+                    graceSlabStarts[g] = 0;
+                    graceSlabCounts[g] = 0;
+                }
+            }
+            for (int d = deferredRetireSlabs.size() - 1; d >= 0; d--) {
+                long[] item = deferredRetireSlabs.get(d);
+                int dStart = (int) item[0];
+                int dCount = (int) item[1];
+                if (dStart > 0 && dCount > 0 && dStart < prevEnd && (dStart + dCount) > prevStart) {
+                    deferredRetireSlabs.remove(d);
+                }
             }
             dirty = true;
             buffer[secDedTableOffset + chunkIdx] = (byte) LcaSectionCodec.computeHammingSecDed8(prevPtr);
@@ -3576,6 +4416,923 @@ public final class LcaRegionWriter {
         }
 
         /**
+         * Encodes and commits a freshly generated chunk directly from pre-extracted Mojang
+         * section palettes, packed {@code SimpleBitStorage} {@code long[]} arrays, light arrays,
+         * and a pre-encoded residual metadata tail — bypassing {@code CompoundTag},
+         * {@code BlockState.CODEC}, and {@code NbtIo} for all voxel/biome/light sections
+         * ({@code anvil-api-ADR-003}, {@code REQ-RTP-S-004}).
+         */
+        public synchronized int saveFreshChunkDirect(
+                int rx,
+                int rz,
+                int dataVersion,
+                long lastUpdate,
+                long inhabitedTime,
+                String statusName,
+                String[][] sectionBlockPalettes,
+                long[][] sectionBlockData,
+                String[][] sectionBiomePalettes,
+                long[][] sectionBiomeData,
+                byte[][] sectionSkyLight,
+                byte[][] sectionBlockLight,
+                byte[] residualMetadataTailBytes
+        ) throws IOException {
+            int baseBlockBookmark = idToBaseBlock.size();
+            int propTupleBookmark = idToPropTuple.size();
+            int stateBookmark = idToBlockState.size();
+            int biomeBookmark = idToBiome.size();
+            int patternBookmark = syncedPatternBytes;
+            int segBookmark = dictSegments.size();
+            try {
+                byte[] payload = encodeFreshChunkPayloadDirect(
+                        rx,
+                        rz,
+                        dataVersion,
+                        lastUpdate,
+                        inhabitedTime,
+                        statusName,
+                        sectionBlockPalettes,
+                        sectionBlockData,
+                        sectionBiomePalettes,
+                        sectionBiomeData,
+                        sectionSkyLight,
+                        sectionBlockLight,
+                        residualMetadataTailBytes
+                );
+                int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+                cachedHeightmapRef[chunkIdx] = null;
+                cachedResidualBytes[chunkIdx] = null;
+                return commitPreEncodedChunkCoW(rx, rz, payload);
+            } catch (RuntimeException | Error | IOException e) {
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                if (e instanceof UncheckedIOException uio) {
+                    throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
+                }
+                throw e;
+            }
+        }
+
+        /**
+         * Pre-registers canonical block-state strings in this region's Layer 2 dictionary and
+         * returns their deterministic global dictionary IDs for GPU/DMA dictionary LUT binding.
+         */
+        public synchronized int[] preRegisterBlockStates(String[] canonicalStates) {
+            if (canonicalStates == null || canonicalStates.length == 0) {
+                return new int[0];
+            }
+            int[] ids = new int[canonicalStates.length];
+            for (int i = 0; i < canonicalStates.length; i++) {
+                String canon = canonicalStates[i] != null ? canonicalStates[i] : "minecraft:air";
+                ids[i] = registerOrGetBlockStateId(canon);
+            }
+            return ids;
+        }
+
+        /**
+         * Zero-copy slice commit variant writing {@code payload[0..payloadLen)} directly from a
+         * caller-owned reusable staging buffer.
+         */
+        public synchronized int commitPreEncodedChunkCoWSlice(int rx, int rz, byte[] payload, int payloadLen) throws IOException {
+            if (payload == null || payloadLen < 24 || payloadLen > payload.length) {
+                return 0;
+            }
+            boolean prevDirty = this.dirty;
+            dirty = true;
+            int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            patchChunkFrameSelfTag(payload, chunkIdx);
+
+            if (bufferedWritesEnabled && headerOnlyChannelMode && channel != null && channel.isOpen()) {
+                byte[] ownedPayload = (payloadLen == payload.length) ? payload : Arrays.copyOf(payload, payloadLen);
+                int headerLen = 24 + (sectionCount << 1);
+                int headerWords = (headerLen + 7) >>> 3;
+                boolean payloadModeB = writeModeBLcd2
+                        || LcaRegionReader.probeLooksLikeModeB(ownedPayload, headerLen, headerWords, payloadLen);
+                if (pendingPayloads == null) {
+                    pendingPayloads = new byte[1024][];
+                    pendingPayloadModeB = new boolean[1024];
+                }
+                if (pendingPayloads[chunkIdx] != null) {
+                    pendingWriteBytes -= pendingPayloads[chunkIdx].length;
+                    coalescedWriteCount++;
+                } else {
+                    pendingWriteCount++;
+                }
+                pendingPayloads[chunkIdx] = ownedPayload;
+                pendingPayloadModeB[chunkIdx] = payloadModeB;
+                pendingWriteBytes += payloadLen;
+                if (pendingWriteCount >= writeBackMaxChunks || pendingWriteBytes >= writeBackMaxBytes) {
+                    flushPendingWrites();
+                }
+                return payloadLen;
+            }
+
+            int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
+            long oldPtr = LcaRegionReader.getVolatileLongBE(buffer, ptrByteOffset);
+            byte oldSyn = buffer[secDedTableOffset + chunkIdx];
+            int oldSlabStart = (int) (oldPtr >>> 29);
+            int oldByteLen = (int) ((oldPtr >>> 8) & 0xFFFFFL);
+            int oldGen = (int) (oldPtr & 0xFFL);
+
+            int newSlabs = Math.max(1, (payloadLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+
+            if (!deferredRetireSlabs.isEmpty()) {
+                for (int i = deferredRetireSlabs.size() - 1; i >= 0; i--) {
+                    long[] item = deferredRetireSlabs.get(i);
+                    int defStart = (int) item[0];
+                    int defCount = (int) item[1];
+                    if (!LcaRegionReader.isSlabRangePinned(defStart, defCount)) {
+                        returnFreeSlabs(defStart, defCount);
+                        deferredRetireSlabs.remove(i);
+                    }
+                }
+            }
+            if (oldSlabStart > 0 && oldByteLen > 0) {
+                int evictedStart = graceSlabStarts[graceCursor];
+                int evictedCount = graceSlabCounts[graceCursor];
+                if (evictedStart > 0 && evictedCount > 0) {
+                    graceSlabStarts[graceCursor] = 0;
+                    graceSlabCounts[graceCursor] = 0;
+                    if (!LcaRegionReader.isSlabRangePinned(evictedStart, evictedCount)) {
+                        returnFreeSlabs(evictedStart, evictedCount);
+                    } else {
+                        deferredRetireSlabs.add(new long[] {evictedStart, evictedCount, 0L});
+                    }
+                }
+            }
+
+            int prevActiveEndSlab = this.activeEndSlab;
+            int prevLastSyncedFooter = this.lastSyncedFooterOffset;
+            int newSlabStart = allocateSlabs(newSlabs, true);
+            try {
+                writeSlabBytesSlice(newSlabStart, payload, payloadLen);
+                writeFooterCanary();
+
+                VarHandle.releaseFence();
+                int nextGen = (oldGen + 1) & 0xFF;
+                int headerLen = 24 + (sectionCount << 1);
+                int headerWords = (headerLen + 7) >>> 3;
+                boolean payloadModeB = writeModeBLcd2
+                        || LcaRegionReader.probeLooksLikeModeB(payload, headerLen, headerWords, payloadLen);
+                long newPtr = packChunkPointer64(newSlabStart, payloadModeB, payloadLen, nextGen);
+                buffer[secDedTableOffset + chunkIdx] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
+                LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
+                persistPointerAndSecDed(chunkIdx);
+                this.readAheadRef = null;
+            } catch (RuntimeException | Error e) {
+                buffer[secDedTableOffset + chunkIdx] = oldSyn;
+                LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, oldPtr);
+                rollbackAllocatedSlabs(newSlabStart, newSlabs, prevActiveEndSlab, prevLastSyncedFooter, true);
+                this.dirty = prevDirty;
+                if (e instanceof UncheckedIOException uio) {
+                    throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
+                }
+                throw e;
+            }
+
+            if (oldSlabStart > 0 && oldByteLen > 0) {
+                prevChunkPointers[chunkIdx] = oldPtr;
+                int oldSlabs = (oldByteLen + 255) >>> LcaRegionReader.SLAB_SHIFT;
+                graceSlabStarts[graceCursor] = oldSlabStart;
+                graceSlabCounts[graceCursor] = oldSlabs;
+                graceCursor = (graceCursor + 1) & (COW_GRACE_EPOCHS - 1);
+            }
+            return payloadLen;
+        }
+
+        /**
+         * Zero-re-encode Unified LCA Mode A direct save path. Streams pre-encoded
+         * {@link LcaModeABlockSection} payloads, GPU/in-memory {@code BLOCK_MODE_FLAT_BITPACK}
+         * ({@code mode 10}) bytes, and hot {@code SimpleBitStorage} sections directly into
+         * {@link LcaSectionCodec.ScratchArena#chunkFrameStaging} in one pass with zero
+         * {@code ByteArrayOutputStream}, zero per-section {@code byte[]}, and zero CPU
+         * Hilbert/Roaring/Gray-code re-encoding ({@code anvil-api-ADR-003}, {@code REQ-RTP-S-004}).
+         */
+        public synchronized int saveFreshChunkDirectModeA(
+                int rx,
+                int rz,
+                int dataVersion,
+                long lastUpdate,
+                long inhabitedTime,
+                String statusName,
+                String[][] sectionBlockPalettes,
+                LcaModeABlockSection[] sectionPreEncodedModeA,
+                byte[][] sectionPreEncodedFlatBytes,
+                int[] sectionPreEncodedFlatBits,
+                long[][] sectionBlockData,
+                String[][] sectionBiomePalettes,
+                long[][] sectionBiomeData,
+                byte[][] sectionSkyLight,
+                byte[][] sectionBlockLight,
+                byte[] residualMetadataTailBytes
+        ) throws IOException {
+            return saveFreshChunkDirectModeA(
+                    rx, rz, dataVersion, lastUpdate, inhabitedTime, statusName,
+                    sectionBlockPalettes, sectionPreEncodedModeA, sectionPreEncodedFlatBytes,
+                    sectionPreEncodedFlatBits, null, null, null,
+                    sectionBlockData, sectionBiomePalettes, sectionBiomeData,
+                    sectionSkyLight, sectionBlockLight, residualMetadataTailBytes);
+        }
+
+        public synchronized int saveFreshChunkDirectModeA(
+                int rx,
+                int rz,
+                int dataVersion,
+                long lastUpdate,
+                long inhabitedTime,
+                String statusName,
+                String[][] sectionBlockPalettes,
+                LcaModeABlockSection[] sectionPreEncodedModeA,
+                byte[][] sectionPreEncodedFlatBytes,
+                int[] sectionPreEncodedFlatBits,
+                int[][] sectionPreResolvedDictIds,
+                long[] sectionPrecomputedOctreeMasks,
+                boolean[] sectionHasPrecomputedOctreeMask,
+                long[][] sectionBlockData,
+                String[][] sectionBiomePalettes,
+                long[][] sectionBiomeData,
+                byte[][] sectionSkyLight,
+                byte[][] sectionBlockLight,
+                byte[] residualMetadataTailBytes
+        ) throws IOException {
+            int baseBlockBookmark = idToBaseBlock.size();
+            int propTupleBookmark = idToPropTuple.size();
+            int stateBookmark = idToBlockState.size();
+            int biomeBookmark = idToBiome.size();
+            int patternBookmark = syncedPatternBytes;
+            int segBookmark = dictSegments.size();
+            try {
+                int chunkDataVersion = dataVersion > 0 ? dataVersion : defaultDataVersion;
+                int statusOrdinal = LcaRegionReader.encodeStatusOrdinal(statusName);
+
+                LcaSectionCodec.ScratchArena arena = LcaSectionCodec.scratch();
+                boolean factoredV3 = isFactoredV3Dict();
+                boolean useSlabLocalPalette = (storageKind == LcaRegionReader.STORAGE_KIND_REGION_VOXEL)
+                        && (factoredV3 || idToBlockState.size() < 8192);
+                boolean canUsePreResolvedIds = factoredV3 && worldgenDictDirectMatch
+                        && boundWorldgenDictIds != null && sectionPreResolvedDictIds != null;
+                int boundDictLen = canUsePreResolvedIds ? boundWorldgenDictIds.length : 0;
+                int[] globalToLocal = (useSlabLocalPalette && canUsePreResolvedIds)
+                        ? arena.resetGlobalToLocal(boundDictLen)
+                        : null;
+                Map<String, Integer> localStateMap = useSlabLocalPalette ? new LinkedHashMap<>(32) : null;
+                List<String> localStateList = useSlabLocalPalette ? new ArrayList<>(32) : null;
+                List<Integer> localStateGlobalIds = useSlabLocalPalette ? new ArrayList<>(32) : null;
+                Map<String, Integer> localBiomeMap = useSlabLocalPalette ? new LinkedHashMap<>(8) : null;
+                List<String> localBiomeList = useSlabLocalPalette ? new ArrayList<>(8) : null;
+                List<Integer> localBiomeGlobalIds = (useSlabLocalPalette && factoredV3) ? new ArrayList<>(8) : null;
+                if (useSlabLocalPalette) {
+                    localStateMap.put("minecraft:air", 0);
+                    localStateList.add("minecraft:air");
+                    int airGlobalId = factoredV3 ? registerOrGetBlockStateId("minecraft:air") : -1;
+                    localStateGlobalIds.add(airGlobalId);
+                    if (globalToLocal != null && airGlobalId >= 0 && airGlobalId < boundDictLen) {
+                        globalToLocal[airGlobalId] = 0;
+                    }
+                    localBiomeMap.put("minecraft:plains", 0);
+                    localBiomeList.add("minecraft:plains");
+                    if (factoredV3) {
+                        localBiomeGlobalIds.add(registerOrGetBiomeId("minecraft:plains"));
+                    }
+                }
+
+                int[][] sectionBlockDictIds = new int[sectionCount][];
+                int[][] sectionBiomeIds = new int[sectionCount][];
+                long[][] resolvedBiomeData = new long[sectionCount][];
+                int chunkDefaultBiomeDictId = -1;
+                int bestBiomeCount = 0;
+                int[] biomeCandidateIds = new int[8];
+                int[] biomeCandidateCounts = new int[8];
+                int biomeCandidatesUsed = 0;
+
+                List<LcaSectionCodec.BiomeTemplate> rawTemplates = useSlabLocalPalette ? new ArrayList<>(8) : Collections.emptyList();
+                int[] rawTemplateCounts = useSlabLocalPalette ? new int[24] : null;
+                int[] sectionRawTemplateIdx = new int[sectionCount];
+                Arrays.fill(sectionRawTemplateIdx, -1);
+
+                int nonEmptySections = 0;
+                int extraModeAPayloadBytes = 0;
+                for (int i = 0; i < sectionCount; i++) {
+                    String[] bp = (sectionBlockPalettes != null && i < sectionBlockPalettes.length) ? sectionBlockPalettes[i] : null;
+                    int[] preIds = (canUsePreResolvedIds && i < sectionPreResolvedDictIds.length)
+                            ? sectionPreResolvedDictIds[i]
+                            : null;
+                    if ((bp == null || bp.length == 0) && (preIds == null || preIds.length == 0)) {
+                        continue;
+                    }
+                    nonEmptySections++;
+                    boolean useFastIds = false;
+                    if (preIds != null && preIds.length > 0 && (bp == null || bp.length == preIds.length)) {
+                        useFastIds = true;
+                        for (int p = 0; p < preIds.length; p++) {
+                            int gid = preIds[p];
+                            if (gid < 0 || gid >= boundDictLen) {
+                                useFastIds = false;
+                                break;
+                            }
+                        }
+                    }
+                    int[] blockIds;
+                    if (useFastIds) {
+                        blockIds = new int[preIds.length];
+                        if (useSlabLocalPalette) {
+                            for (int p = 0; p < preIds.length; p++) {
+                                int gid = preIds[p];
+                                int localIdx = globalToLocal[gid];
+                                if (localIdx < 0) {
+                                    localIdx = localStateGlobalIds.size();
+                                    globalToLocal[gid] = localIdx;
+                                    localStateGlobalIds.add(gid);
+                                }
+                                blockIds[p] = localIdx;
+                            }
+                        } else {
+                            System.arraycopy(preIds, 0, blockIds, 0, preIds.length);
+                        }
+                    } else {
+                        blockIds = new int[bp.length];
+                        for (int p = 0; p < bp.length; p++) {
+                            String canon = bp[p] != null ? bp[p] : "minecraft:air";
+                            if (useSlabLocalPalette) {
+                                Integer existing = localStateMap.get(canon);
+                                if (existing != null) {
+                                    blockIds[p] = existing;
+                                } else {
+                                    int gid = factoredV3 ? registerOrGetBlockStateId(canon) : -1;
+                                    if (globalToLocal != null && gid >= 0 && gid < boundDictLen && globalToLocal[gid] >= 0) {
+                                        int localIdx = globalToLocal[gid];
+                                        localStateMap.put(canon, localIdx);
+                                        blockIds[p] = localIdx;
+                                    } else {
+                                        int localIdx = localStateGlobalIds.size();
+                                        localStateMap.put(canon, localIdx);
+                                        localStateList.add(canon);
+                                        localStateGlobalIds.add(gid);
+                                        if (globalToLocal != null && gid >= 0 && gid < boundDictLen) {
+                                            globalToLocal[gid] = localIdx;
+                                        }
+                                        blockIds[p] = localIdx;
+                                    }
+                                }
+                            } else {
+                                blockIds[p] = registerOrGetBlockStateId(canon);
+                            }
+                        }
+                    }
+                    sectionBlockDictIds[i] = blockIds;
+                    if (sectionPreEncodedModeA != null && i < sectionPreEncodedModeA.length && sectionPreEncodedModeA[i] != null) {
+                        extraModeAPayloadBytes += sectionPreEncodedModeA[i].payloadByteLength();
+                    }
+
+                    String[] biomeNames = (sectionBiomePalettes != null && i < sectionBiomePalettes.length) ? sectionBiomePalettes[i] : null;
+                    int[] bIds = null;
+                    if (biomeNames != null && biomeNames.length > 0) {
+                        bIds = new int[biomeNames.length];
+                        for (int b = 0; b < biomeNames.length; b++) {
+                            String bName = biomeNames[b] != null ? biomeNames[b] : "minecraft:plains";
+                            if (useSlabLocalPalette) {
+                                Integer existing = localBiomeMap.get(bName);
+                                if (existing != null) {
+                                    bIds[b] = existing;
+                                } else {
+                                    int localIdx = localBiomeList.size();
+                                    localBiomeMap.put(bName, localIdx);
+                                    localBiomeList.add(bName);
+                                    if (localBiomeGlobalIds != null) {
+                                        localBiomeGlobalIds.add(registerOrGetBiomeId(bName));
+                                    }
+                                    bIds[b] = localIdx;
+                                }
+                            } else {
+                                bIds[b] = registerOrGetBiomeId(bName);
+                            }
+                        }
+                    }
+                    long[] bData = (sectionBiomeData != null && i < sectionBiomeData.length) ? sectionBiomeData[i] : null;
+                    sectionBiomeIds[i] = bIds;
+                    resolvedBiomeData[i] = bData;
+
+                    if (useSlabLocalPalette && bIds != null && bIds.length > 0) {
+                        int foundT = -1;
+                        for (int t = 0; t < rawTemplates.size(); t++) {
+                            if (rawTemplates.get(t).matches(bIds, bData)) {
+                                foundT = t;
+                                break;
+                            }
+                        }
+                        if (foundT < 0 && rawTemplates.size() < 24) {
+                            foundT = rawTemplates.size();
+                            rawTemplates.add(new LcaSectionCodec.BiomeTemplate(bIds, bData, Collections.emptyList(), null));
+                        }
+                        if (foundT >= 0) {
+                            rawTemplateCounts[foundT]++;
+                            sectionRawTemplateIdx[i] = foundT;
+                        }
+                    }
+                    if (bIds != null && bIds.length == 1 && bIds[0] < 30) {
+                        int singleBId = bIds[0];
+                        int foundSlot = -1;
+                        for (int k = 0; k < biomeCandidatesUsed; k++) {
+                            if (biomeCandidateIds[k] == singleBId) {
+                                foundSlot = k;
+                                break;
+                            }
+                        }
+                        if (foundSlot < 0 && biomeCandidatesUsed < biomeCandidateIds.length) {
+                            foundSlot = biomeCandidatesUsed++;
+                            biomeCandidateIds[foundSlot] = singleBId;
+                        }
+                        if (foundSlot >= 0) {
+                            int cnt = ++biomeCandidateCounts[foundSlot];
+                            if (cnt > bestBiomeCount) {
+                                bestBiomeCount = cnt;
+                                chunkDefaultBiomeDictId = singleBId;
+                            }
+                        }
+                    }
+                }
+
+                List<LcaSectionCodec.BiomeTemplate> sortedBiomeTemplates = Collections.emptyList();
+                int[] oldToSortedTemplate = null;
+                if (useSlabLocalPalette && !rawTemplates.isEmpty()) {
+                    int tSize = rawTemplates.size();
+                    Integer[] tOrder = new Integer[tSize];
+                    for (int t = 0; t < tSize; t++) tOrder[t] = t;
+                    Arrays.sort(tOrder, (a, b) -> Integer.compare(rawTemplateCounts[b], rawTemplateCounts[a]));
+                    sortedBiomeTemplates = new ArrayList<>(tSize);
+                    oldToSortedTemplate = new int[tSize];
+                    for (int newIdx = 0; newIdx < tSize; newIdx++) {
+                        int oldIdx = tOrder[newIdx];
+                        oldToSortedTemplate[oldIdx] = newIdx;
+                        sortedBiomeTemplates.add(rawTemplates.get(oldIdx));
+                    }
+                }
+
+                byte[] slabLocalPaletteBytes;
+                if (!useSlabLocalPalette) {
+                    slabLocalPaletteBytes = new byte[0];
+                } else if (factoredV3) {
+                    int[] localStateGlobalIdArr = new int[localStateGlobalIds.size()];
+                    for (int k = 0; k < localStateGlobalIdArr.length; k++) {
+                        localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
+                    }
+                    int[] localBiomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
+                    for (int k = 0; k < localBiomeGlobalIdArr.length; k++) {
+                        localBiomeGlobalIdArr[k] = localBiomeGlobalIds.get(k);
+                    }
+                    slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
+                            localStateGlobalIdArr, localStateGlobalIdArr.length,
+                            localBiomeGlobalIdArr, localBiomeGlobalIdArr.length,
+                            sortedBiomeTemplates);
+                } else {
+                    int[] localStateGlobalIdArr = new int[localStateGlobalIds.size()];
+                    for (int k = 0; k < localStateGlobalIdArr.length; k++) {
+                        localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
+                    }
+                    slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
+                            localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates);
+                }
+
+                byte[] residualBytes = residualMetadataTailBytes != null ? residualMetadataTailBytes : new byte[0];
+                int headerLen = 24 + (sectionCount << 1);
+                int worstCaseCap = headerLen
+                        + slabLocalPaletteBytes.length
+                        + (nonEmptySections * 9216)
+                        + extraModeAPayloadBytes
+                        + residualBytes.length
+                        + 512;
+                byte[] frameBuf = arena.ensureChunkFrameCap(worstCaseCap);
+
+                final boolean scale4B = true;
+                int bodyPos = headerLen;
+                if (useSlabLocalPalette && slabLocalPaletteBytes.length > 0) {
+                    System.arraycopy(slabLocalPaletteBytes, 0, frameBuf, bodyPos, slabLocalPaletteBytes.length);
+                    bodyPos += slabLocalPaletteBytes.length;
+                }
+
+                int[] sectionOffsetEntries = arena.sectionEntries;
+                for (int i = 0; i < sectionCount; i++) {
+                    int[] blockIds = sectionBlockDictIds[i];
+                    if (blockIds == null || blockIds.length == 0) {
+                        sectionOffsetEntries[i] = 0x0000;
+                        continue;
+                    }
+                    while (((bodyPos - headerLen) & 3) != 0) {
+                        frameBuf[bodyPos++] = 0;
+                    }
+                    int startRel = bodyPos - headerLen;
+                    LcaModeABlockSection preModeA = (sectionPreEncodedModeA != null && i < sectionPreEncodedModeA.length)
+                            ? sectionPreEncodedModeA[i] : null;
+                    byte[] preFlatBytes = (sectionPreEncodedFlatBytes != null && i < sectionPreEncodedFlatBytes.length)
+                            ? sectionPreEncodedFlatBytes[i] : null;
+                    int preFlatBits = (sectionPreEncodedFlatBits != null && i < sectionPreEncodedFlatBits.length)
+                            ? sectionPreEncodedFlatBits[i] : 0;
+                    boolean hasPreOctree = (sectionHasPrecomputedOctreeMask != null
+                            && i < sectionHasPrecomputedOctreeMask.length
+                            && sectionHasPrecomputedOctreeMask[i]
+                            && sectionPrecomputedOctreeMasks != null
+                            && i < sectionPrecomputedOctreeMasks.length);
+                    long preOctree = hasPreOctree ? sectionPrecomputedOctreeMasks[i] : 0L;
+                    long[] blockData = (sectionBlockData != null && i < sectionBlockData.length) ? sectionBlockData[i] : null;
+                    byte[] skyLight = (sectionSkyLight != null && i < sectionSkyLight.length) ? sectionSkyLight[i] : null;
+                    byte[] blkLight = (sectionBlockLight != null && i < sectionBlockLight.length) ? sectionBlockLight[i] : null;
+                    int secTmplIdx = (oldToSortedTemplate != null && sectionRawTemplateIdx[i] >= 0)
+                            ? oldToSortedTemplate[sectionRawTemplateIdx[i]]
+                            : -1;
+
+                    int res = LcaSectionCodec.encodeSectionModeAPassthroughToBuf(
+                            blockIds,
+                            preModeA,
+                            preFlatBytes,
+                            preFlatBits,
+                            hasPreOctree,
+                            preOctree,
+                            blockData,
+                            sectionBiomeIds[i],
+                            resolvedBiomeData[i],
+                            skyLight,
+                            blkLight,
+                            chunkDefaultBiomeDictId,
+                            secTmplIdx,
+                            arena,
+                            frameBuf,
+                            bodyPos
+                    );
+                    if (res < 0) {
+                        sectionOffsetEntries[i] = -res;
+                    } else {
+                        int entry16 = (startRel >>> 2) + 1;
+                        if (entry16 > 0x7FFF) {
+                            throw new IOException("Section offset exceeded 15-bit range with scale4B=true: " + entry16);
+                        }
+                        sectionOffsetEntries[i] = entry16;
+                        bodyPos += res;
+                    }
+                }
+                while (((bodyPos - headerLen) & 3) != 0) {
+                    frameBuf[bodyPos++] = 0;
+                }
+                int residualNbtRelOffset = (bodyPos - headerLen) >>> 2;
+                if (residualNbtRelOffset > 0xFFFF) {
+                    throw new IOException("Residual offset exceeded 16-bit range: " + residualNbtRelOffset);
+                }
+
+                boolean hasResidualNbt = residualBytes.length > 0;
+                if (hasResidualNbt) {
+                    System.arraycopy(residualBytes, 0, frameBuf, bodyPos, residualBytes.length);
+                    bodyPos += residualBytes.length;
+                }
+
+                int defaultBiomeCode = (chunkDefaultBiomeDictId >= 0 && chunkDefaultBiomeDictId < 30)
+                        ? (chunkDefaultBiomeDictId + 1)
+                        : 0;
+                int chunkFlags = (hasResidualNbt ? 1 : 0)
+                        | (useSlabLocalPalette ? 2 : 0)
+                        | (scale4B ? 4 : 0)
+                        | ((defaultBiomeCode & 0x1F) << 3);
+
+                int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+                int selfDescribingDvWord = LcaRegionReader.CHUNK_FRAME_SELF_TAG_MAGIC
+                        | ((chunkIdx & 0x03FF) << 16)
+                        | (chunkDataVersion & 0xFFFF);
+                ByteBuffer bb = ByteBuffer.wrap(frameBuf, 0, headerLen);
+                bb.putInt(0, selfDescribingDvWord);
+                bb.putLong(4, lastUpdate);
+                bb.putLong(12, inhabitedTime);
+                frameBuf[20] = (byte) statusOrdinal;
+                frameBuf[21] = (byte) chunkFlags;
+                bb.putShort(22, (short) residualNbtRelOffset);
+                for (int i = 0; i < sectionCount; i++) {
+                    bb.putShort(24 + (i << 1), (short) sectionOffsetEntries[i]);
+                }
+
+                cachedHeightmapRef[chunkIdx] = null;
+                cachedResidualBytes[chunkIdx] = null;
+                if (writeModeBLcd2) {
+                    byte[] modeBPayload = encodeModeBWithAtomicDict(
+                            Arrays.copyOf(frameBuf, bodyPos), headerLen, Math.max(1, lcd2Level));
+                    return commitPreEncodedChunkCoWSlice(rx, rz, modeBPayload, modeBPayload.length);
+                }
+                return commitPreEncodedChunkCoWSlice(rx, rz, frameBuf, bodyPos);
+            } catch (RuntimeException | Error | IOException e) {
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                if (e instanceof UncheckedIOException uio) {
+                    throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
+                }
+                throw e;
+            }
+        }
+
+        private byte[] encodeFreshChunkPayloadDirect(
+                int rx,
+                int rz,
+                int dataVersion,
+                long lastUpdate,
+                long inhabitedTime,
+                String statusName,
+                String[][] sectionBlockPalettes,
+                long[][] sectionBlockData,
+                String[][] sectionBiomePalettes,
+                long[][] sectionBiomeData,
+                byte[][] sectionSkyLight,
+                byte[][] sectionBlockLight,
+                byte[] residualMetadataTailBytes
+        ) throws IOException {
+            int chunkDataVersion = dataVersion > 0 ? dataVersion : defaultDataVersion;
+            int statusOrdinal = LcaRegionReader.encodeStatusOrdinal(statusName);
+
+            boolean factoredV3 = isFactoredV3Dict();
+            boolean useSlabLocalPalette = (storageKind == LcaRegionReader.STORAGE_KIND_REGION_VOXEL)
+                    && (factoredV3 || idToBlockState.size() < 8192);
+            Map<String, Integer> localStateMap = useSlabLocalPalette ? new LinkedHashMap<>(32) : null;
+            List<String> localStateList = useSlabLocalPalette ? new ArrayList<>(32) : null;
+            List<Integer> localStateGlobalIds = useSlabLocalPalette ? new ArrayList<>(32) : null;
+            Map<String, Integer> localBiomeMap = useSlabLocalPalette ? new LinkedHashMap<>(8) : null;
+            List<String> localBiomeList = useSlabLocalPalette ? new ArrayList<>(8) : null;
+            List<Integer> localBiomeGlobalIds = (useSlabLocalPalette && factoredV3) ? new ArrayList<>(8) : null;
+            if (useSlabLocalPalette) {
+                localStateMap.put("minecraft:air", 0);
+                localStateList.add("minecraft:air");
+                localStateGlobalIds.add(factoredV3 ? registerOrGetBlockStateId("minecraft:air") : -1);
+                localBiomeMap.put("minecraft:plains", 0);
+                localBiomeList.add("minecraft:plains");
+                if (factoredV3) {
+                    localBiomeGlobalIds.add(registerOrGetBiomeId("minecraft:plains"));
+                }
+            }
+
+            int[][] sectionBiomeIds = new int[sectionCount][];
+            long[][] resolvedBiomeData = new long[sectionCount][];
+            int chunkDefaultBiomeDictId = -1;
+            int bestBiomeCount = 0;
+            int[] biomeCandidateIds = new int[8];
+            int[] biomeCandidateCounts = new int[8];
+            int biomeCandidatesUsed = 0;
+
+            List<LcaSectionCodec.BiomeTemplate> rawTemplates = useSlabLocalPalette ? new ArrayList<>(8) : Collections.emptyList();
+            int[] rawTemplateCounts = useSlabLocalPalette ? new int[24] : null;
+            int[] sectionRawTemplateIdx = new int[sectionCount];
+            Arrays.fill(sectionRawTemplateIdx, -1);
+
+            for (int i = 0; i < sectionCount; i++) {
+                String[] bp = (sectionBlockPalettes != null && i < sectionBlockPalettes.length) ? sectionBlockPalettes[i] : null;
+                if (bp == null || bp.length == 0) {
+                    continue;
+                }
+                String[] biomeNames = (sectionBiomePalettes != null && i < sectionBiomePalettes.length) ? sectionBiomePalettes[i] : null;
+                int[] bIds = null;
+                if (biomeNames != null && biomeNames.length > 0) {
+                    bIds = new int[biomeNames.length];
+                    for (int b = 0; b < biomeNames.length; b++) {
+                        String bName = biomeNames[b] != null ? biomeNames[b] : "minecraft:plains";
+                        if (useSlabLocalPalette) {
+                            Integer existing = localBiomeMap.get(bName);
+                            if (existing != null) {
+                                bIds[b] = existing;
+                            } else {
+                                int localIdx = localBiomeList.size();
+                                localBiomeMap.put(bName, localIdx);
+                                localBiomeList.add(bName);
+                                if (localBiomeGlobalIds != null) {
+                                    localBiomeGlobalIds.add(registerOrGetBiomeId(bName));
+                                }
+                                bIds[b] = localIdx;
+                            }
+                        } else {
+                            bIds[b] = registerOrGetBiomeId(bName);
+                        }
+                    }
+                }
+                long[] bData = (sectionBiomeData != null && i < sectionBiomeData.length) ? sectionBiomeData[i] : null;
+                sectionBiomeIds[i] = bIds;
+                resolvedBiomeData[i] = bData;
+
+                if (useSlabLocalPalette && bIds != null && bIds.length > 0) {
+                    int foundT = -1;
+                    for (int t = 0; t < rawTemplates.size(); t++) {
+                        if (rawTemplates.get(t).matches(bIds, bData)) {
+                            foundT = t;
+                            break;
+                        }
+                    }
+                    if (foundT < 0 && rawTemplates.size() < 24) {
+                        foundT = rawTemplates.size();
+                        rawTemplates.add(new LcaSectionCodec.BiomeTemplate(bIds, bData, Collections.emptyList(), null));
+                    }
+                    if (foundT >= 0) {
+                        rawTemplateCounts[foundT]++;
+                        sectionRawTemplateIdx[i] = foundT;
+                    }
+                }
+                if (bIds != null && bIds.length == 1 && bIds[0] < 30) {
+                    int singleBId = bIds[0];
+                    int foundSlot = -1;
+                    for (int k = 0; k < biomeCandidatesUsed; k++) {
+                        if (biomeCandidateIds[k] == singleBId) {
+                            foundSlot = k;
+                            break;
+                        }
+                    }
+                    if (foundSlot < 0 && biomeCandidatesUsed < biomeCandidateIds.length) {
+                        foundSlot = biomeCandidatesUsed++;
+                        biomeCandidateIds[foundSlot] = singleBId;
+                    }
+                    if (foundSlot >= 0) {
+                        int cnt = ++biomeCandidateCounts[foundSlot];
+                        if (cnt > bestBiomeCount) {
+                            bestBiomeCount = cnt;
+                            chunkDefaultBiomeDictId = singleBId;
+                        }
+                    }
+                }
+            }
+
+            List<LcaSectionCodec.BiomeTemplate> sortedBiomeTemplates = Collections.emptyList();
+            int[] oldToSortedTemplate = null;
+            if (useSlabLocalPalette && !rawTemplates.isEmpty()) {
+                int tSize = rawTemplates.size();
+                Integer[] tOrder = new Integer[tSize];
+                for (int t = 0; t < tSize; t++) tOrder[t] = t;
+                Arrays.sort(tOrder, (a, b) -> Integer.compare(rawTemplateCounts[b], rawTemplateCounts[a]));
+                sortedBiomeTemplates = new ArrayList<>(tSize);
+                oldToSortedTemplate = new int[tSize];
+                for (int newIdx = 0; newIdx < tSize; newIdx++) {
+                    int oldIdx = tOrder[newIdx];
+                    oldToSortedTemplate[oldIdx] = newIdx;
+                    sortedBiomeTemplates.add(rawTemplates.get(oldIdx));
+                }
+            }
+
+            LcaSectionCodec.EncodedSection[] encodedSections = new LcaSectionCodec.EncodedSection[sectionCount];
+            int totalSectionPayloadBytes = 0;
+            boolean allowV3Eikonal = this.formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3
+                    && this.storageKind != 3
+                    && (this.writeModeBLcd2 || (LcaV3Codec.currentFeatureMask() & LcaV3Codec.FEATURE_EIKONAL_MODE_A) != 0);
+            int[] modeBLitLen = writeModeBLcd2 ? atomicDictLitLen() : null;
+            byte[] cachedLightV1 = null;
+            int cachedLightV1Len = 0;
+
+            for (int i = 0; i < sectionCount; i++) {
+                String[] bp = (sectionBlockPalettes != null && i < sectionBlockPalettes.length) ? sectionBlockPalettes[i] : null;
+                if (bp == null || bp.length == 0) {
+                    continue;
+                }
+                int[] blockDictIds = new int[bp.length];
+                for (int p = 0; p < bp.length; p++) {
+                    String canon = bp[p] != null ? bp[p] : "minecraft:air";
+                    if (useSlabLocalPalette) {
+                        Integer existing = localStateMap.get(canon);
+                        if (existing != null) {
+                            blockDictIds[p] = existing;
+                        } else {
+                            int localIdx = localStateList.size();
+                            localStateMap.put(canon, localIdx);
+                            localStateList.add(canon);
+                            localStateGlobalIds.add(factoredV3 ? registerOrGetBlockStateId(canon) : -1);
+                            blockDictIds[p] = localIdx;
+                        }
+                    } else {
+                        blockDictIds[p] = registerOrGetBlockStateId(canon);
+                    }
+                }
+                long[] blockData = (sectionBlockData != null && i < sectionBlockData.length) ? sectionBlockData[i] : null;
+                int[] biomeDictIds = sectionBiomeIds[i];
+                long[] biomeData = resolvedBiomeData[i];
+                byte[] skyLight = (sectionSkyLight != null && i < sectionSkyLight.length) ? sectionSkyLight[i] : null;
+                byte[] blkLight = (sectionBlockLight != null && i < sectionBlockLight.length) ? sectionBlockLight[i] : null;
+                int secTmplIdx = (oldToSortedTemplate != null && sectionRawTemplateIdx[i] >= 0)
+                        ? oldToSortedTemplate[sectionRawTemplateIdx[i]]
+                        : -1;
+
+                byte[] secLightV1 = null;
+                if (allowV3Eikonal && (skyLight != null || blkLight != null)) {
+                    List<String> activeStates = useSlabLocalPalette ? localStateList : idToBlockState;
+                    int curSize = activeStates.size();
+                    if (cachedLightV1 == null || cachedLightV1.length < curSize) {
+                        cachedLightV1 = cachedLightV1 == null
+                                ? new byte[Math.max(64, curSize)]
+                                : Arrays.copyOf(cachedLightV1, Math.max(curSize, cachedLightV1.length << 1));
+                    }
+                    for (int sIdx = cachedLightV1Len; sIdx < curSize; sIdx++) {
+                        cachedLightV1[sIdx] = LcaV3Codec.classifyLightV1(activeStates.get(sIdx));
+                    }
+                    cachedLightV1Len = curSize;
+                    secLightV1 = cachedLightV1;
+                }
+
+                LcaSectionCodec.EncodedSection enc = LcaSectionCodec.encodeSection(
+                        blockDictIds, blockData, biomeDictIds, biomeData,
+                        skyLight, blkLight, chunkDefaultBiomeDictId, secTmplIdx,
+                        this.formatVersion, secLightV1, modeBLitLen, this.directFlatBitPack);
+                encodedSections[i] = enc;
+                if (enc.inlineEntry16 == 0 && enc.frameBytes.length > 0) {
+                    totalSectionPayloadBytes += enc.frameBytes.length;
+                }
+            }
+
+            int[] localStateGlobalIdArr = null;
+            if (useSlabLocalPalette && localStateGlobalIds != null) {
+                localStateGlobalIdArr = new int[localStateGlobalIds.size()];
+                for (int k = 0; k < localStateGlobalIdArr.length; k++) {
+                    localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
+                }
+            }
+            byte[] slabLocalPaletteBytes;
+            if (!useSlabLocalPalette) {
+                slabLocalPaletteBytes = new byte[0];
+            } else if (factoredV3) {
+                int[] localBiomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
+                for (int k = 0; k < localBiomeGlobalIdArr.length; k++) {
+                    localBiomeGlobalIdArr[k] = localBiomeGlobalIds.get(k);
+                }
+                slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
+                        localStateGlobalIdArr, localStateGlobalIdArr.length,
+                        localBiomeGlobalIdArr, localBiomeGlobalIdArr.length,
+                        sortedBiomeTemplates);
+            } else {
+                slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
+                        localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates);
+            }
+            totalSectionPayloadBytes += slabLocalPaletteBytes.length;
+
+            boolean scale4B = totalSectionPayloadBytes > 0x7FFF;
+            int unitShift = scale4B ? 2 : 0;
+            int unitAlign = 1 << unitShift;
+
+            ByteArrayOutputStream sectionsBody = new ByteArrayOutputStream(totalSectionPayloadBytes + 16);
+            if (useSlabLocalPalette) {
+                sectionsBody.writeBytes(slabLocalPaletteBytes);
+            }
+            int[] sectionOffsetEntries = new int[sectionCount];
+            for (int i = 0; i < sectionCount; i++) {
+                LcaSectionCodec.EncodedSection enc = encodedSections[i];
+                if (enc == null) {
+                    sectionOffsetEntries[i] = 0x0000;
+                } else if (enc.inlineEntry16 != 0) {
+                    sectionOffsetEntries[i] = enc.inlineEntry16;
+                } else {
+                    while ((sectionsBody.size() & (unitAlign - 1)) != 0) {
+                        sectionsBody.write(0);
+                    }
+                    int startRel = sectionsBody.size();
+                    int entry16 = (startRel >>> unitShift) + 1;
+                    if (entry16 > 0x7FFF) {
+                        throw new IOException("Section offset exceeded 15-bit range even with scale4B=" + scale4B);
+                    }
+                    sectionOffsetEntries[i] = entry16;
+                    sectionsBody.writeBytes(enc.frameBytes);
+                }
+            }
+            if (scale4B) {
+                while ((sectionsBody.size() & 3) != 0) {
+                    sectionsBody.write(0);
+                }
+            }
+            int residualNbtRelOffset = sectionsBody.size() >>> unitShift;
+            if (residualNbtRelOffset > 0xFFFF) {
+                throw new IOException("Residual offset exceeded 16-bit range: " + residualNbtRelOffset);
+            }
+
+            byte[] residualBytes = residualMetadataTailBytes != null ? residualMetadataTailBytes : new byte[0];
+            boolean hasResidualNbt = residualBytes.length > 0;
+            int defaultBiomeCode = (chunkDefaultBiomeDictId >= 0 && chunkDefaultBiomeDictId < 30)
+                    ? (chunkDefaultBiomeDictId + 1)
+                    : 0;
+            int chunkFlags = (hasResidualNbt ? 1 : 0)
+                    | (useSlabLocalPalette ? 2 : 0)
+                    | (scale4B ? 4 : 0)
+                    | ((defaultBiomeCode & 0x1F) << 3);
+
+            int chunkIdx = (rx & 31) | ((rz & 31) << 5);
+            int headerLen = 24 + (sectionCount << 1);
+            byte[] secBytes = sectionsBody.toByteArray();
+            byte[] chunkFrame = new byte[headerLen + secBytes.length + residualBytes.length];
+            ByteBuffer bb = ByteBuffer.wrap(chunkFrame);
+            int selfDescribingDvWord = LcaRegionReader.CHUNK_FRAME_SELF_TAG_MAGIC
+                    | ((chunkIdx & 0x03FF) << 16)
+                    | (chunkDataVersion & 0xFFFF);
+            bb.putInt(0, selfDescribingDvWord);
+            bb.putLong(4, lastUpdate);
+            bb.putLong(12, inhabitedTime);
+            chunkFrame[20] = (byte) statusOrdinal;
+            chunkFrame[21] = (byte) chunkFlags;
+            bb.putShort(22, (short) residualNbtRelOffset);
+            for (int i = 0; i < sectionCount; i++) {
+                bb.putShort(24 + (i << 1), (short) sectionOffsetEntries[i]);
+            }
+            System.arraycopy(secBytes, 0, chunkFrame, headerLen, secBytes.length);
+            if (hasResidualNbt) {
+                System.arraycopy(residualBytes, 0, chunkFrame, headerLen + secBytes.length, residualBytes.length);
+            }
+
+            if (writeModeBLcd2) {
+                return encodeModeBWithAtomicDict(chunkFrame, headerLen, Math.max(1, lcd2Level));
+            }
+            return chunkFrame;
+        }
+
+        /**
          * Encodes a chunk NBT compound into a `.lca` `ChunkFrame` slab payload without mutating
          * the region pointer directory or slab allocator. Safe to execute concurrently on caller
          * worker pools (such as `C2ME`'s `GlobalExecutors.prioritizedScheduler` via
@@ -3602,6 +5359,30 @@ public final class LcaRegionWriter {
             dirty = true;
             int chunkIdx = (rx & 31) | ((rz & 31) << 5);
             patchChunkFrameSelfTag(payload, chunkIdx);
+
+            if (bufferedWritesEnabled && headerOnlyChannelMode && channel != null && channel.isOpen()) {
+                int headerLen = 24 + (sectionCount << 1);
+                int headerWords = (headerLen + 7) >>> 3;
+                boolean payloadModeB = writeModeBLcd2
+                        || LcaRegionReader.probeLooksLikeModeB(payload, headerLen, headerWords, payload.length);
+                if (pendingPayloads == null) {
+                    pendingPayloads = new byte[1024][];
+                    pendingPayloadModeB = new boolean[1024];
+                }
+                if (pendingPayloads[chunkIdx] != null) {
+                    pendingWriteBytes -= pendingPayloads[chunkIdx].length;
+                    coalescedWriteCount++;
+                } else {
+                    pendingWriteCount++;
+                }
+                pendingPayloads[chunkIdx] = payload;
+                pendingPayloadModeB[chunkIdx] = payloadModeB;
+                pendingWriteBytes += payload.length;
+                if (pendingWriteCount >= writeBackMaxChunks || pendingWriteBytes >= writeBackMaxBytes) {
+                    flushPendingWrites();
+                }
+                return payload.length;
+            }
 
             int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (chunkIdx << 3);
             long oldPtr = LcaRegionReader.getVolatileLongBE(buffer, ptrByteOffset);
@@ -3656,6 +5437,7 @@ public final class LcaRegionWriter {
                 buffer[secDedTableOffset + chunkIdx] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
                 LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
                 persistPointerAndSecDed(chunkIdx);
+                this.readAheadRef = null;
             } catch (RuntimeException | Error e) {
                 buffer[secDedTableOffset + chunkIdx] = oldSyn;
                 LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, oldPtr);
@@ -3884,14 +5666,14 @@ public final class LcaRegionWriter {
             LcaSectionCodec.EncodedSection enc = LcaSectionCodec.encodeSection(
                     blockDictIds, blockData, biomeDictIds, biomeData,
                     skyLight, blkLight, defaultBiomeDictId, -1,
-                    this.formatVersion, patchSecLightV1, patchLitLen);
+                    this.formatVersion, patchSecLightV1, patchLitLen, this.directFlatBitPack);
             // Force a non-uniform SectionFrame body when testing out-of-order section frame placement
             byte[] secFrameBytes = enc.frameBytes;
             if (secFrameBytes == null || secFrameBytes.length == 0) {
                 LcaSectionCodec.EncodedSection forced = LcaSectionCodec.encodeSection(
                         blockDictIds, blockData, biomeDictIds, biomeData,
                         skyLight, blkLight, -2, -1,
-                        this.formatVersion, patchSecLightV1, patchLitLen);
+                        this.formatVersion, patchSecLightV1, patchLitLen, this.directFlatBitPack);
                 secFrameBytes = forced.frameBytes;
             }
 
@@ -4189,7 +5971,7 @@ public final class LcaRegionWriter {
                 LcaSectionCodec.EncodedSection enc = LcaSectionCodec.encodeSection(
                         blockDictIds, blockData, biomeDictIds, biomeData,
                         skyLight, blkLight, chunkDefaultBiomeDictId, secTmplIdx,
-                        this.formatVersion, secLightV1, modeBLitLen);
+                        this.formatVersion, secLightV1, modeBLitLen, this.directFlatBitPack);
                 encodedSections[i] = enc;
                 if (enc.inlineEntry16 == 0 && enc.frameBytes.length > 0) {
                     totalSectionPayloadBytes += enc.frameBytes.length;
@@ -5496,6 +7278,9 @@ public final class LcaRegionWriter {
          */
         private synchronized void flushDictSegment(DictSegmentMeta seg) {
             byte[] staged = stageDictSegmentInBuffer(seg);
+            if (bufferedWritesEnabled && headerOnlyChannelMode) {
+                return;
+            }
             writeFooterCanary();
             writeChannelRangeUnchecked(seg.byteOffset(), staged, 0, seg.capacityBytes());
             if (channel != null && channel.isOpen()) {
@@ -5508,7 +7293,7 @@ public final class LcaRegionWriter {
                 return;
             }
             freeSlabPoolInitialized = true;
-            int maxIntervals = 1024 + dictSegments.size();
+            int maxIntervals = 1024 + dictSegments.size() + COW_GRACE_EPOCHS + deferredRetireSlabs.size();
             long[] packedIntervals = new long[maxIntervals];
             int count = 0;
             for (int s = 0; s < dictSegments.size(); s++) {
@@ -5529,6 +7314,23 @@ public final class LcaRegionWriter {
                         int slabEnd = slabStart + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
                         packedIntervals[count++] = ((long) slabStart << 32) | (slabEnd & 0xFFFF_FFFFL);
                     }
+                }
+            }
+            for (int g = 0; g < COW_GRACE_EPOCHS; g++) {
+                int gStart = graceSlabStarts[g];
+                int gCount = graceSlabCounts[g];
+                if (gStart >= this.slabPoolBaseSlab && gCount > 0) {
+                    int gEnd = gStart + gCount;
+                    packedIntervals[count++] = ((long) gStart << 32) | (gEnd & 0xFFFF_FFFFL);
+                }
+            }
+            for (int d = 0; d < deferredRetireSlabs.size(); d++) {
+                long[] item = deferredRetireSlabs.get(d);
+                int dStart = (int) item[0];
+                int dCount = (int) item[1];
+                if (dStart >= this.slabPoolBaseSlab && dCount > 0) {
+                    int dEnd = dStart + dCount;
+                    packedIntervals[count++] = ((long) dStart << 32) | (dEnd & 0xFFFF_FFFFL);
                 }
             }
             Arrays.sort(packedIntervals, 0, count);
@@ -5728,33 +7530,55 @@ public final class LcaRegionWriter {
          * Off-thread padded slab and coalesced EOF canary writer (`REQ-RTP-S-005`, `@scheduler_dispatch`).
          */
         private synchronized void writeSlabBytes(int startSlab, byte[] payload) {
+            writeSlabBytesSlice(startSlab, payload, payload.length);
+        }
+
+        private synchronized void writeSlabBytesSlice(int startSlab, byte[] payload, int payloadLen) {
             int byteOffset = startSlab << LcaRegionReader.SLAB_SHIFT;
-            int paddedBytes = ((payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT) << LcaRegionReader.SLAB_SHIFT;
+            int paddedBytes = ((payloadLen + 255) >>> LcaRegionReader.SLAB_SHIFT) << LcaRegionReader.SLAB_SHIFT;
             int footerOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
             boolean isAtActiveEnd = (activeEndSlab >= slabPoolBaseSlab
                     && slabPoolBaseSlab > 0
                     && byteOffset + paddedBytes == footerOffset);
             if (headerOnlyChannelMode) {
                 if (isAtActiveEnd && channel != null && channel.isOpen() && footerOffset != lastSyncedFooterOffset) {
-                    byte[] coalesced = Arrays.copyOf(payload, paddedBytes + LcaRegionReader.FOOTER_SIZE);
-                    LcaRegionReader.setVolatileLongBE(coalesced, paddedBytes, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
-                    writeChannelRangeUnchecked(byteOffset, coalesced, 0, coalesced.length);
+                    int totalWrite = paddedBytes + LcaRegionReader.FOOTER_SIZE;
+                    if (payload.length >= totalWrite) {
+                        if (paddedBytes > payloadLen) {
+                            Arrays.fill(payload, payloadLen, paddedBytes, (byte) 0);
+                        }
+                        LcaRegionReader.setVolatileLongBE(payload, paddedBytes, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                        writeChannelRangeUnchecked(byteOffset, payload, 0, totalWrite);
+                    } else {
+                        byte[] coalesced = Arrays.copyOf(payload, totalWrite);
+                        if (paddedBytes > payloadLen) {
+                            Arrays.fill(coalesced, payloadLen, paddedBytes, (byte) 0);
+                        }
+                        LcaRegionReader.setVolatileLongBE(coalesced, paddedBytes, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                        writeChannelRangeUnchecked(byteOffset, coalesced, 0, totalWrite);
+                    }
                     lastSyncedFooterOffset = footerOffset;
                     return;
                 }
                 writeFooterCanary();
-                if (paddedBytes == payload.length) {
-                    writeChannelRangeUnchecked(byteOffset, payload, 0, payload.length);
+                if (payload.length >= paddedBytes) {
+                    if (paddedBytes > payloadLen) {
+                        Arrays.fill(payload, payloadLen, paddedBytes, (byte) 0);
+                    }
+                    writeChannelRangeUnchecked(byteOffset, payload, 0, paddedBytes);
                 } else {
                     byte[] padded = Arrays.copyOf(payload, paddedBytes);
+                    if (paddedBytes > payloadLen) {
+                        Arrays.fill(padded, payloadLen, paddedBytes, (byte) 0);
+                    }
                     writeChannelRangeUnchecked(byteOffset, padded, 0, paddedBytes);
                 }
                 return;
             }
             ensureBufferCapacity(Math.max(byteOffset + paddedBytes, footerOffset) + LcaRegionReader.FOOTER_SIZE);
-            System.arraycopy(payload, 0, buffer, byteOffset, payload.length);
-            if (paddedBytes > payload.length) {
-                Arrays.fill(buffer, byteOffset + payload.length, byteOffset + paddedBytes, (byte) 0);
+            System.arraycopy(payload, 0, buffer, byteOffset, payloadLen);
+            if (paddedBytes > payloadLen) {
+                Arrays.fill(buffer, byteOffset + payloadLen, byteOffset + paddedBytes, (byte) 0);
             }
             if (isAtActiveEnd) {
                 LcaRegionReader.setVolatileLongBE(buffer, footerOffset, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);

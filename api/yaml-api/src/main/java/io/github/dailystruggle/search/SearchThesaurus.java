@@ -13,11 +13,11 @@ import java.util.Set;
 public final class SearchThesaurus {
 
     private static final SearchThesaurus DEFAULT = new SearchThesaurus(
-            io.github.dailystruggle.rtp.common.search.SearchThesaurus.defaultInstance());
+            net.leaf.yaml.search.SearchThesaurus.defaultInstance());
 
-    private final io.github.dailystruggle.rtp.common.search.SearchThesaurus delegate;
+    private final net.leaf.yaml.search.SearchThesaurus delegate;
 
-    private SearchThesaurus(io.github.dailystruggle.rtp.common.search.SearchThesaurus delegate) {
+    private SearchThesaurus(net.leaf.yaml.search.SearchThesaurus delegate) {
         this.delegate = delegate;
     }
 

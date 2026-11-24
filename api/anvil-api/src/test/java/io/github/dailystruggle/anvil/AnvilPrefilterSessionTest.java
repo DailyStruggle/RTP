@@ -102,12 +102,11 @@ class AnvilPrefilterSessionTest {
     }
 
     @Test
-    @DisplayName("probeDetailed with a null executor falls back to the Anvil I/O pool")
-    void nullExecutorUsesPool(@TempDir Path world) throws IOException {
+    @DisplayName("probeDetailed with a null executor fails closed with NullPointerException")
+    void nullExecutorFailsClosed(@TempDir Path world) throws IOException {
         writeRegion(world, "r.0.0.mca", stoneRoot());
-        AnvilPrefilter.ProbeResult res = AnvilPrefilter.probeDetailed(
-                world, "", 0, 0, Set.of("LAVA"), AnvilPrefilter.DEFAULT_RECONCILER, null).join();
-        assertEquals(Verdict.ACCEPT, res.verdict());
+        assertThrows(NullPointerException.class, () -> AnvilPrefilter.probeDetailed(
+                world, "", 0, 0, Set.of("LAVA"), AnvilPrefilter.DEFAULT_RECONCILER, null));
     }
 
     @Test
@@ -225,21 +224,26 @@ class AnvilPrefilterSessionTest {
     }
 
     @Test
-    @DisplayName("probeColumnAsync short-circuits invalid input and serves real requests on the pool")
+    @DisplayName("probeColumnAsync short-circuits invalid input and serves real requests on the supplied coalescer")
     void probeColumnAsync(@TempDir Path world) throws IOException {
-        CompletableFuture<ColumnProbe> nullWorld = AnvilPrefilter.probeColumnAsync(null, "", 0, 0, 0, 15);
-        assertTrue(nullWorld.isDone());
-        assertNull(nullWorld.join());
-        CompletableFuture<ColumnProbe> inverted = AnvilPrefilter.probeColumnAsync(world, "", 0, 0, 15, 0);
-        assertTrue(inverted.isDone());
-        assertNull(inverted.join());
+        try (ColumnProbeCoalescer coalescer = AnvilPrefilter.createColumnProbeCoalescer(Runnable::run)) {
+            CompletableFuture<ColumnProbe> nullWorld =
+                    AnvilPrefilter.probeColumnAsync(coalescer, null, "", 0, 0, 0, 15);
+            assertTrue(nullWorld.isDone());
+            assertNull(nullWorld.join());
+            CompletableFuture<ColumnProbe> inverted =
+                    AnvilPrefilter.probeColumnAsync(coalescer, world, "", 0, 0, 15, 0);
+            assertTrue(inverted.isDone());
+            assertNull(inverted.join());
 
-        writeRegion(world, "r.0.0.mca", stoneRoot());
-        long requestsBefore = AnvilPrefilter.columnProbeRequests();
-        ColumnProbe probe = AnvilPrefilter.probeColumnAsync(world, null, 0, 0, 0, 15).join();
-        assertNotNull(probe);
-        assertEquals(0, probe.minY());
-        assertTrue(AnvilPrefilter.columnProbeRequests() > requestsBefore);
-        assertTrue(AnvilPrefilter.columnProbeGroups() > 0);
+            writeRegion(world, "r.0.0.mca", stoneRoot());
+            long requestsBefore = coalescer.requestsServed();
+            ColumnProbe probe =
+                    AnvilPrefilter.probeColumnAsync(coalescer, world, null, 0, 0, 0, 15).join();
+            assertNotNull(probe);
+            assertEquals(0, probe.minY());
+            assertTrue(coalescer.requestsServed() > requestsBefore);
+            assertTrue(coalescer.groupsDrained() > 0);
+        }
     }
 }

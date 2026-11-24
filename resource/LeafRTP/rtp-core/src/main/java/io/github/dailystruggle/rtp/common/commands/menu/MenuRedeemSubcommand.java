@@ -1374,9 +1374,9 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         if (ActiveConfigs.get() == null) return "";
         String target = bareFileName.toLowerCase(java.util.Locale.ROOT);
         if (target.endsWith(".yml")) target = target.substring(0, target.length() - 4);
-        io.github.dailystruggle.rtp.common.factory.FactoryValue<?> match = null;
+        net.leaf.yaml.factory.FactoryValue<?> match = null;
         try {
-            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
+            for (net.leaf.yaml.configuration.ConfigParser<?> p
                     : ActiveConfigs.get().configParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 String pn = p.name.toLowerCase(java.util.Locale.ROOT);
@@ -1440,7 +1440,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
 
     /**
      * Descend a dotted sub-path into a section/map value. Supports
-     * {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection}
+     * {@link net.leaf.yaml.RtpYamlSection}
      * (which accepts dotted keys natively) and nested {@link java.util.Map}s.
      * Returns {@code null} when the path cannot be resolved.
      */
@@ -1453,7 +1453,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         // surfaced as a spurious "(unset)" current value in the finite-value
         // picker even after the operator picked a type. Descend via the
         // enum-keyed data map instead.
-        if (value instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
+        if (value instanceof net.leaf.yaml.factory.FactoryValue<?> fv) {
             int dot = dottedPath.indexOf('.');
             String head = dot < 0 ? dottedPath : dottedPath.substring(0, dot);
             String rest = dot < 0 ? null : dottedPath.substring(dot + 1);
@@ -1466,7 +1466,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             }
             return null;
         }
-        if (value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section) {
+        if (value instanceof net.leaf.yaml.RtpYamlSection section) {
             try {
                 return section.get(dottedPath);
             } catch (RuntimeException e) {
@@ -1496,17 +1496,17 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      * {@link #resolveCurrentConfigValueAsString} for entry parsers
      * reached via {@code <kind>/<entryName>}-shaped synthetic fileNames.
      * Resolves through {@link #resolveMultiConfigParser} and the entry's
-     * {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser#getParser(String)}.
+     * {@link net.leaf.yaml.configuration.MultiConfigParser#getParser(String)}.
      */
     private static String resolveCurrentMultiConfigValueAsString(
             String kind, String entryName, String paramName) {
         if (paramName == null || paramName.isEmpty()) return "";
         if (kind == null || kind.isEmpty()) return "";
         if (entryName == null || entryName.isEmpty()) return "";
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp =
+        net.leaf.yaml.configuration.MultiConfigParser<?> mcp =
                 resolveMultiConfigParser(kind);
         if (mcp == null) return "";
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> entry;
+        net.leaf.yaml.configuration.ConfigParser<?> entry;
         try {
             entry = mcp.getParser(entryName);
         } catch (RuntimeException e) {
@@ -1654,7 +1654,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      */
     private static java.util.List<String> resolveFiniteOptions(String fileName, String paramName) {
         if (paramName == null || paramName.isEmpty()) return java.util.List.of();
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot =
+        net.leaf.yaml.RtpYamlSection yamlRoot =
                 resolveYamlRootForFile(fileName);
         String comment = null;
         if (yamlRoot != null) {
@@ -1665,8 +1665,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 comment = null;
             }
         }
-        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives directives =
-                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
+        net.leaf.yaml.configuration.ConfigDirectives directives =
+                net.leaf.yaml.configuration.ConfigDirectives.parse(comment);
         // ADR-073 inheritance fallback: a dotted key like "shape.name" carries
         // no local comment when its parent block ships an @<file> inheritance
         // token (e.g. region/world files store `shape: "@config"`). The menu
@@ -1675,7 +1675,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         // to the owning default file and read the sub-key's comment there.
         if (directives.options().isEmpty()
                 && (directives.source() == null || directives.source().isEmpty())) {
-            io.github.dailystruggle.rtp.common.configuration.ConfigDirectives inherited =
+            net.leaf.yaml.configuration.ConfigDirectives inherited =
                     resolveInheritedDirectives(fileName, paramName);
             if (!inherited.options().isEmpty()
                     || (inherited.source() != null && !inherited.source().isEmpty())) {
@@ -1735,10 +1735,10 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      * Resolve directives for {@code paramName} with inheritance fallback (ADR-073).
      * Handles materialized multiconfig entries, inherited default blocks, and template fallbacks.
      */
-    private static io.github.dailystruggle.rtp.common.configuration.ConfigDirectives
+    private static net.leaf.yaml.configuration.ConfigDirectives
             resolveInheritedDirectives(String fileName, String paramName) {
-        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives empty =
-                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+        net.leaf.yaml.configuration.ConfigDirectives empty =
+                net.leaf.yaml.configuration.ConfigDirectives.parse(null);
         if (paramName == null || paramName.isEmpty()) return empty;
 
         int slash = fileName == null ? -1 : fileName.indexOf('/');
@@ -1752,7 +1752,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             String kind = fileName.substring(0, slash);
             String entry = fileName.substring(slash + 1);
             if (!stripYmlLower(entry).equals("default")) {
-                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives d =
+                net.leaf.yaml.configuration.ConfigDirectives d =
                         directivesFor(kind + "/default", paramName);
                 if (hasFiniteDomain(d)) return d;
             }
@@ -1779,7 +1779,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     String lookupKey = refFile.equals("config")
                             ? "defaults." + paramName
                             : paramName;
-                    io.github.dailystruggle.rtp.common.configuration.ConfigDirectives d =
+                    net.leaf.yaml.configuration.ConfigDirectives d =
                             directivesFor(refFile, lookupKey);
                     if (hasFiniteDomain(d)) return d;
                 }
@@ -1792,7 +1792,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         // Candidate C: region/world block schemas mirror config.yml#defaults, so
         // a materialized (non-reference) inherited block still finds its
         // directive under config.yml#defaults.<paramName>.
-        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives fromConfig =
+        net.leaf.yaml.configuration.ConfigDirectives fromConfig =
                 directivesFor("config", "defaults." + paramName);
         if (hasFiniteDomain(fromConfig)) return fromConfig;
 
@@ -1801,25 +1801,25 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
 
     /**
      * Read the in-memory block comment for {@code key} in {@code fileName} and
-     * parse it into {@link io.github.dailystruggle.rtp.common.configuration.ConfigDirectives}.
+     * parse it into {@link net.leaf.yaml.configuration.ConfigDirectives}.
      * Returns empty directives when the file's YAML root is unavailable or the
      * comment lookup fails. No file I/O.
      */
-    private static io.github.dailystruggle.rtp.common.configuration.ConfigDirectives
+    private static net.leaf.yaml.configuration.ConfigDirectives
             directivesFor(String fileName, String key) {
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection root =
+        net.leaf.yaml.RtpYamlSection root =
                 resolveYamlRootForFile(fileName);
         if (root == null) {
-            return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+            return net.leaf.yaml.configuration.ConfigDirectives.parse(null);
         }
         String comment;
         try {
             comment = root.getComment(key);
         } catch (RuntimeException e) {
             CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.directivesFor:" + key, e);
-            return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+            return net.leaf.yaml.configuration.ConfigDirectives.parse(null);
         }
-        return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
+        return net.leaf.yaml.configuration.ConfigDirectives.parse(comment);
     }
 
     /**
@@ -1827,7 +1827,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      *     (a non-empty {@code @options} list or a non-empty {@code @source}).
      */
     private static boolean hasFiniteDomain(
-            io.github.dailystruggle.rtp.common.configuration.ConfigDirectives directives) {
+            net.leaf.yaml.configuration.ConfigDirectives directives) {
         return directives != null
                 && (!directives.options().isEmpty()
                     || (directives.source() != null && !directives.source().isEmpty()));
@@ -1841,7 +1841,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      * sub-parsers by entry name). Returns {@code null} when configs are not
      * loaded or no parser matches.
      */
-    private static io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection
+    private static net.leaf.yaml.RtpYamlSection
             resolveYamlRootForFile(String fileName) {
         if (fileName == null || fileName.isEmpty()) return null;
         if (ActiveConfigs.get() == null) return null;
@@ -1849,11 +1849,11 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             int slash = fileName.indexOf('/');
             if (slash > 0 && slash < fileName.length() - 1) {
                 String entry = stripYmlLower(fileName.substring(slash + 1));
-                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp
+                for (net.leaf.yaml.configuration.MultiConfigParser<?> mcp
                         : ActiveConfigs.get().multiConfigParserMap.values()) {
                     if (mcp == null) continue;
                     for (String name : mcp.listParsers()) {
-                        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> sub =
+                        net.leaf.yaml.configuration.ConfigParser<?> sub =
                                 mcp.getParser(name);
                         if (sub == null || sub.name == null) continue;
                         if (stripYmlLower(sub.name).equals(entry)) {
@@ -1864,7 +1864,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 return null;
             }
             String target = stripYmlLower(fileName);
-            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
+            for (net.leaf.yaml.configuration.ConfigParser<?> p
                     : ActiveConfigs.get().configParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 if (stripYmlLower(p.name).equals(target)) {
@@ -2627,19 +2627,19 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     }
 
     /**
-     * Resolve a {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser}
+     * Resolve a {@link net.leaf.yaml.configuration.MultiConfigParser}
      * by its case-insensitive {@code name}. Returns {@code null} when no
      * registered multi-config parser matches; the dispatch arms treat that
      * as an S-004 reject path (token forged with an unknown kind, or the
      * matching parser has been unregistered since the token was minted).
      */
-    private static @Nullable io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> resolveMultiConfigParser(
+    private static @Nullable net.leaf.yaml.configuration.MultiConfigParser<?> resolveMultiConfigParser(
             String parserKind) {
         if (parserKind == null || parserKind.isEmpty()) return null;
         if (ActiveConfigs.get() == null) return null;
         String target = parserKind.toLowerCase(java.util.Locale.ROOT);
         try {
-            for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> p
+            for (net.leaf.yaml.configuration.MultiConfigParser<?> p
                     : ActiveConfigs.get().multiConfigParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 if (p.name.toLowerCase(java.util.Locale.ROOT).equals(target)) {
@@ -2688,7 +2688,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             effectiveKind = rawKind.substring("!toggle:".length());
             isToggle = true;
         }
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+        net.leaf.yaml.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(effectiveKind);
         if (parser == null) {
             RTPRuntime.log(Level.WARNING,
@@ -2716,7 +2716,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             @SuppressWarnings({"unchecked", "rawtypes"})
             MenuModel m = multiConfigBuilder.buildSelector(
-                    effectiveKind, (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser) parser,
+                    effectiveKind, (net.leaf.yaml.configuration.MultiConfigParser) parser,
                     removeMode, senderId);
             model = m;
         } catch (RuntimeException e) {
@@ -2777,7 +2777,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         }
         String kind = open.parserKind();
         String entry = open.entryName();
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+        net.leaf.yaml.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(kind);
         if (parser == null) {
             RTPRuntime.log(Level.WARNING,
@@ -2799,7 +2799,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             @SuppressWarnings({"unchecked", "rawtypes"})
             MenuModel m = multiConfigBuilder.buildEntry(
                     kind, entry,
-                    (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser) parser,
+                    (net.leaf.yaml.configuration.MultiConfigParser) parser,
                     senderId,
                     cartSnap);
             model = m;
@@ -2858,7 +2858,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         String kind = mutate.parserKind();
         String entry = mutate.entryName();
         MenuAction.MultiConfigMutate.Op op = mutate.op();
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+        net.leaf.yaml.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(kind);
         if (parser == null) {
             RTPRuntime.log(Level.WARNING,
@@ -2950,13 +2950,13 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      */
     @SuppressWarnings("unchecked") // NetherEndConfigAmender.amend invoked on the raw-typed parser (see local raw below)
     private static void tryAmendNetherEndSeed(
-            io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
+            net.leaf.yaml.configuration.MultiConfigParser<?> parser,
             String entry) {
         if (entry == null) return;
         String lower = entry.toLowerCase(java.util.Locale.ROOT);
         if (!lower.endsWith("_nether") && !lower.endsWith("_the_end")) return;
         try {
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> region =
+            net.leaf.yaml.configuration.ConfigParser<?> region =
                     parser.getParser(entry);
             if (region == null) return;
             io.github.dailystruggle.rtp.api.world.RTPWorld world = null;
@@ -2968,7 +2968,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 }
             }
             @SuppressWarnings({"unchecked", "rawtypes"})
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser raw = region;
+            net.leaf.yaml.configuration.ConfigParser raw = region;
             io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender
                     .amend(new java.util.HashMap<>(), raw, world);
         } catch (RuntimeException e) {
@@ -3008,14 +3008,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      */
     private void registerParentChild(
             String kind,
-            io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
+            net.leaf.yaml.configuration.MultiConfigParser<?> parser,
             String entry) {
         if (kind == null || entry == null || parser == null) return;
         io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand parent =
                 resolveParentConfigCmd(kind);
         if (parent == null) return;
         try {
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> child = parser.getParser(entry);
+            net.leaf.yaml.configuration.ConfigParser<?> child = parser.getParser(entry);
             if (child == null) return;
             if (parent instanceof io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar registrar) {
                 registrar.registerChildParser(child);

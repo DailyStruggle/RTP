@@ -21,7 +21,7 @@ import java.util.function.Function;
  * {@code FabricProgressBarsUnobf} (which serves the deobf MC 26.x runtime through the
  * per-version adapter).
  *
- * <p><b>Why this is a separate class.</b> {@code FabricServerAccessor} is constructed
+ * <p>{@code FabricServerAccessor} is constructed
  * unconditionally by {@code RTPFabricMod} on every runtime, so it must <em>load and link</em>
  * on the deobf MC 26.x runtime where the intermediary names (e.g. {@code class_2561 =
  * Component}, {@code ServerBossEvent}) do not exist. Keeping the typed {@code net.minecraft.*}

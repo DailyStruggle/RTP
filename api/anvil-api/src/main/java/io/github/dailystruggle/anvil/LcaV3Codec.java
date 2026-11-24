@@ -2,6 +2,7 @@ package io.github.dailystruggle.anvil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -81,7 +82,7 @@ final class LcaV3Codec {
     private static final ThreadLocal<Integer> THREAD_FEATURE_MASK = ThreadLocal.withInitial(() -> DEFAULT_V3_FEATURES);
 
     @SuppressWarnings("java:S5164")
-    private static final ThreadLocal<V3Scratch> V3_SCRATCH = ThreadLocal.withInitial(V3Scratch::new);
+    private static final ThreadLocal<SoftReference<V3Scratch>> V3_SCRATCH = new ThreadLocal<>();
 
     private static final byte[] MINECRAFT_PREFIX_BYTES = "minecraft:".getBytes(StandardCharsets.UTF_8);
 
@@ -100,7 +101,13 @@ final class LcaV3Codec {
     }
 
     static V3Scratch v3Scratch() {
-        return V3_SCRATCH.get();
+        SoftReference<V3Scratch> ref = V3_SCRATCH.get();
+        V3Scratch scratch = ref != null ? ref.get() : null;
+        if (scratch == null) {
+            scratch = new V3Scratch();
+            V3_SCRATCH.set(new SoftReference<>(scratch));
+        }
+        return scratch;
     }
 
     static void clearThreadLocalScratch() {
@@ -119,20 +126,44 @@ final class LcaV3Codec {
         final byte[] lightStagingAlt = new byte[4096];
         final long[] b1OctVoxMasks = new long[64];
         final byte[] b1NzNibbles = new byte[SECTION_VOXELS];
-        final int[] domainA = new int[SECTION_VOXELS];
-        final int[] domainB = new int[SECTION_VOXELS];
-        final byte[] claimed = new byte[SECTION_VOXELS];
-        final byte[] rankStaging = new byte[16384];
-        final int[] unpackedYzx = new int[SECTION_VOXELS];
-        final int[] grayAdjMatrix = new int[MAX_GRAY_PALETTE * MAX_GRAY_PALETTE];
-        final int[] grayOldToNew = new int[MAX_GRAY_PALETTE];
-        final int[] grayNewToOld = new int[MAX_GRAY_PALETTE];
-        final boolean[] grayUsed = new boolean[MAX_GRAY_PALETTE];
-        final int[] grayRemappedGlobalIds = new int[MAX_GRAY_PALETTE];
-        final int[] grayCurveVals = new int[SECTION_VOXELS];
-        final int[] grayRunStaging = new int[SECTION_VOXELS];
-        final int[] grayRunStagingAlt = new int[SECTION_VOXELS];
-        final byte[] grayStaging = new byte[16384];
+        int[] domainA;
+        int[] domainB;
+        byte[] claimed;
+        byte[] rankStaging;
+        int[] unpackedYzx;
+        int[] grayAdjMatrix;
+        int[] grayOldToNew;
+        int[] grayNewToOld;
+        boolean[] grayUsed;
+        int[] grayRemappedGlobalIds;
+        int[] grayCurveVals;
+        int[] grayRunStaging;
+        int[] grayRunStagingAlt;
+        byte[] grayStaging;
+
+        void ensureRankBuffers() {
+            if (domainA == null) {
+                domainA = new int[SECTION_VOXELS];
+                domainB = new int[SECTION_VOXELS];
+                claimed = new byte[SECTION_VOXELS];
+                rankStaging = new byte[16384];
+                unpackedYzx = new int[SECTION_VOXELS];
+            }
+        }
+
+        void ensureGrayBuffers() {
+            if (grayAdjMatrix == null) {
+                grayAdjMatrix = new int[MAX_GRAY_PALETTE * MAX_GRAY_PALETTE];
+                grayOldToNew = new int[MAX_GRAY_PALETTE];
+                grayNewToOld = new int[MAX_GRAY_PALETTE];
+                grayUsed = new boolean[MAX_GRAY_PALETTE];
+                grayRemappedGlobalIds = new int[MAX_GRAY_PALETTE];
+                grayCurveVals = new int[SECTION_VOXELS];
+                grayRunStaging = new int[SECTION_VOXELS];
+                grayRunStagingAlt = new int[SECTION_VOXELS];
+                grayStaging = new byte[16384];
+            }
+        }
     }
 
     // =========================================================================
@@ -1731,6 +1762,7 @@ final class LcaV3Codec {
             byte[] dst
     ) {
         V3Scratch sc = v3Scratch();
+        sc.ensureRankBuffers();
         int[] curDom = sc.domainA;
         int[] nextDom = sc.domainB;
         int rem = activeVoxels;
@@ -1812,6 +1844,7 @@ final class LcaV3Codec {
     ) throws CorruptRegionEntryException {
         int[] curveToLoc = LcaSectionCodec.CURVE_BITS_TO_PACKED_LOC[curveId][bits];
         V3Scratch sc = v3Scratch();
+        sc.ensureRankBuffers();
         int[] curDom = sc.domainA;
         int[] nextDom = sc.domainB;
         byte[] claimed = sc.claimed;
@@ -2082,6 +2115,7 @@ final class LcaV3Codec {
             return -1;
         }
         V3Scratch sc = v3Scratch();
+        sc.ensureGrayBuffers();
         int[] adj = sc.grayAdjMatrix;
         int pSq = paletteSize * paletteSize;
         Arrays.fill(adj, 0, pSq, 0);
@@ -2351,6 +2385,8 @@ final class LcaV3Codec {
         }
 
         V3Scratch sc = v3Scratch();
+        sc.ensureRankBuffers();
+        sc.ensureGrayBuffers();
         int[] curDom = sc.domainA;
         int activeVoxels = buildInitialCurveDomain(curveId, expectedOctreeMask64, curDom);
         int[] grayCurve = sc.grayCurveVals;

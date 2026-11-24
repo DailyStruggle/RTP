@@ -255,6 +255,8 @@ public final class BytecodeCausalGraphScanner {
         CAUSAL_SYNC_MAIN_THREAD_IO,
         /** Order 2: Intra-method Closeable/stream/ChunkTicket allocation lacks close()/release()/MemoryTracker across exit paths ({@code CAUSAL-LEAK}, {@code S-002}). */
         CAUSAL_UNCLOSED_RESOURCE_LEAK,
+        /** Order 2: Command/event handler or unclosed lifecycle init spawns raw Thread, Timer, or Executors pool bypassing the server scheduler ({@code F-001}, {@code S-002}). */
+        CAUSAL_UNMANAGED_THREAD_SPAWN,
         /** Order 2 (Advisory): Subscribed LLM semantic/guard-polarity mismatch grounded in closed-world AST symbols. */
         CAUSAL_LLM_SEMANTIC_MISMATCH
     }
@@ -2082,6 +2084,20 @@ public final class BytecodeCausalGraphScanner {
                         listenerRegistrations
                 );
         findings.addAll(leakFindings);
+        findingSeq += leakFindings.size();
+
+        List<CausalFinding> unmanagedThreadFindings =
+                BytecodeParityAnalyzers.detectUnmanagedThreadSpawns(
+                        effName,
+                        findingSeq,
+                        classesByName,
+                        methodsBySymbol,
+                        methodsByName,
+                        allAsyncSpawnedLambdas,
+                        listenerRegistrations
+                );
+        findings.addAll(unmanagedThreadFindings);
+        findingSeq += unmanagedThreadFindings.size();
 
         List<CausalChainSlice> enrichedChains =
                 BytecodeParityAnalyzers.enrichSlicesWithHoareFramesAndProofs(

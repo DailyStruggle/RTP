@@ -85,8 +85,61 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             Map<String, Integer> callCountByFnName,
             Map<String, Integer> memoSlotByFnName,
             int memo2dKeepMask,
-            String memoElemType
+            String memoElemType,
+            CoarseInterpSpec coarseInterpSpec
     ) {
+    }
+
+    /**
+     * Specification for coarse-grid {@code __local} trilinear interpolation inside
+     * {@link BatchLayout#SECTION_PALETTE_FILL_U2} ({@code 16x16x16} section workgroup).
+     * Each coarse function {@code (int x, int y, int z) -> float} is evaluated on the
+     * {@code (16/cellSizeXz + 1) x (16/cellSizeY + 1) x (16/cellSizeXz + 1)} grid into
+     * workgroup {@code __local} memory and trilinearly interpolated into the dense combiner
+     * entry function's {@code K} extra float parameters.
+     */
+    public record CoarseInterpSpec(
+            int cellSizeXz,
+            int cellSizeY,
+            List<String> coarseFunctionNames
+    ) {
+        public static final int MAX_CHANNELS = 8;
+        public static final int MAX_LOCAL_FLOATS = 4096;
+
+        public CoarseInterpSpec {
+            if (cellSizeXz <= 0 || (16 % cellSizeXz) != 0) {
+                throw new IllegalArgumentException("cellSizeXz must divide 16: " + cellSizeXz);
+            }
+            if (cellSizeY <= 0 || (16 % cellSizeY) != 0) {
+                throw new IllegalArgumentException("cellSizeY must divide 16: " + cellSizeY);
+            }
+            Objects.requireNonNull(coarseFunctionNames, "coarseFunctionNames");
+            if (coarseFunctionNames.isEmpty() || coarseFunctionNames.size() > MAX_CHANNELS) {
+                throw new IllegalArgumentException(
+                        "coarseFunctionNames size must be in 1.." + MAX_CHANNELS + ": " + coarseFunctionNames.size());
+            }
+            coarseFunctionNames = List.copyOf(coarseFunctionNames);
+            int nx = (16 / cellSizeXz) + 1;
+            int ny = (16 / cellSizeY) + 1;
+            int totalFloats = nx * ny * nx * coarseFunctionNames.size();
+            if (totalFloats > MAX_LOCAL_FLOATS) {
+                throw new IllegalArgumentException(
+                        "Coarse __local float budget exceeded: " + totalFloats + " > " + MAX_LOCAL_FLOATS);
+            }
+        }
+
+        public int gridSizeXz() {
+            return (16 / cellSizeXz) + 1;
+        }
+
+        public int gridSizeY() {
+            return (16 / cellSizeY) + 1;
+        }
+
+        public int pointsPerChannel() {
+            int nx = gridSizeXz();
+            return nx * gridSizeY() * nx;
+        }
     }
 
     private record DiamondMemoPlan(
@@ -156,6 +209,444 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                     + ", spilledLutCount=" + this.spilledLutCount
                     + ", deduplicatedLutCount=" + this.deduplicatedLutCount
                     + "]";
+        }
+    }
+
+    /**
+     * Self-contained OpenCL C99 {@code DensityVolume} batch evaluation program with deterministic
+     * SHA-256 content digest and optional {@code __global const int*} spilled LUT payload.
+     */
+    public record DensityVolumeProgram(
+            String kernelName,
+            String sourceCode,
+            String kernelDigestSha256,
+            int[] spilledLutWords,
+            int usedConstantBytes,
+            int spilledLutCount,
+            int deduplicatedLutCount
+    ) {
+        public DensityVolumeProgram {
+            Objects.requireNonNull(kernelName, "kernelName");
+            Objects.requireNonNull(sourceCode, "sourceCode");
+            Objects.requireNonNull(kernelDigestSha256, "kernelDigestSha256");
+            spilledLutWords = spilledLutWords == null ? new int[0] : java.util.Arrays.copyOf(spilledLutWords, spilledLutWords.length);
+        }
+
+        @Override
+        public int[] spilledLutWords() {
+            return java.util.Arrays.copyOf(spilledLutWords, spilledLutWords.length);
+        }
+    }
+
+    /**
+     * Emits a self-contained {@link BatchLayout#DENSITY_VOLUME_BATCH_F32} OpenCL C99 program with
+     * automatic {@code __constant} LUT compaction/deduplication, {@code __global const int*}
+     * overflow spill ({@code gl_lut_spill}), and a deterministic SHA-256 content digest suitable
+     * for JAR-packed kernel lookup and on-disk binary caching.
+     */
+    public DensityVolumeProgram emitDensityVolumeBatchProgram(ConceptModule module, EmitOptions options) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(options, "options");
+        ConstantLutAllocator allocator = new ConstantLutAllocator(MAX_CONSTANT_BUDGET_BYTES, 0, "gl_lut_spill");
+        EmitOptions volumeOpts = options.withBatchLayout(BatchLayout.DENSITY_VOLUME_BATCH_F32);
+        TranspiledArtifact artifact = emitWithAllocator(module, volumeOpts, "", allocator, true);
+        int[] spilled = allocator.spilledWordsArray();
+        String kernelName = artifact.kernel3DName() != null ? artifact.kernel3DName() : "evaluate_density_volume_batch_f32";
+        String digest = computeDensityVolumeDigest(volumeOpts.gpuExactArithmeticMode(), artifact.sourceCode(), spilled);
+        return new DensityVolumeProgram(
+                kernelName,
+                artifact.sourceCode(),
+                digest,
+                spilled,
+                allocator.usedConstantBytes(),
+                allocator.spilledLutCount(),
+                allocator.deduplicatedLutCount());
+    }
+
+    /**
+     * Emits a single fused 6-channel OpenCL C99 program ({@code eval_biome_climate6_batch}) that
+     * evaluates all 6 climate {@link ConceptModule}s ({@code temperature}, {@code vegetation},
+     * {@code continents}, {@code erosion}, {@code depth}, {@code ridges}) in one kernel dispatch
+     * and one contiguous interleaved {@code float[batch * volume * 6]} readback while deduplicating
+     * shared noise LUTs across all 6 channels.
+     */
+    public DensityVolumeProgram emitFusedBiomeClimateBatchProgram(
+            List<ConceptModule> climateModules6,
+            EmitOptions options) {
+        Objects.requireNonNull(climateModules6, "climateModules6");
+        Objects.requireNonNull(options, "options");
+        if (climateModules6.size() != 6) {
+            throw new IllegalArgumentException(
+                    "emitFusedBiomeClimateBatchProgram requires exactly 6 climate modules, got " + climateModules6.size());
+        }
+        ConstantLutAllocator allocator = new ConstantLutAllocator(MAX_CONSTANT_BUDGET_BYTES, 0, "gl_lut_spill");
+        EmitOptions volumeOpts = options.withBatchLayout(BatchLayout.DENSITY_VOLUME_BATCH_F32);
+        GpuExactArithmeticMode arithmeticMode = volumeOpts.gpuExactArithmeticMode();
+
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("// Auto-generated fused 6-channel OpenCL C99 biome climate kernel\n");
+        if (arithmeticMode == GpuExactArithmeticMode.NATIVE_FP64) {
+            sb.append("#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n");
+            sb.append("#pragma OPENCL FP_CONTRACT OFF\n\n");
+        } else if (arithmeticMode == GpuExactArithmeticMode.INT64_Q32_FP32) {
+            sb.append("// Floating-point mode: INT64_Q32_FP32 (64-bit Q32.32 coordinate arithmetic + FP32 interpolation)\n");
+            sb.append("#pragma OPENCL FP_CONTRACT OFF\n\n");
+            emitQ32Helpers(sb);
+            sb.append('\n');
+        } else {
+            sb.append("// Floating-point mode: DOWNCAST_FP32\n");
+            sb.append("#pragma OPENCL FP_CONTRACT OFF\n\n");
+        }
+
+        String[] channelCallExprs = new String[6];
+        boolean[] channelQ32Ret = new boolean[6];
+        EmitScope prevScope = ACTIVE_EMIT_SCOPE.get();
+        try {
+            for (int c = 0; c < 6; c++) {
+                ConceptModule rawModule = Objects.requireNonNull(climateModules6.get(c), "climateModules6[" + c + "]");
+                ConceptModule lowered = ConceptOptimizerPass.deduplicateLookupTables(rawModule);
+                Q32LoweringPlan q32Plan = arithmeticMode.usesInt64Q32()
+                        ? ConceptOptimizerPass.analyzeQ32Lowering(lowered)
+                        : Q32LoweringPlan.empty();
+
+                Map<String, ConceptFunction> fnByKey = new LinkedHashMap<>();
+                Map<String, ConceptFunction> fnByName = new LinkedHashMap<>();
+                registerFunctionLookup(lowered, fnByKey, fnByName);
+                Map<String, Integer> callCountByFnName = countFunctionCallSites(lowered, fnByKey, fnByName);
+
+                String chPrefix = "ch" + c + "_";
+                ACTIVE_EMIT_SCOPE.set(new EmitScope(
+                        chPrefix,
+                        allocator,
+                        true,
+                        callCountByFnName,
+                        DiamondMemoPlan.EMPTY.fnNameToSlot(),
+                        DiamondMemoPlan.EMPTY.keep2dMask(),
+                        DiamondMemoPlan.EMPTY.elemType(),
+                        null));
+
+                sb.append("// --- Climate channel ").append(c).append(": ").append(lowered.moduleName()).append(" ---\n");
+                for (ConceptLut lut : lowered.lookupTables()) {
+                    if (arithmeticMode.usesInt64Q32()
+                            && lut.elementType() == ConceptType.F64
+                            && q32Plan.q32LutSymbol(lut.symbolName()) != null
+                            && !q32Plan.isFp32ReferencedLut(lut.symbolName())) {
+                        continue;
+                    }
+                    allocator.allocateAndEmit(sb, lut, volumeOpts, chPrefix);
+                    sb.append('\n');
+                }
+                if (arithmeticMode.usesInt64Q32()) {
+                    for (ConceptLut q32Lut : q32Plan.synthesizedQ32Luts()) {
+                        allocator.allocateAndEmit(sb, q32Lut, volumeOpts, chPrefix);
+                        sb.append('\n');
+                    }
+                }
+                for (ConceptFunction helper : lowered.helperFunctions()) {
+                    emitDeviceFunctionPrototype(sb, helper, volumeOpts, q32Plan);
+                }
+                if (!lowered.helperFunctions().isEmpty()) {
+                    sb.append('\n');
+                }
+                for (ConceptFunction helper : lowered.helperFunctions()) {
+                    emitDeviceFunction(sb, helper, volumeOpts, q32Plan, fnByKey, fnByName);
+                    sb.append('\n');
+                }
+                emitDeviceFunction(sb, lowered.entryFunction(), volumeOpts, q32Plan, fnByKey, fnByName);
+                sb.append('\n');
+
+                ConceptFunction target = lowered.entryFunction();
+                String rawCall = buildIntCoordTargetCall(target, "bx", "by", "bz", volumeOpts, q32Plan);
+                String callExpr = chPrefix + rawCall;
+                int closeParen = callExpr.lastIndexOf(')');
+                String beforeClose = callExpr.substring(0, closeParen);
+                String sep = beforeClose.endsWith("(") ? "" : ", ";
+                channelCallExprs[c] = beforeClose + sep + "gl_lut_spill)";
+                channelQ32Ret[c] = arithmeticMode.usesInt64Q32() && q32Plan.isQ32Return(target);
+            }
+        } finally {
+            if (prevScope == null) {
+                ACTIVE_EMIT_SCOPE.remove();
+            } else {
+                ACTIVE_EMIT_SCOPE.set(prevScope);
+            }
+        }
+
+        String kernelName = "eval_biome_climate6_batch";
+        sb.append("__kernel void ")
+                .append(kernelName)
+                .append("(\n")
+                .append("    __global float* restrict out_values,\n")
+                .append("    __global const int4* restrict batch_origins,\n")
+                .append("    const int batch_count,\n")
+                .append("    const int size_x,\n")
+                .append("    const int size_y,\n")
+                .append("    const int size_z,\n")
+                .append("    const int step_x,\n")
+                .append("    const int step_y,\n")
+                .append("    const int step_z,\n")
+                .append("    __global const int* restrict gl_lut_spill)\n")
+                .append("{\n")
+                .append("    const int gid = (int)get_global_id(0);\n")
+                .append("    const int volume_size = size_x * size_y * size_z;\n")
+                .append("    const int total_voxels = batch_count * volume_size;\n")
+                .append("    if (gid >= total_voxels) {\n")
+                .append("        return;\n")
+                .append("    }\n")
+                .append("    const int batch_idx = gid / volume_size;\n")
+                .append("    const int voxel_idx = gid - batch_idx * volume_size;\n")
+                .append("    const int col_idx = voxel_idx / size_y;\n")
+                .append("    const int ly = voxel_idx - col_idx * size_y;\n")
+                .append("    const int lz = col_idx / size_x;\n")
+                .append("    const int lx = col_idx - lz * size_x;\n")
+                .append("    const int4 orig = batch_origins[batch_idx];\n")
+                .append("    const int bx = orig.x + lx * step_x;\n")
+                .append("    const int by = orig.y + ly * step_y;\n")
+                .append("    const int bz = orig.z + lz * step_z;\n")
+                .append("    const int out_base = gid * 6;\n");
+        for (int c = 0; c < 6; c++) {
+            sb.append("    out_values[out_base + ").append(c).append("] = ");
+            if (channelQ32Ret[c]) {
+                sb.append("q32_to_f32(").append(channelCallExprs[c]).append(");\n");
+            } else {
+                sb.append("(float)(").append(channelCallExprs[c]).append(");\n");
+            }
+        }
+        sb.append("}\n");
+
+        int[] spilled = allocator.spilledWordsArray();
+        String source = sb.toString();
+        String digest = computeDensityVolumeDigest(arithmeticMode, source, spilled);
+        return new DensityVolumeProgram(
+                kernelName,
+                source,
+                digest,
+                spilled,
+                allocator.usedConstantBytes(),
+                allocator.spilledLutCount(),
+                allocator.deduplicatedLutCount());
+    }
+
+    /**
+     * Emits a self-contained {@link BatchLayout#SECTION_PALETTE_FILL_U2} OpenCL C99 program that
+     * fuses 3D density evaluation, 2-bit palette classification, {@code (ly << 8) | (lz << 4) | lx}
+     * bit-packing ({@code 1024 B/section}), and per-section uniformity/block-count reduction
+     * ({@code 8 B/section}) for compact zero-allocation DMA writeback.
+     */
+    public DensityVolumeProgram emitSectionPaletteFillProgram(ConceptModule module, EmitOptions options) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(options, "options");
+        ConstantLutAllocator allocator = new ConstantLutAllocator(MAX_CONSTANT_BUDGET_BYTES, 0, "gl_lut_spill");
+        EmitOptions fillOpts = options.withBatchLayout(BatchLayout.SECTION_PALETTE_FILL_U2);
+        TranspiledArtifact artifact = emitWithAllocator(module, fillOpts, "", allocator, true);
+        int[] spilled = allocator.spilledWordsArray();
+        String kernelName = artifact.kernel3DName() != null ? artifact.kernel3DName() : "fill_section_palette_batch_u2";
+        String digest = computeDensityVolumeDigest(fillOpts.gpuExactArithmeticMode(), artifact.sourceCode(), spilled);
+        return new DensityVolumeProgram(
+                kernelName,
+                artifact.sourceCode(),
+                digest,
+                spilled,
+                allocator.usedConstantBytes(),
+                allocator.spilledLutCount(),
+                allocator.deduplicatedLutCount());
+    }
+
+    /**
+     * Emits a self-contained {@link BatchLayout#SECTION_PALETTE_FILL_U2} OpenCL C99 program that
+     * evaluates {@code coarseSpec.coarseFunctionNames()} on the coarse section grid into
+     * workgroup {@code __local} memory, trilinearly interpolates all {@code 4096} voxels in
+     * registers, invokes the dense combiner entry function, and packs 2-bit section palettes
+     * ({@code 1024 B/section}) + uniformity metadata ({@code 8 B/section}).
+     */
+    public DensityVolumeProgram emitInterpolatedSectionPaletteFillProgram(
+            ConceptModule module,
+            EmitOptions options,
+            CoarseInterpSpec coarseSpec) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(coarseSpec, "coarseSpec");
+        ConstantLutAllocator allocator = new ConstantLutAllocator(MAX_CONSTANT_BUDGET_BYTES, 0, "gl_lut_spill");
+        EmitOptions fillOpts = options.withBatchLayout(BatchLayout.SECTION_PALETTE_FILL_U2);
+        TranspiledArtifact artifact = emitWithAllocatorAndMemo(
+                module, fillOpts, "", allocator, true, DiamondMemoPlan.EMPTY, coarseSpec);
+        int[] spilled = allocator.spilledWordsArray();
+        String kernelName = artifact.kernel3DName() != null ? artifact.kernel3DName() : "fill_section_palette_batch_u2";
+        String digest = computeDensityVolumeDigest(fillOpts.gpuExactArithmeticMode(), artifact.sourceCode(), spilled);
+        return new DensityVolumeProgram(
+                kernelName,
+                artifact.sourceCode(),
+                digest,
+                spilled,
+                allocator.usedConstantBytes(),
+                allocator.spilledLutCount(),
+                allocator.deduplicatedLutCount());
+    }
+
+    /**
+     * Emitted primary section-fill program combined with auxiliary {@link ConceptModule} device
+     * helpers sharing one {@link ConstantLutAllocator} and {@code gl_lut_spill} buffer.
+     */
+    public record MultiModuleSectionProgram(
+            String primarySourceCode,
+            String auxiliaryHelpersSource,
+            List<String> auxEntryCallExprs,
+            int[] spilledLutWords,
+            int usedConstantBytes,
+            int spilledLutCount,
+            int deduplicatedLutCount) {
+        public MultiModuleSectionProgram {
+            Objects.requireNonNull(primarySourceCode, "primarySourceCode");
+            Objects.requireNonNull(auxiliaryHelpersSource, "auxiliaryHelpersSource");
+            auxEntryCallExprs = List.copyOf(Objects.requireNonNull(auxEntryCallExprs, "auxEntryCallExprs"));
+            spilledLutWords = spilledLutWords == null ? new int[0] : java.util.Arrays.copyOf(spilledLutWords, spilledLutWords.length);
+        }
+
+        @Override
+        public int[] spilledLutWords() {
+            return java.util.Arrays.copyOf(spilledLutWords, spilledLutWords.length);
+        }
+    }
+
+    /**
+     * Emits the primary section-fill {@link ConceptModule} (coarse-interpolated when
+     * {@code coarseSpec != null}) alongside any number of auxiliary {@link ConceptModule}s
+     * (e.g., {@code MaterialRule} surface noises, {@code preliminarySurface}, and {@code OreVeinRule}
+     * densities), sharing a single {@link ConstantLutAllocator} so all noise LUTs deduplicate into
+     * one {@code __constant} / {@code gl_lut_spill} namespace.
+     */
+    public MultiModuleSectionProgram emitSectionFillWithAuxModules(
+            ConceptModule primaryModule,
+            CoarseInterpSpec coarseSpec,
+            List<ConceptModule> auxModules,
+            EmitOptions options) {
+        Objects.requireNonNull(primaryModule, "primaryModule");
+        Objects.requireNonNull(auxModules, "auxModules");
+        Objects.requireNonNull(options, "options");
+        ConstantLutAllocator allocator = new ConstantLutAllocator(MAX_CONSTANT_BUDGET_BYTES, 0, "gl_lut_spill");
+        EmitOptions fillOpts = options.withBatchLayout(BatchLayout.SECTION_PALETTE_FILL_U2);
+        GpuExactArithmeticMode arithmeticMode = fillOpts.gpuExactArithmeticMode();
+
+        TranspiledArtifact primaryArtifact = emitWithAllocatorAndMemo(
+                primaryModule, fillOpts, "", allocator, true, DiamondMemoPlan.EMPTY, coarseSpec);
+
+        StringBuilder auxSb = new StringBuilder(4096);
+        List<String> auxCallExprs = new ArrayList<>(auxModules.size());
+        EmitOptions volumeOpts = options.withBatchLayout(BatchLayout.DENSITY_VOLUME_BATCH_F32);
+        EmitScope prevScope = ACTIVE_EMIT_SCOPE.get();
+        try {
+            for (int i = 0; i < auxModules.size(); i++) {
+                ConceptModule rawModule = Objects.requireNonNull(auxModules.get(i), "auxModules[" + i + "]");
+                ConceptModule lowered = ConceptOptimizerPass.deduplicateLookupTables(rawModule);
+                Q32LoweringPlan q32Plan = arithmeticMode.usesInt64Q32()
+                        ? ConceptOptimizerPass.analyzeQ32Lowering(lowered)
+                        : Q32LoweringPlan.empty();
+
+                Map<String, ConceptFunction> fnByKey = new LinkedHashMap<>();
+                Map<String, ConceptFunction> fnByName = new LinkedHashMap<>();
+                registerFunctionLookup(lowered, fnByKey, fnByName);
+                Map<String, Integer> callCountByFnName = countFunctionCallSites(lowered, fnByKey, fnByName);
+
+                String prefix = "aux" + i + "_";
+                ACTIVE_EMIT_SCOPE.set(new EmitScope(
+                        prefix,
+                        allocator,
+                        true,
+                        callCountByFnName,
+                        DiamondMemoPlan.EMPTY.fnNameToSlot(),
+                        DiamondMemoPlan.EMPTY.keep2dMask(),
+                        DiamondMemoPlan.EMPTY.elemType(),
+                        null));
+
+                auxSb.append("// --- Aux module ").append(i).append(": ").append(lowered.moduleName()).append(" ---\n");
+                for (ConceptLut lut : lowered.lookupTables()) {
+                    if (arithmeticMode.usesInt64Q32()
+                            && lut.elementType() == ConceptType.F64
+                            && q32Plan.q32LutSymbol(lut.symbolName()) != null
+                            && !q32Plan.isFp32ReferencedLut(lut.symbolName())) {
+                        continue;
+                    }
+                    allocator.allocateAndEmit(auxSb, lut, volumeOpts, prefix);
+                    auxSb.append('\n');
+                }
+                if (arithmeticMode.usesInt64Q32()) {
+                    for (ConceptLut q32Lut : q32Plan.synthesizedQ32Luts()) {
+                        allocator.allocateAndEmit(auxSb, q32Lut, volumeOpts, prefix);
+                        auxSb.append('\n');
+                    }
+                }
+                for (ConceptFunction helper : lowered.helperFunctions()) {
+                    emitDeviceFunctionPrototype(auxSb, helper, volumeOpts, q32Plan);
+                }
+                if (!lowered.helperFunctions().isEmpty()) {
+                    auxSb.append('\n');
+                }
+                for (ConceptFunction helper : lowered.helperFunctions()) {
+                    emitDeviceFunction(auxSb, helper, volumeOpts, q32Plan, fnByKey, fnByName);
+                    auxSb.append('\n');
+                }
+                emitDeviceFunction(auxSb, lowered.entryFunction(), volumeOpts, q32Plan, fnByKey, fnByName);
+                auxSb.append('\n');
+
+                ConceptFunction target = lowered.entryFunction();
+                String rawCall = buildIntCoordTargetCall(target, "bx", "by", "bz", volumeOpts, q32Plan);
+                String callExpr = prefix + rawCall;
+                int closeParen = callExpr.lastIndexOf(')');
+                String beforeClose = callExpr.substring(0, closeParen);
+                String sep = beforeClose.endsWith("(") ? "" : ", ";
+                String fullCall = beforeClose + sep + "gl_lut_spill)";
+                if (arithmeticMode.usesInt64Q32() && q32Plan.isQ32Return(target)) {
+                    auxCallExprs.add("q32_to_f32(" + fullCall + ")");
+                } else {
+                    auxCallExprs.add("(float)(" + fullCall + ")");
+                }
+            }
+        } finally {
+            if (prevScope == null) {
+                ACTIVE_EMIT_SCOPE.remove();
+            } else {
+                ACTIVE_EMIT_SCOPE.set(prevScope);
+            }
+        }
+
+        return new MultiModuleSectionProgram(
+                primaryArtifact.sourceCode(),
+                auxSb.toString(),
+                auxCallExprs,
+                allocator.spilledWordsArray(),
+                allocator.usedConstantBytes(),
+                allocator.spilledLutCount(),
+                allocator.deduplicatedLutCount());
+    }
+
+    private static String computeDensityVolumeDigest(
+            GpuExactArithmeticMode mode,
+            String sourceCode,
+            int[] spilledLutWords) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            md.update(mode.name().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            md.update((byte) '\n');
+            md.update(sourceCode.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (spilledLutWords != null && spilledLutWords.length > 0) {
+                byte[] buf = new byte[4];
+                for (int w : spilledLutWords) {
+                    buf[0] = (byte) (w >>> 24);
+                    buf[1] = (byte) (w >>> 16);
+                    buf[2] = (byte) (w >>> 8);
+                    buf[3] = (byte) w;
+                    md.update(buf);
+                }
+            }
+            byte[] hash = md.digest();
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(Character.forDigit((b >>> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 MessageDigest unavailable", e);
         }
     }
 
@@ -471,6 +962,17 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             ConstantLutAllocator lutAllocator,
             boolean emitKernels,
             DiamondMemoPlan memoPlan) {
+        return emitWithAllocatorAndMemo(module, options, symbolPrefix, lutAllocator, emitKernels, memoPlan, null);
+    }
+
+    private TranspiledArtifact emitWithAllocatorAndMemo(
+            ConceptModule module,
+            EmitOptions options,
+            String symbolPrefix,
+            ConstantLutAllocator lutAllocator,
+            boolean emitKernels,
+            DiamondMemoPlan memoPlan,
+            CoarseInterpSpec coarseInterpSpec) {
         Objects.requireNonNull(module, "module");
         Objects.requireNonNull(options, "options");
         String effPrefix = symbolPrefix == null ? "" : symbolPrefix;
@@ -499,7 +1001,8 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 callCountByFnName,
                 effMemo.fnNameToSlot(),
                 effMemo.keep2dMask(),
-                effMemo.elemType()));
+                effMemo.elemType(),
+                coarseInterpSpec));
         try {
             StringBuilder sb = new StringBuilder(2048);
             sb.append("// Auto-generated OpenCL C99 kernel from JVM bytecode module: ")
@@ -987,6 +1490,8 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             case SECTION_4096_VOXEL -> emitSection4096VoxelKernel(sb, spec, options, q32Plan);
             case SECTION_4096_LCA_NIBBLE_PACKED -> emitLcaPackedBatchKernel3D(sb, spec, options, q32Plan);
             case CORNER_SLICE_5X49_PACKED -> emitCornerSlice5x49PackedKernel(sb, spec, options, q32Plan);
+            case DENSITY_VOLUME_BATCH_F32 -> emitDensityVolumeBatchF32Kernel(sb, spec, options, q32Plan);
+            case SECTION_PALETTE_FILL_U2 -> emitSectionPaletteFillU2Kernel(sb, spec, options, q32Plan);
         }
     }
 
@@ -1361,6 +1866,330 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                     .append("    out_lca_frames[s * 516 + tid] = as_uint(val);\n");
         }
         sb.append("}\n");
+    }
+
+    private static void emitDensityVolumeBatchF32Kernel(
+            StringBuilder sb,
+            ConceptBatchSpec spec,
+            EmitOptions options,
+            Q32LoweringPlan q32Plan) {
+        ConceptFunction target = spec.targetFunction();
+        EmitScope scope = ACTIVE_EMIT_SCOPE.get();
+        String prefix = scope != null ? scope.symbolPrefix() : "";
+        boolean passGlobalSpill = scope != null && scope.passGlobalSpillParam();
+        String spillBufName = (scope != null && scope.lutAllocator() != null
+                && scope.lutAllocator().globalSpillBufferName != null)
+                ? scope.lutAllocator().globalSpillBufferName
+                : "gl_lut_spill";
+        boolean q32Ret = options.gpuExactArithmeticMode().usesInt64Q32()
+                && q32Plan.isQ32Return(target);
+
+        sb.append("__kernel void ")
+                .append(spec.kernelName())
+                .append("(\n")
+                .append("    __global float* restrict out_values,\n")
+                .append("    __global const int4* restrict batch_origins,\n")
+                .append("    const int batch_count,\n")
+                .append("    const int size_x,\n")
+                .append("    const int size_y,\n")
+                .append("    const int size_z,\n")
+                .append("    const int step_x,\n")
+                .append("    const int step_y,\n")
+                .append("    const int step_z,\n")
+                .append("    __global const int* restrict ")
+                .append(spillBufName);
+        for (ConceptParam extra : spec.extraUniformParams()) {
+            sb.append(",\n    const ")
+                    .append(mapExtraUniformType(target, extra, options, q32Plan))
+                    .append(' ')
+                    .append(extra.name());
+        }
+        sb.append(")\n{\n")
+                .append("    const int gid = (int)get_global_id(0);\n")
+                .append("    const int volume_size = size_x * size_y * size_z;\n")
+                .append("    const int total_voxels = batch_count * volume_size;\n")
+                .append("    if (gid >= total_voxels) {\n")
+                .append("        return;\n")
+                .append("    }\n");
+        if (!passGlobalSpill) {
+            sb.append("    (void)").append(spillBufName).append(";\n");
+        }
+        sb.append("    const int batch_idx = gid / volume_size;\n")
+                .append("    const int voxel_idx = gid - batch_idx * volume_size;\n")
+                .append("    const int col_idx = voxel_idx / size_y;\n")
+                .append("    const int ly = voxel_idx - col_idx * size_y;\n")
+                .append("    const int lz = col_idx / size_x;\n")
+                .append("    const int lx = col_idx - lz * size_x;\n")
+                .append("    const int4 orig = batch_origins[batch_idx];\n")
+                .append("    const int bx = orig.x + lx * step_x;\n")
+                .append("    const int by = orig.y + ly * step_y;\n")
+                .append("    const int bz = orig.z + lz * step_z;\n");
+
+        String rawCall = buildIntCoordTargetCall(target, "bx", "by", "bz", options, q32Plan);
+        String callExpr = prefix.isEmpty() ? rawCall : prefix + rawCall;
+        if (passGlobalSpill) {
+            int closeParen = callExpr.lastIndexOf(')');
+            String beforeClose = callExpr.substring(0, closeParen);
+            String sep = beforeClose.endsWith("(") ? "" : ", ";
+            callExpr = beforeClose + sep + spillBufName + ")";
+        }
+        if (q32Ret) {
+            sb.append("    out_values[gid] = q32_to_f32(")
+                    .append(callExpr)
+                    .append(");\n");
+        } else {
+            sb.append("    out_values[gid] = (float)(")
+                    .append(callExpr)
+                    .append(");\n");
+        }
+        sb.append("}\n");
+    }
+
+    private static void emitSectionPaletteFillU2Kernel(
+            StringBuilder sb,
+            ConceptBatchSpec spec,
+            EmitOptions options,
+            Q32LoweringPlan q32Plan) {
+        ConceptFunction target = spec.targetFunction();
+        EmitScope scope = ACTIVE_EMIT_SCOPE.get();
+        String prefix = scope != null ? scope.symbolPrefix() : "";
+        boolean passGlobalSpill = scope != null && scope.passGlobalSpillParam();
+        String spillBufName = (scope != null && scope.lutAllocator() != null
+                && scope.lutAllocator().globalSpillBufferName != null)
+                ? scope.lutAllocator().globalSpillBufferName
+                : "gl_lut_spill";
+        CoarseInterpSpec coarseSpec = scope != null ? scope.coarseInterpSpec() : null;
+        boolean q32Ret = options.gpuExactArithmeticMode().usesInt64Q32()
+                && q32Plan.isQ32Return(target);
+
+        int coarseChannelCount = coarseSpec != null ? coarseSpec.coarseFunctionNames().size() : 0;
+        if (coarseSpec != null && spec.extraUniformParams().size() < coarseChannelCount) {
+            throw new IllegalArgumentException(
+                    "Entry function must declare at least " + coarseChannelCount
+                            + " coarse channel parameters after (x, y, z)");
+        }
+
+        sb.append("__kernel void ")
+                .append(spec.kernelName())
+                .append("(\n")
+                .append("    __global uint* restrict out_section_words,\n")
+                .append("    __global ushort4* restrict out_section_meta,\n")
+                .append("    __global const int4* restrict batch_origins,\n")
+                .append("    const int batch_count,\n")
+                .append("    const int section_count,\n")
+                .append("    const int sea_level,\n")
+                .append("    const int deep_fluid_y,\n")
+                .append("    __global const int* restrict ")
+                .append(spillBufName);
+        for (int i = coarseChannelCount; i < spec.extraUniformParams().size(); i++) {
+            ConceptParam extra = spec.extraUniformParams().get(i);
+            sb.append(",\n    const ")
+                    .append(mapExtraUniformType(target, extra, options, q32Plan))
+                    .append(' ')
+                    .append(extra.name());
+        }
+        sb.append(")\n{\n")
+                .append("    const int wg_id = (int)get_group_id(0);\n")
+                .append("    const int total_sections = batch_count * section_count;\n")
+                .append("    if (wg_id >= total_sections) {\n")
+                .append("        return;\n")
+                .append("    }\n");
+        if (!passGlobalSpill) {
+            sb.append("    (void)").append(spillBufName).append(";\n");
+        }
+        sb.append("    const int lid = (int)get_local_id(0);\n")
+                .append("    const int batch_idx = wg_id / section_count;\n")
+                .append("    const int section_idx = wg_id - batch_idx * section_count;\n")
+                .append("    const int lx = lid & 15;\n")
+                .append("    const int lz = lid >> 4;\n")
+                .append("    const int4 orig = batch_origins[batch_idx];\n")
+                .append("    const int bx = orig.x + lx;\n")
+                .append("    const int base_y = orig.y + (section_idx << 4);\n")
+                .append("    const int bz = orig.z + lz;\n")
+                .append("    const int section_word_base = wg_id << 8;\n")
+                .append("    __local uchar slice_codes[256];\n")
+                .append("    __local ushort red_non_empty[256];\n")
+                .append("    __local ushort red_fluid[256];\n")
+                .append("    __local uchar red_mask[256];\n");
+
+        String rawCall = buildIntCoordTargetCall(target, "bx", "by", "bz", options, q32Plan);
+        String callExpr = prefix.isEmpty() ? rawCall : prefix + rawCall;
+        if (passGlobalSpill) {
+            int closeParen = callExpr.lastIndexOf(')');
+            String beforeClose = callExpr.substring(0, closeParen);
+            String sep = beforeClose.endsWith("(") ? "" : ", ";
+            callExpr = beforeClose + sep + spillBufName + ")";
+        }
+
+        if (coarseSpec != null) {
+            int cellXz = coarseSpec.cellSizeXz();
+            int cellY = coarseSpec.cellSizeY();
+            int nx = coarseSpec.gridSizeXz();
+            int ny = coarseSpec.gridSizeY();
+            int nCoarse = coarseSpec.pointsPerChannel();
+            int totalCoarseTasks = coarseChannelCount * nCoarse;
+            int cellsY = 16 / cellY;
+            float invCellXz = 1.0f / (float) cellXz;
+            float invCellY = 1.0f / (float) cellY;
+
+            sb.append("    __local float coarse_vals[").append(totalCoarseTasks).append("];\n")
+                    .append("    for (int task = lid; task < ").append(totalCoarseTasks).append("; task += 256) {\n")
+                    .append("        const int ch = task / ").append(nCoarse).append(";\n")
+                    .append("        const int cidx = task - ch * ").append(nCoarse).append(";\n")
+                    .append("        const int cx = cidx % ").append(nx).append(";\n")
+                    .append("        const int ctmp = cidx / ").append(nx).append(";\n")
+                    .append("        const int cz = ctmp % ").append(nx).append(";\n")
+                    .append("        const int cy = ctmp / ").append(nx).append(";\n")
+                    .append("        const int gx = orig.x + cx * ").append(cellXz).append(";\n")
+                    .append("        const int gy = base_y + cy * ").append(cellY).append(";\n")
+                    .append("        const int gz = orig.z + cz * ").append(cellXz).append(";\n")
+                    .append("        float cval = 0.0f;\n")
+                    .append("        switch (ch) {\n");
+            for (int k = 0; k < coarseChannelCount; k++) {
+                String fnName = prefix + coarseSpec.coarseFunctionNames().get(k);
+                String coarseCall = passGlobalSpill
+                        ? fnName + "(gx, gy, gz, " + spillBufName + ")"
+                        : fnName + "(gx, gy, gz)";
+                sb.append("            case ").append(k).append(": cval = (float)(").append(coarseCall).append("); break;\n");
+            }
+            sb.append("            default: break;\n")
+                    .append("        }\n")
+                    .append("        coarse_vals[task] = cval;\n")
+                    .append("    }\n")
+                    .append("    barrier(CLK_LOCAL_MEM_FENCE);\n")
+                    .append("    const int col_cx = lx / ").append(cellXz).append(";\n")
+                    .append("    const int col_cz = lz / ").append(cellXz).append(";\n")
+                    .append("    const float col_fx = (float)(lx - col_cx * ").append(cellXz).append(") * ")
+                    .append(invCellXz).append("f;\n")
+                    .append("    const float col_fz = (float)(lz - col_cz * ").append(cellXz).append(") * ")
+                    .append(invCellXz).append("f;\n")
+                    .append("    ushort local_non_empty = 0;\n")
+                    .append("    ushort local_fluid = 0;\n")
+                    .append("    uchar local_mask = 0;\n")
+                    .append("    for (int cy = 0; cy < ").append(cellsY).append("; cy++) {\n")
+                    .append("        const int cell_base = (cy * ").append(nx).append(" + col_cz) * ")
+                    .append(nx).append(" + col_cx;\n");
+            int strideZ = nx;
+            int strideY = nx * nx;
+            for (int k = 0; k < coarseChannelCount; k++) {
+                int chOff = k * nCoarse;
+                sb.append("        const int cb_").append(k).append(" = ").append(chOff).append(" + cell_base;\n")
+                        .append("        const float c000_").append(k).append(" = coarse_vals[cb_").append(k).append("];\n")
+                        .append("        const float c100_").append(k).append(" = coarse_vals[cb_").append(k).append(" + 1];\n")
+                        .append("        const float c001_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideZ).append("];\n")
+                        .append("        const float c101_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideZ + 1).append("];\n")
+                        .append("        const float c010_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideY).append("];\n")
+                        .append("        const float c110_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideY + 1).append("];\n")
+                        .append("        const float c011_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideY + strideZ).append("];\n")
+                        .append("        const float c111_").append(k).append(" = coarse_vals[cb_").append(k).append(" + ").append(strideY + strideZ + 1).append("];\n")
+                        .append("        const float cz00_").append(k).append(" = c000_").append(k).append(" + col_fz * (c001_").append(k).append(" - c000_").append(k).append(");\n")
+                        .append("        const float cz01_").append(k).append(" = c010_").append(k).append(" + col_fz * (c011_").append(k).append(" - c010_").append(k).append(");\n")
+                        .append("        const float cz10_").append(k).append(" = c100_").append(k).append(" + col_fz * (c101_").append(k).append(" - c100_").append(k).append(");\n")
+                        .append("        const float cz11_").append(k).append(" = c110_").append(k).append(" + col_fz * (c111_").append(k).append(" - c110_").append(k).append(");\n")
+                        .append("        const float cx0_").append(k).append(" = cz00_").append(k).append(" + col_fx * (cz10_").append(k).append(" - cz00_").append(k).append(");\n")
+                        .append("        const float cx1_").append(k).append(" = cz01_").append(k).append(" + col_fx * (cz11_").append(k).append(" - cz01_").append(k).append(");\n")
+                        .append("        const float step_").append(k).append(" = (cx1_").append(k).append(" - cx0_").append(k).append(") * ")
+                        .append(invCellY).append("f;\n");
+            }
+            sb.append("        for (int sub_y = 0; sub_y < ").append(cellY).append("; sub_y++) {\n")
+                    .append("            const int ly = cy * ").append(cellY).append(" + sub_y;\n")
+                    .append("            const int by = base_y + ly;\n");
+            for (int k = 0; k < coarseChannelCount; k++) {
+                String paramName = spec.extraUniformParams().get(k).name();
+                sb.append("            const float ").append(paramName)
+                        .append(" = cx0_").append(k).append(" + step_").append(k).append(" * (float)sub_y;\n");
+            }
+            if (q32Ret) {
+                sb.append("            const float d = q32_to_f32(").append(callExpr).append(");\n");
+            } else {
+                sb.append("            const float d = (float)(").append(callExpr).append(");\n");
+            }
+            sb.append("            uchar code;\n")
+                    .append("            if (d > 0.0f) {\n")
+                    .append("                code = (uchar)1;\n")
+                    .append("                local_non_empty++;\n")
+                    .append("            } else if (by < deep_fluid_y) {\n")
+                    .append("                code = (uchar)3;\n")
+                    .append("                local_non_empty++;\n")
+                    .append("                local_fluid++;\n")
+                    .append("            } else if (by < sea_level) {\n")
+                    .append("                code = (uchar)2;\n")
+                    .append("                local_non_empty++;\n")
+                    .append("                local_fluid++;\n")
+                    .append("            } else {\n")
+                    .append("                code = (uchar)0;\n")
+                    .append("            }\n")
+                    .append("            local_mask |= (uchar)(1u << code);\n")
+                    .append("            slice_codes[lid] = code;\n")
+                    .append("            barrier(CLK_LOCAL_MEM_FENCE);\n")
+                    .append("            if (lid < 16) {\n")
+                    .append("                const int row_base = lid << 4;\n")
+                    .append("                uint packed = 0u;\n")
+                    .append("                for (int k = 0; k < 16; k++) {\n")
+                    .append("                    packed |= ((uint)slice_codes[row_base + k]) << (k << 1);\n")
+                    .append("                }\n")
+                    .append("                out_section_words[section_word_base + (ly << 4) + lid] = packed;\n")
+                    .append("            }\n")
+                    .append("            barrier(CLK_LOCAL_MEM_FENCE);\n")
+                    .append("        }\n")
+                    .append("    }\n");
+        } else {
+            sb.append("    ushort local_non_empty = 0;\n")
+                    .append("    ushort local_fluid = 0;\n")
+                    .append("    uchar local_mask = 0;\n")
+                    .append("    for (int ly = 0; ly < 16; ly++) {\n")
+                    .append("        const int by = base_y + ly;\n");
+
+            if (q32Ret) {
+                sb.append("        const float d = q32_to_f32(").append(callExpr).append(");\n");
+            } else {
+                sb.append("        const float d = (float)(").append(callExpr).append(");\n");
+            }
+            sb.append("        uchar code;\n")
+                    .append("        if (d > 0.0f) {\n")
+                    .append("            code = (uchar)1;\n")
+                    .append("            local_non_empty++;\n")
+                    .append("        } else if (by < deep_fluid_y) {\n")
+                    .append("            code = (uchar)3;\n")
+                    .append("            local_non_empty++;\n")
+                    .append("            local_fluid++;\n")
+                    .append("        } else if (by < sea_level) {\n")
+                    .append("            code = (uchar)2;\n")
+                    .append("            local_non_empty++;\n")
+                    .append("            local_fluid++;\n")
+                    .append("        } else {\n")
+                    .append("            code = (uchar)0;\n")
+                    .append("        }\n")
+                    .append("        local_mask |= (uchar)(1u << code);\n")
+                    .append("        slice_codes[lid] = code;\n")
+                    .append("        barrier(CLK_LOCAL_MEM_FENCE);\n")
+                    .append("        if (lid < 16) {\n")
+                    .append("            const int row_base = lid << 4;\n")
+                    .append("            uint packed = 0u;\n")
+                    .append("            for (int k = 0; k < 16; k++) {\n")
+                    .append("                packed |= ((uint)slice_codes[row_base + k]) << (k << 1);\n")
+                    .append("            }\n")
+                    .append("            out_section_words[section_word_base + (ly << 4) + lid] = packed;\n")
+                    .append("        }\n")
+                    .append("        barrier(CLK_LOCAL_MEM_FENCE);\n")
+                    .append("    }\n");
+        }
+        sb.append("    red_non_empty[lid] = local_non_empty;\n")
+                .append("    red_fluid[lid] = local_fluid;\n")
+                .append("    red_mask[lid] = local_mask;\n")
+                .append("    barrier(CLK_LOCAL_MEM_FENCE);\n")
+                .append("    for (int stride = 128; stride > 0; stride >>= 1) {\n")
+                .append("        if (lid < stride) {\n")
+                .append("            red_non_empty[lid] += red_non_empty[lid + stride];\n")
+                .append("            red_fluid[lid] += red_fluid[lid + stride];\n")
+                .append("            red_mask[lid] |= red_mask[lid + stride];\n")
+                .append("        }\n")
+                .append("        barrier(CLK_LOCAL_MEM_FENCE);\n")
+                .append("    }\n")
+                .append("    if (lid == 0) {\n")
+                .append("        out_section_meta[wg_id] = (ushort4)(red_non_empty[0], red_fluid[0], (ushort)red_mask[0], (ushort)0);\n")
+                .append("    }\n")
+                .append("}\n");
     }
 
     private static String buildIntCoordTargetCall(
@@ -2982,22 +3811,23 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 args.add(emitExpr(a, fn, options, q32Plan, fnByKey, fnByName, false));
             }
             boolean fp = math.type().isFloatingPoint();
+            boolean fastSfu = mode == GpuExactArithmeticMode.DOWNCAST_FP32;
             String fnName = switch (math.kind()) {
                 case FLOOR -> "floor";
                 case CEIL -> "ceil";
                 case ROUND -> "rint";
-                case SQRT -> "sqrt";
+                case SQRT -> fastSfu ? "native_sqrt" : "sqrt";
                 case ABS -> fp ? "fabs" : "abs";
-                case SIN -> "sin";
-                case COS -> "cos";
-                case TAN -> "tan";
+                case SIN -> fastSfu ? "native_sin" : "sin";
+                case COS -> fastSfu ? "native_cos" : "cos";
+                case TAN -> fastSfu ? "native_tan" : "tan";
                 case ATAN2 -> "atan2";
-                case EXP -> "exp";
-                case LOG -> "log";
+                case EXP -> fastSfu ? "native_exp" : "exp";
+                case LOG -> fastSfu ? "native_log" : "log";
                 case POW -> "pow";
                 case MIN -> fp ? "fmin" : "min";
                 case MAX -> fp ? "fmax" : "max";
-                case FMA -> "fma";
+                case FMA -> fastSfu ? "mad" : "fma";
                 case IS_FINITE -> "isfinite";
                 case IS_NAN -> "isnan";
                 case POPCOUNT -> "popcount";

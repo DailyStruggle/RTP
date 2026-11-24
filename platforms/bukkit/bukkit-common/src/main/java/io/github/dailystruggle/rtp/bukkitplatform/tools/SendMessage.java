@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.server.api.GradientExpander;
 import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
@@ -424,10 +424,10 @@ public class SendMessage {
   private static Level resolveMinLevel() {
     try {
       if (ActiveConfigs.get() == null) return Level.ALL;
-      io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+      net.leaf.yaml.configuration.ConfigParser<
               io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>
           logging =
-              (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+              (net.leaf.yaml.configuration.ConfigParser<
                       io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
                   ActiveConfigs.get().getParser(
                       io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);

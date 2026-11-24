@@ -10,20 +10,20 @@ import java.util.regex.Pattern;
  */
 public final class ConfigDirectives {
 
-    private final io.github.dailystruggle.rtp.common.configuration.ConfigDirectives delegate;
+    private final net.leaf.yaml.configuration.ConfigDirectives delegate;
 
-    private ConfigDirectives(io.github.dailystruggle.rtp.common.configuration.ConfigDirectives delegate) {
+    private ConfigDirectives(net.leaf.yaml.configuration.ConfigDirectives delegate) {
         this.delegate = delegate;
     }
 
     public static ConfigDirectives parse(String commentBlock) {
         return new ConfigDirectives(
-                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(commentBlock));
+                net.leaf.yaml.configuration.ConfigDirectives.parse(commentBlock));
     }
 
     public static ConfigDirectives parseLines(List<String> commentLines) {
         return new ConfigDirectives(
-                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parseLines(commentLines));
+                net.leaf.yaml.configuration.ConfigDirectives.parseLines(commentLines));
     }
 
     public String type() { return delegate.type(); }

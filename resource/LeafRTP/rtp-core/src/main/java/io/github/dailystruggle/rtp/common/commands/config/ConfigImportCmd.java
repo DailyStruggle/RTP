@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
-import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
+import net.leaf.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;

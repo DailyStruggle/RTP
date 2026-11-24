@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.metrics.MetricBucketRow;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocol;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespPool;
+import net.leaf.database.resp.RespProtocol;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;

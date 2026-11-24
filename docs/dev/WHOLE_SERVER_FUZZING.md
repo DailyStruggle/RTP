@@ -53,7 +53,7 @@ python3 scripts/bench_fuzz.py --mode server --active \
 
 ---
 
-## Why a target-free mode
+## Target-free mode
 
 Target mode found BetterRTP 3.6.13's quit-session retention because the operator isolated `BetterRTP-3.6.13.jar` and told the bots to send `/betterrtp:rtp`. A server admin with many plugins has neither piece of knowledge. Server mode replaces each piece of prior knowledge with something the server reports or a measurement:
 
@@ -143,7 +143,7 @@ sequenceDiagram
 
 - **Arms:** (command node, follow-up shape). Shapes: `quit_lt1s` (quit within a second), `quit_delay` (quit while a delay or countdown is pending), `rejoin`, `repeat`, `concurrent` (another bot runs the same node), and protocol-level `window_click` + `close_window` sequences when a command opens an inventory window (`bench-swarm.js` handles `open_window`, `window_click` and `close_window` packets directly because lean mode disables Mineflayer's `inventory` plugin).
 - **Selection:** UCB1, stratified by tier so `default`-visible (player-reachable) nodes get the primary episode share and cannot be starved by a much larger `op` tree (`--tiers default` restricts the run to player-reachable nodes). **Reward:** novelty (a reply shape or log signature not seen before, the ADR-111 corpus keys) plus harm (class growth per action, tick-gap excess, kicks).
-- **Why follow-ups matter:** both session-leak positives below (BetterRTP and the planted `ff:queue`) need the player to leave while something the command started is still pending. A bandit over nodes alone would send the command and wait, which retains nothing.
+- **Follow-up rationale:** both session-leak positives below (BetterRTP and the planted `ff:queue`) need the player to leave while something the command started is still pending. A bandit over nodes alone would send the command and wait, which retains nothing.
 
 ## 3. Detection (design)
 
@@ -173,7 +173,7 @@ flowchart LR
     P -->|1-minimal| Z[blamed jar set]
 ```
 
-- **Why two probes first:** `ddmin` in `scripts/bench_fuzz.py` assumes the full set reproduces, never tests the empty set and always returns at least one item. Without the prerequisites-only probe, a vanilla stall or leak would be pinned on whichever jar `ddmin` ends on.
+- **Pre-`ddmin` probes:** `ddmin` in `scripts/bench_fuzz.py` assumes the full set reproduces, never tests the empty set and always returns at least one item. Without the prerequisites-only probe, a vanilla stall or leak would be pinned on whichever jar `ddmin` ends on.
 - **Full set:** a restart with every jar, then `--finding-n` replays. Fewer than `--finding-k` hits: the finding is reported as not reproducible after restart and is not attributed.
 - **Prerequisites only:** a restart with only the prerequisites (and the harness, if it is the observer), then `--finding-n` replays. At least `--finding-k` hits: labelled `server`, no `ddmin`, no jar blamed. A shrunk program whose command does not exist in vanilla gets the unknown-command reply and so does not reproduce.
 - The index gives a first suspect; `ddmin` gives the verdict. A finding is blamed on a jar only if removing that jar makes it stop reproducing.

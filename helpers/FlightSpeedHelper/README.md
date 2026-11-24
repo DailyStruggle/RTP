@@ -6,7 +6,7 @@ Lives under [`helpers/`](..) with zero `rtp-api`, `rtp-core`, or `LeafAnvil` dep
 
 ---
 
-## Why this exists
+## Background
 
 1. Vanilla `/effect give <player> minecraft:speed` only scales ground `MOVEMENT_SPEED`, and `/attribute <player> minecraft:flying_speed` only affects AI mobs (`Player#getFlyingSpeed()` reads `Abilities#getFlyingSpeed()` directly).
 2. CraftBukkit's `CraftPlayer#setFlySpeed(float)` validates inputs in `[-1.0f, 1.0f]` and divides by `2`, capping standard plugins (such as EssentialsX `/speed 10`) at `Abilities.flyingSpeed = 0.5f` (`10x` vanilla creative's `0.05f` default).

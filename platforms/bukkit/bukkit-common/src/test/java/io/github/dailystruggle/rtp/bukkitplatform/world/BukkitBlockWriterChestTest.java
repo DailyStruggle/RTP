@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.bukkitplatform.world;
 
 import io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster;
-import io.github.dailystruggle.rtp.api.schematic.LoadedSchematic;
-import io.github.dailystruggle.rtp.api.schematic.PasteAnchor;
-import io.github.dailystruggle.rtp.api.schematic.PasteOptions;
-import io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity;
-import io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner;
-import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteAnchor;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.PlacedBlockEntity;
+import net.leaf.schematics.schematic.SchematicPlacementPlanner;
+import net.leaf.schematics.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import be.seeseemelk.mockbukkit.MockBukkit;

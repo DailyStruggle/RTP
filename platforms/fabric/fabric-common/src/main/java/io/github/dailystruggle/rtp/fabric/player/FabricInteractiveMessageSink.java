@@ -4,7 +4,7 @@ package io.github.dailystruggle.rtp.fabric.player;
  * Optional capability marker for an {@link io.github.dailystruggle.rtp.api.entity.RTPPlayer}
  * sink that can render an interactive (hover + click) chat line itself.
  *
- * <p><b>Why this exists.</b> The common {@code FabricRTPPlayer} lives in
+ * <p>The common {@code FabricRTPPlayer} lives in
  * {@code rtp-fabric-common} and is compiled by Loom against intermediary
  * mappings; its {@code net.minecraft.*} references do not link on the
  * deobfuscated MC 26.x runtime. The deobf carriers therefore ship their own

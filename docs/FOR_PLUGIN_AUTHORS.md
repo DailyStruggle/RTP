@@ -8,7 +8,7 @@ This guide is for developers building a **standalone Minecraft plugin or mod** -
 
 ---
 
-## 1. Why Use the LeafCraft `api/*` SDK?
+## 1. What the LeafCraft `api/*` SDK Provides
 
 Roughly 80% of this repository is **platform-neutral infrastructure** (`api/*`, multi-version platform carriers, headless fuzzers, and release tooling) rather than teleport-specific logic. Every subsystem that a production server plugin needs has been extracted into 14 standalone, MIT-licensed Java 17 libraries under [`api/`](../api/README.md):
 

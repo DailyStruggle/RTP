@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.common.menu.search;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
-import io.github.dailystruggle.rtp.common.search.OnlineQueryExpander;
+import net.leaf.yaml.configuration.MultiConfigParser;
+import net.leaf.yaml.RtpYamlSection;
+import net.leaf.yaml.search.FuzzySearchEngine;
+import net.leaf.yaml.search.OnlineQueryExpander;
 import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip.StripResult;
@@ -163,7 +163,7 @@ public final class ConfigSearchResultsBuilder {
      */
     private static void collectLeaves(
             String prefix, Object value, LinkedHashMap<String, Object> out) {
-        if (value instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
+        if (value instanceof net.leaf.yaml.factory.FactoryValue<?> fv) {
             // Shape / VerticalAdjustor region keys hold a typed FactoryValue
             // (after RegionConfigLoader replaces the raw YAML section with the
             // deserialized object). Its getData() carries the tunables

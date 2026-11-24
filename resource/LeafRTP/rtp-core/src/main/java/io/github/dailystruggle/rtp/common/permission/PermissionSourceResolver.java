@@ -5,7 +5,7 @@ import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.UniversalConfigImporter;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import net.leaf.yaml.search.FuzzySearchEngine;
 import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

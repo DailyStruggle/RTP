@@ -8,7 +8,7 @@
 
 ---
 
-## Why prefabs exist
+## Purpose
 
 A fresh RTP install picks one set of defaults that has to work everywhere: shared-CPU VPS, dedicated bare metal, Folia regional scheduler, Paper, small-population creative server, 1000-player survival network. The defaults are the conservative middle. Prefabs let you jump to a curated tuning bundle in one click, instead of reading [PERFORMANCE.md](configuration/PERFORMANCE.md) + [REGIONS.md](configuration/REGIONS.md) and hand-tuning four files.
 

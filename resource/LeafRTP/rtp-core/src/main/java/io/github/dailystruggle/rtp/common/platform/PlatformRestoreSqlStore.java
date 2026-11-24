@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.platform;
 
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 

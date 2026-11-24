@@ -22,7 +22,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestStatusCmd;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BitKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -221,16 +221,16 @@ class RtpBitCoverageAndStartupTest {
         }
         assertTrue(current != null, "repository root must be resolvable");
         java.nio.file.Path resources = current.resolve("resource/LeafRTP/rtp-plugin/src/main/resources");
-        var reader = io.github.dailystruggle.rtp.common.bit.config.MessageKeyParity.ResourceReader.directory(resources);
-        var categories = io.github.dailystruggle.rtp.common.bit.config.MessageKeyParity.categories(reader);
+        var reader = net.leaf.bit.config.MessageKeyParity.ResourceReader.directory(resources);
+        var categories = net.leaf.bit.config.MessageKeyParity.categories(reader);
         assertTrue(categories.contains("advanced/bit"), "advanced/bit must be discovered as a baseline category");
-        var gaps = io.github.dailystruggle.rtp.common.bit.config.MessageKeyParity.gaps(reader, categories);
+        var gaps = net.leaf.bit.config.MessageKeyParity.gaps(reader, categories);
         assertTrue(gaps.isEmpty(), () -> "Expected zero locale parity gaps, found: " + gaps);
 
         String bundledBitYaml = java.nio.file.Files.readString(resources.resolve("advanced/bit.yml"));
-        var snapshot = io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot.of(
+        var snapshot = net.leaf.bit.config.ConfigSnapshot.of(
                 Map.of("advanced/bit.yml", bundledBitYaml));
-        var findings = io.github.dailystruggle.rtp.common.bit.config.DirectiveValidator.validate(
+        var findings = net.leaf.bit.config.DirectiveValidator.validate(
                 snapshot.document("advanced/bit.yml").orElseThrow(),
                 bundledBitYaml,
                 io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck.CODES);
@@ -322,10 +322,10 @@ class RtpBitCoverageAndStartupTest {
             assertTrue(mdContent.contains("| " + code.id() + " | `" + code.key() + "` |"),
                     "docs/dev/BIT_CODES.md missing row for " + code.namespace() + ":" + code.id() + " " + code.key());
         }
-        assertEquals("CFG", io.github.dailystruggle.rtp.common.bit.config.DirectiveCodes.CFG.prefix());
-        assertEquals(7, io.github.dailystruggle.rtp.common.bit.config.DirectiveCodes.class.getRecordComponents().length);
-        assertEquals(7, io.github.dailystruggle.rtp.common.bit.config.MessageParityCodes.class.getRecordComponents().length);
-        assertEquals(2, io.github.dailystruggle.rtp.common.bit.config.ReferenceSettingCheck.Codes.class.getRecordComponents().length);
+        assertEquals("CFG", net.leaf.bit.config.DirectiveCodes.CFG.prefix());
+        assertEquals(7, net.leaf.bit.config.DirectiveCodes.class.getRecordComponents().length);
+        assertEquals(7, net.leaf.bit.config.MessageParityCodes.class.getRecordComponents().length);
+        assertEquals(2, net.leaf.bit.config.ReferenceSettingCheck.Codes.class.getRecordComponents().length);
     }
 
     private static byte[] singleClassExecStream(String className, boolean[] probes) throws IOException {

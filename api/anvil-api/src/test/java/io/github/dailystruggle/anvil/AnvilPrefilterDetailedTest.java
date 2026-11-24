@@ -39,7 +39,7 @@ class AnvilPrefilterDetailedTest {
     @Test
     void testProbeDetailedNullWorldFolder() {
         CompletableFuture<AnvilPrefilter.ProbeResult> fut = AnvilPrefilter.probeDetailed(
-                null, "", 0, 0, Set.of("LAVA"), null);
+                null, "", 0, 0, Set.of("LAVA"), null, Runnable::run);
         assertTrue(fut.isDone());
         AnvilPrefilter.ProbeResult res = fut.join();
         assertEquals(Verdict.UNKNOWN, res.verdict());
@@ -57,7 +57,7 @@ class AnvilPrefilterDetailedTest {
         Files.write(regionDir.resolve("r.0.0.mca"), AnvilTestFixtures.writeSingleChunkRegion(root));
 
         CompletableFuture<AnvilPrefilter.ProbeResult> fut = AnvilPrefilter.probeDetailed(
-                tempDir, null, 0, 0, Set.of("LAVA"), null);
+                tempDir, null, 0, 0, Set.of("LAVA"), null, Runnable::run);
         AnvilPrefilter.ProbeResult res = fut.join();
         assertEquals(Verdict.ACCEPT, res.verdict());
         assertNotNull(res.view());

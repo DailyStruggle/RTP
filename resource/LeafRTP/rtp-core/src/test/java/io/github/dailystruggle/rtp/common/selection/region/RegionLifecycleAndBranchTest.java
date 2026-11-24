@@ -84,7 +84,7 @@ public class RegionLifecycleAndBranchTest {
             ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         }
         if (ActiveSelection.get().shapeFactory == null) {
-            io.github.dailystruggle.rtp.common.factory.Factory<Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+            net.leaf.yaml.factory.Factory<Shape<?>> shapeFactory = new net.leaf.yaml.factory.Factory<>();
             shapeFactory.add("SQUARE", new Square());
             ActiveSelection.get().shapeFactory = shapeFactory;
             FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
@@ -92,10 +92,10 @@ public class RegionLifecycleAndBranchTest {
             ActiveSelection.get().shapeFactory.add("SQUARE", new Square());
         }
 
-        io.github.dailystruggle.rtp.common.factory.Factory<VerticalAdjustor<?>> vertFactory =
-                (io.github.dailystruggle.rtp.common.factory.Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
+        net.leaf.yaml.factory.Factory<VerticalAdjustor<?>> vertFactory =
+                (net.leaf.yaml.factory.Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         if (vertFactory == null) {
-            vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+            vertFactory = new net.leaf.yaml.factory.Factory<>();
             FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
         }
         if (!vertFactory.contains("LINEAR")) {
@@ -1036,8 +1036,8 @@ public class RegionLifecycleAndBranchTest {
 
         // Configure PerformanceKeys to trigger heap pressure
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0001);

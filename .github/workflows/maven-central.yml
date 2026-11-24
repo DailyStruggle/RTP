@@ -93,9 +93,9 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Skip when this version is already released: a re-upload would only create
-      # a duplicate deployment that Central rejects on publish. Queries the Portal
-      # (authoritative, no repo1 CDN lag). A failed query does not skip.
+      # Skip each namespace when this version is already released: a re-upload would
+      # only create a duplicate deployment that Central rejects on publish. Queries
+      # the Portal (authoritative, no repo1 CDN lag). A failed query does not skip.
       - name: Skip if version already published
         id: published
         env:
@@ -104,16 +104,37 @@ jobs:
         run: |
           VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
           AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
-          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output published.json \
-            -H "Authorization: Bearer ${AUTH}" \
-            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.dailystruggle&name=rtp-api&version=${VERSION}" || true)
-          if [ "${HTTP_CODE}" = "200" ] && jq -e '.published == true' published.json >/dev/null; then
-            echo "::notice::io.github.dailystruggle:rtp-api:${VERSION} is already published; nothing to upload."
+          check_ns() {
+            local ns="$1"
+            local probe="$2"
+            local out="$3"
+            local code
+            code=$(curl --silent --show-error --write-out '%{http_code}' --output "${out}" \
+              -H "Authorization: Bearer ${AUTH}" \
+              "https://central.sonatype.com/api/v1/publisher/published?namespace=${ns}&name=${probe}&version=${VERSION}" || true)
+            if [ "${code}" = "200" ] && jq -e '.published == true' "${out}" >/dev/null; then
+              echo "::notice::${ns}:${probe}:${VERSION} is already published."
+              return 0
+            fi
+            if [ "${code}" != "200" ]; then
+              echo "::warning::Central published-check for ${ns}:${probe} returned HTTP ${code}; continuing with upload."
+            fi
+            return 1
+          }
+          SKIP_RTP=false
+          SKIP_LEAF=false
+          if check_ns "io.github.dailystruggle" "rtp-api" "published-rtp.json"; then
+            SKIP_RTP=true
+          fi
+          if check_ns "io.github.leafcraftdev" "server-api" "published-leaf.json"; then
+            SKIP_LEAF=true
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "skip_rtp=${SKIP_RTP}" >> "$GITHUB_OUTPUT"
+          echo "skip_leaf=${SKIP_LEAF}" >> "$GITHUB_OUTPUT"
+          if [ "${SKIP_RTP}" = "true" ] && [ "${SKIP_LEAF}" = "true" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            if [ "${HTTP_CODE}" != "200" ]; then
-              echo "::warning::Central published-check returned HTTP ${HTTP_CODE}; continuing with the upload."
-            fi
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -182,32 +203,52 @@ jobs:
             exit 1
           fi
 
-      # The Portal expects a zip whose internal layout IS the Maven repository
-      # layout (i.e. the contents of build/central-staging).
-      - name: Bundle the staging tree
+      # The Portal expects one namespace per bundle whose internal layout IS the
+      # Maven repository layout. Bundle io.github.leafcraftdev and
+      # io.github.dailystruggle separately so each namespace deploys cleanly.
+      - name: Bundle the staging tree per namespace
         if: steps.published.outputs.skip != 'true'
+        env:
+          SKIP_RTP: ${{ steps.published.outputs.skip_rtp }}
+          SKIP_LEAF: ${{ steps.published.outputs.skip_leaf }}
         run: |
           cd build/central-staging
-          zip -r ../central-bundle.zip .
+          if [ "${SKIP_LEAF}" != "true" ] && [ -d "io/github/leafcraftdev" ]; then
+            zip -r ../central-bundle-leafcraftdev.zip io/github/leafcraftdev
+          fi
+          if [ "${SKIP_RTP}" != "true" ] && [ -d "io/github/dailystruggle" ]; then
+            zip -r ../central-bundle-dailystruggle.zip io/github/dailystruggle
+          fi
           cd -
-          ls -l build/central-bundle.zip
+          ls -l build/central-bundle-*.zip
 
-      - name: Upload bundle to the Central Portal
+      - name: Upload bundles to the Central Portal
         if: steps.published.outputs.skip != 'true'
         env:
           CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
           CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          VERSION: ${{ steps.published.outputs.version }}
         run: |
           AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
-          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output upload-response.txt \
-            -H "Authorization: Bearer ${AUTH}" \
-            -F bundle=@build/central-bundle.zip \
-            https://central.sonatype.com/api/v1/publisher/upload)
-          echo "Portal responded HTTP ${HTTP_CODE}:"
-          cat upload-response.txt || true
-          echo
-          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
-            echo "::error::Central Portal upload failed (HTTP ${HTTP_CODE})."
-            exit 1
-          fi
-          echo "::notice::Deployment uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."
+          upload_bundle() {
+            local label="$1"
+            local file="$2"
+            if [ ! -f "${file}" ]; then
+              return 0
+            fi
+            local code
+            code=$(curl --silent --show-error --write-out '%{http_code}' --output "upload-${label}.txt" \
+              -H "Authorization: Bearer ${AUTH}" \
+              -F "bundle=@${file}" \
+              "https://central.sonatype.com/api/v1/publisher/upload?name=${label}-${VERSION}")
+            echo "Portal responded HTTP ${code} for ${label}:"
+            cat "upload-${label}.txt" || true
+            echo
+            if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
+              echo "::error::Central Portal upload failed for ${label} (HTTP ${code})."
+              exit 1
+            fi
+          }
+          upload_bundle "leafcraftdev" "build/central-bundle-leafcraftdev.zip"
+          upload_bundle "dailystruggle-rtp" "build/central-bundle-dailystruggle.zip"
+          echo "::notice::Deployment(s) uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."

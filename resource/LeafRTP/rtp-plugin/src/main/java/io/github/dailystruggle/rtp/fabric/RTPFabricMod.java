@@ -534,7 +534,7 @@ public final class RTPFabricMod implements ModInitializer {
      * {@code rtp-fabric-vXX_YY_R1} submodule, then install it into
      * {@link FabricVersionAdapterRegistry}.
      *
-     * <p><b>Why reflection (and not a direct {@code new}):</b> the v26_1_R1
+     * <p><b>Reflective loading (not direct {@code new}):</b> the v26_1_R1
      * adapter is compiled to Java 25 bytecode (MC 26.1's mandated minimum).
      * Servers running on a Java 21 JVM cannot resolve Java 25 classes -
      * they would throw {@code UnsupportedClassVersionError} the moment the

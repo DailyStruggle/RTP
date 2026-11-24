@@ -19,10 +19,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -269,28 +265,7 @@ public final class WeightedParityEvaluator {
 
         public static TemplateConformityLibrary fromSources(Collection<Path> nbtSources) throws IOException {
             Collection<Path> safeSources = nbtSources == null ? List.of() : List.copyOf(nbtSources);
-            try {
-                return ForkJoinPool.commonPool()
-                        .submit(() -> loadFromSourcesOnWorker(safeSources))
-                        .get(5L, TimeUnit.MINUTES);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "Interrupted loading structure .nbt template conformity library", ex);
-                throw new IOException("Interrupted loading structure .nbt template conformity library", ex);
-            } catch (TimeoutException ex) {
-                LOGGER.log(Level.WARNING, "Timed out loading structure .nbt template conformity library", ex);
-                throw new IOException("Timed out loading structure .nbt template conformity library", ex);
-            } catch (ExecutionException ex) {
-                Throwable cause = ex.getCause();
-                LOGGER.log(Level.WARNING, "Failed loading structure .nbt template conformity library", cause);
-                if (cause instanceof IOException ioe) {
-                    throw ioe;
-                }
-                if (cause instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new IOException("Failed loading structure .nbt template conformity library", cause);
-            }
+            return loadFromSourcesOnWorker(safeSources);
         }
 
         static TemplateConformityLibrary loadFromSourcesOnWorker(Collection<Path> nbtSources) throws IOException {

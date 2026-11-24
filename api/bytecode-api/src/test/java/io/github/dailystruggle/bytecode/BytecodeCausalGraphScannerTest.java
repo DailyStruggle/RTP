@@ -1432,6 +1432,95 @@ class BytecodeCausalGraphScannerTest {
         );
     }
 
+    @Test
+    @DisplayName("Rule F-001 & S-002: Stage 5 detects hot-path COMMAND/EVENT unmanaged thread spawns (CONFIRMED) and unclosed init pools (ADVISORY) while exempting shutdown-managed pools and scheduler dispatch")
+    void detectsUnmanagedThreadSpawnsAndExemptsShutdownManagedPools() throws IOException {
+        List<byte[]> classes = List.of(
+                readClassBytes(FakeGlobalRegionScheduler.class),
+                readClassBytes(UnmanagedThreadCommandFixture.class),
+                readClassBytes(UnclosedInitPoolFixture.class),
+                readClassBytes(ProperlyClosedInitPoolFixture.class),
+                readClassBytes(SchedulerManagedCommandFixture.class)
+        );
+        CausalGraphReport report = BytecodeCausalGraphScanner.analyzeClasses(
+                "plugin:thread-audit-test",
+                "ThreadAuditTest",
+                classes,
+                List.of(),
+                Map.of()
+        );
+        assertTrue(
+                report.findings().stream().anyMatch(f ->
+                        f.kind() == FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN
+                                && f.confidenceTier() == ConfidenceTier.CONFIRMED
+                                && f.entryPointSymbol().contains("UnmanagedThreadCommandFixture#onCommand")),
+                "Expected CONFIRMED CAUSAL_UNMANAGED_THREAD_SPAWN on UnmanagedThreadCommandFixture#onCommand: "
+                        + report.findings()
+        );
+        assertTrue(
+                report.findings().stream().anyMatch(f ->
+                        f.kind() == FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN
+                                && f.confidenceTier() == ConfidenceTier.ADVISORY
+                                && f.entryPointSymbol().contains("UnclosedInitPoolFixture#onEnable")),
+                "Expected ADVISORY CAUSAL_UNMANAGED_THREAD_SPAWN on UnclosedInitPoolFixture#onEnable: "
+                        + report.findings()
+        );
+        assertFalse(
+                report.findings().stream().anyMatch(f ->
+                        f.kind() == FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN
+                                && f.entryPointSymbol().contains("ProperlyClosedInitPoolFixture")),
+                "Pool with onDisable shutdown() must not be flagged: " + report.findings()
+        );
+        assertFalse(
+                report.findings().stream().anyMatch(f ->
+                        f.kind() == FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN
+                                && f.entryPointSymbol().contains("SchedulerManagedCommandFixture")),
+                "Command using server scheduler must not be flagged: " + report.findings()
+        );
+    }
+
+    static final class UnmanagedThreadCommandFixture {
+        public boolean onCommand(Object sender, String label) {
+            spawnHelper();
+            return true;
+        }
+
+        private void spawnHelper() {
+            new Thread(() -> {}).start();
+        }
+    }
+
+    static final class UnclosedInitPoolFixture {
+        private java.util.concurrent.ExecutorService pool;
+
+        public void onEnable() {
+            this.pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        }
+    }
+
+    static final class ProperlyClosedInitPoolFixture {
+        private java.util.concurrent.ExecutorService pool;
+
+        public void onEnable() {
+            this.pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        }
+
+        public void onDisable() {
+            if (this.pool != null) {
+                this.pool.shutdown();
+            }
+        }
+    }
+
+    static final class SchedulerManagedCommandFixture {
+        private final FakeGlobalRegionScheduler scheduler = new FakeGlobalRegionScheduler();
+
+        public boolean onCommand(Object sender, String label) {
+            scheduler.run(this, () -> {});
+            return true;
+        }
+    }
+
     private static byte[] buildSyntheticClassWithConstantPoolRefs(
             String thisClassInternal,
             List<String> referencedInternalNames

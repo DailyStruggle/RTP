@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -42,21 +42,21 @@ public class ConfigCmdTest {
         configs = new Configs(tempDir.toFile());
         ActiveConfigs.set(configs);
 
-        performanceConfig = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
+        performanceConfig = mock(net.leaf.yaml.configuration.ConfigParser.class);
         performanceConfig.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         performanceConfig.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         performanceConfig.name = "performance";
-        io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
+        net.leaf.yaml.YamlFileCache mockDb = mock(net.leaf.yaml.YamlFileCache.class);
         try {
-            java.lang.reflect.Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("myClass");
+            java.lang.reflect.Field myClassField = net.leaf.yaml.factory.FactoryValue.class.getDeclaredField("myClass");
             myClassField.setAccessible(true);
             myClassField.set(performanceConfig, io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
 
-            java.lang.reflect.Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
+            java.lang.reflect.Field cachedLookupField = net.leaf.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
             cachedLookupField.setAccessible(true);
             cachedLookupField.set(mockDb, new java.util.concurrent.atomic.AtomicReference<>(new java.util.concurrent.ConcurrentHashMap<>()));
 
-            java.lang.reflect.Field fileDatabaseField = io.github.dailystruggle.rtp.common.configuration.ConfigParser.class.getDeclaredField("fileDatabase");
+            java.lang.reflect.Field fileDatabaseField = net.leaf.yaml.configuration.ConfigParser.class.getDeclaredField("fileDatabase");
             fileDatabaseField.setAccessible(true);
             fileDatabaseField.set(performanceConfig, mockDb);
         } catch (Exception e) {}
@@ -109,14 +109,14 @@ public class ConfigCmdTest {
         }).when(performanceConfig).setConfigValue(anyString(), any());
         configs.configParserMap.put(PerformanceKeys.class, performanceConfig);
 
-        ConfigParser lang = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
+        ConfigParser lang = mock(net.leaf.yaml.configuration.ConfigParser.class);
         lang.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         lang.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class)).when(lang).getData();
         when(lang.getConfigValue(any(), any())).thenReturn("");
         lang.name = "messages";
         try {
-            java.lang.reflect.Field fileDatabaseField = io.github.dailystruggle.rtp.common.configuration.ConfigParser.class.getDeclaredField("fileDatabase");
+            java.lang.reflect.Field fileDatabaseField = net.leaf.yaml.configuration.ConfigParser.class.getDeclaredField("fileDatabase");
             fileDatabaseField.setAccessible(true);
             fileDatabaseField.set(lang, mockDb);
         } catch (Exception e) {}

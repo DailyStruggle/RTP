@@ -11,7 +11,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -86,7 +86,7 @@ class PregenTaskTerrainRecheckTest {
     }
 
     @Override
-    public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet u) {
+    public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet u) {
       return true;
     }
 

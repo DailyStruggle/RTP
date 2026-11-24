@@ -16,10 +16,10 @@ import java.util.function.Function;
 
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitMaterialResolver;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.TemporalUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -132,7 +132,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public int setBlocks(
-      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+      java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     return io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter
         .setBlocks(world, blocks);
   }
@@ -146,7 +146,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public int restoreBlockEntities(
-      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+      java.util.List<net.leaf.schematics.schematic.PlacedBlockEntity> entities) {
     return io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter
         .restoreBlockEntities(world, entities);
   }
@@ -219,7 +219,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
               s -> (RTPRuntime.serverAccessor() != null)
                   ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                  : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s),
+              RTPRuntime.blockingIoExecutor())
           .thenCompose(result -> {
             io.github.dailystruggle.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -260,7 +261,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
    *
    * <p>S-005 / Folia threading: all file I/O is coalesced per region file onto
-   * {@link io.github.dailystruggle.anvil.AnvilIoPool}, never a region
+   * the server's lifecycle-managed blocking-I/O executor, never a region
    * thread. The applicability gate ({@link #shouldPrefilter}) already tolerates
    * the region-thread-restricted {@code world.isChunkLoaded} call by treating
    * a thrown {@code ThreadAccessException} as "continue into the probe", so
@@ -277,9 +278,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
-    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    // Coalesced on the server's blocking-I/O executor: pending probes for one r.X.Z.mca share
+    // one open (S-005: no I/O on the caller; drained before shutdown/world unload).
     return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+        RTPRuntime.columnProbeCoalescer(),
         worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
         if (err != null) throw err;
@@ -308,7 +310,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * <p>Folia mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}: reads
    * {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease via {@link
    * io.github.dailystruggle.anvil.AnvilRegionSampler#readAllBiomes} on the
-   * {@link io.github.dailystruggle.anvil.AnvilIoPool} and samples each chunk's
+   * server's blocking-I/O executor and samples each chunk's
    * biome at chunk-local {@code (8, y, 8)}.
    * Canonicalises to the same uppercase, {@code minecraft:}-stripped form
    * {@code MemoryShape.addBiomeLocation} stores under, so
@@ -1144,14 +1146,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           final int chunkMinZ = Math.max(lz - radiusFinal, cz << 4);
           final int chunkMaxZ = Math.min(lz + radiusFinal, (cz << 4) + 15);
           RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> {
-            java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> diff =
+            java.util.List<net.leaf.schematics.platform.BlockDelta> diff =
                 restoreSeconds >= 0 ? new java.util.ArrayList<>() : null;
             for (int x = chunkMinX; x <= chunkMaxX; x++) {
               for (int z = chunkMinZ; z <= chunkMaxZ; z++) {
                 for (int dy = -depthFinal; dy < 0; dy++) {
                   org.bukkit.block.Block b = world.getBlockAt(x, ly + dy, z);
                   if (diff != null) {
-                    diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+                    diff.add(new net.leaf.schematics.platform.BlockDelta(
                         b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
                   }
                   b.setType(materialFinal);
@@ -1159,7 +1161,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                 for (int dy = 0; dy < airHeightFinal; dy++) {
                   org.bukkit.block.Block b = world.getBlockAt(x, ly + dy, z);
                   if (diff != null) {
-                    diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+                    diff.add(new net.leaf.schematics.platform.BlockDelta(
                         b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
                   }
                   b.setType(Material.AIR);
@@ -1183,9 +1185,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public boolean restoreBlocks(
-      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+      java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     if (world == null || blocks == null || blocks.isEmpty()) return false;
-    for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+    for (net.leaf.schematics.platform.BlockDelta delta : blocks) {
       try {
         org.bukkit.block.data.BlockData data = Bukkit.createBlockData(delta.token());
         world.getBlockAt(delta.x(), delta.y(), delta.z()).setBlockData(data, false);

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.governor;
 
-import io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator;
-import io.github.dailystruggle.rtp.common.predict.WorkAttributionLedger;
+import net.leaf.predict.WaterFillingAllocator;
+import net.leaf.predict.WorkAttributionLedger;
 
 import java.util.Comparator;
 import java.util.List;

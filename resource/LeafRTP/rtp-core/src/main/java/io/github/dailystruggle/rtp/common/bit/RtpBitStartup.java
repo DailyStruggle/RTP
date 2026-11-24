@@ -10,7 +10,7 @@ import io.github.dailystruggle.bit.BitRunner;
 import io.github.dailystruggle.bit.BitSelector;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BitKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;

@@ -4,12 +4,12 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
     private File pluginDir;
     private ConfigParser<PerformanceKeys> performanceConfig;
     private EnumMap<PerformanceKeys, Object> performanceData;
-    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
+    private net.leaf.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -45,8 +45,8 @@ public class ReqRtpSubConfigCmdCoverageTest {
         RTPTestSetup.install(pluginDir);
         ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
+        mockDb = mock(net.leaf.yaml.YamlFileCache.class);
+        Field cachedLookupField = net.leaf.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
 
@@ -56,7 +56,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
         performanceConfig.name = "performance.yml";
         performanceConfig.pluginDirectory = pluginDir;
 
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("myClass");
+        Field myClassField = net.leaf.yaml.factory.FactoryValue.class.getDeclaredField("myClass");
         myClassField.setAccessible(true);
         myClassField.set(performanceConfig, PerformanceKeys.class);
 
@@ -179,7 +179,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
         regionConfig.reverse_language_mapping = new ConcurrentHashMap<>();
         regionConfig.name = "default.yml";
 
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("myClass");
+        Field myClassField = net.leaf.yaml.factory.FactoryValue.class.getDeclaredField("myClass");
         myClassField.setAccessible(true);
         myClassField.set(regionConfig, RegionKeys.class);
 

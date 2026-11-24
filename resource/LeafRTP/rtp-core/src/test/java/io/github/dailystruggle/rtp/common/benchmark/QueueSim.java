@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Discrete-event queueing model of a random-teleport request path (ADR-080).
  *
- * <p><b>Why a queue and not a sum.</b> The previous tier added per-request operation costs and
+ * <p><b>Queueing vs. summation.</b> The previous tier added per-request operation costs and
  * divided. That can only ever produce the spread of the operation counts - about 2x between the
  * designs modelled - while the real harness measures a spread of several hundred fold on mean
  * latency. The missing factor is not a cost constant, it is contention: foreground chunk work

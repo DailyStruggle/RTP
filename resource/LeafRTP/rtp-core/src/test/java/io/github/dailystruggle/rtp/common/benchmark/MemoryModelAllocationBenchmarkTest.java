@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>Opt-in.</b> Tagged {@code simulation} and excluded from {@code test}; run via {@code
  * ./gradlew :rtp-core:simulationBenchmark}.
  *
- * <p><b>Why allocation rather than heap.</b> Whole-JVM heap under load needs a real server and
+ * <p><b>Allocation vs. heap.</b> Whole-JVM heap under load needs a real server and
  * 30-60 minutes per data point, which makes it a confirmation instrument, not an iteration one.
  * Allocated bytes per request is the thing GC pressure actually is - collector work is driven by
  * allocation rate, not by residency - and {@code getThreadAllocatedBytes} reports it exactly, on one

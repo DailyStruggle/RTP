@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.database.api.SqlDialect;
-import io.github.dailystruggle.rtp.common.database.pool.MiniConnectionPool;
+import net.leaf.database.pool.MiniConnectionPool;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.sql.*;
 import java.util.*;

@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.importer.schema;
 
 import io.github.dailystruggle.rtp.common.importer.AbstractForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ImportResult;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

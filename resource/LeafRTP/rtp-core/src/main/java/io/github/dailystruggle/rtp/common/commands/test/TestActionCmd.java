@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.action.ActionSimulator;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;

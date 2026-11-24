@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
@@ -607,7 +607,8 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
 
   @Override
   public void stop() {
-    // Implementation
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.closeColumnProbeCoalescer();
+    shutdownBlockingIo(java.time.Duration.ofSeconds(5));
     for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
   }
 
@@ -628,6 +629,7 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
               + plugin.getClass().getName());
     }
     bindPlugin(bukkitPlugin);
+    reopenBlockingIo();
     this.dataFolder = bukkitPlugin.getDataFolder();
     if (!playerLifecycleHookRegistered) {
       playerLifecycleHook.register(bukkitPlugin);

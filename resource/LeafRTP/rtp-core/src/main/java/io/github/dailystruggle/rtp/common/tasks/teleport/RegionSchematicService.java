@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
-import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
+import net.leaf.schematics.schematic.SchematicSource;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;

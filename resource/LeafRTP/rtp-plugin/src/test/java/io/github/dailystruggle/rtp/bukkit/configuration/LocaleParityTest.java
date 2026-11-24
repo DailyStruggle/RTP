@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
 import io.github.dailystruggle.bit.BitFinding;
-import io.github.dailystruggle.rtp.common.bit.config.MessageKeyParity;
+import net.leaf.bit.config.MessageKeyParity;
 import io.github.dailystruggle.rtp.common.bit.config.MessagesConfigCheck;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;

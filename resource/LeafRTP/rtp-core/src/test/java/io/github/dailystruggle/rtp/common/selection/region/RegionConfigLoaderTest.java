@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -321,23 +321,23 @@ public class RegionConfigLoaderTest {
         setupDefaultMocks(parser);
 
         // Mock factoryMap
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new net.leaf.yaml.factory.Factory<>();
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square = new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square("SQUARE");
         shapeFactory.add("SQUARE", square);
         FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new net.leaf.yaml.factory.Factory<>();
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor linear = new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>());
         vertFactory.add("LINEAR", linear);
         FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
 
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection shapeSection = mock(io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection.class);
+        net.leaf.yaml.RtpYamlSection shapeSection = mock(net.leaf.yaml.RtpYamlSection.class);
         java.util.Map<String, Object> shapeMap = new java.util.HashMap<>();
         shapeMap.put("name", "SQUARE");
         when(shapeSection.getMapValues(false)).thenReturn(shapeMap);
         doReturn(shapeSection).when(parser).getConfigValue(eq(RegionKeys.shape), any());
 
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection vertSection = mock(io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection.class);
+        net.leaf.yaml.RtpYamlSection vertSection = mock(net.leaf.yaml.RtpYamlSection.class);
         java.util.Map<String, Object> vertMap = new java.util.HashMap<>();
         vertMap.put("name", "LINEAR");
         when(vertSection.getMapValues(false)).thenReturn(vertMap);
@@ -357,11 +357,11 @@ public class RegionConfigLoaderTest {
         parser.name = "fallback_region.yml";
         setupDefaultMocks(parser);
 
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new net.leaf.yaml.factory.Factory<>();
         shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle());
         FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new net.leaf.yaml.factory.Factory<>();
         vertFactory.add("LINEAR", new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>()));
         vertFactory.add("JUMP", new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor(new java.util.ArrayList<>()));
         FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
@@ -387,7 +387,7 @@ public class RegionConfigLoaderTest {
         RegionConfigLoader.applyPolygonVertices(polygon, mapWithObjectArrays);
 
         // 2. RtpYamlSection for vertices
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlVertices = mock(io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection.class);
+        net.leaf.yaml.RtpYamlSection yamlVertices = mock(net.leaf.yaml.RtpYamlSection.class);
         java.util.Map<String, Object> vertexEntries = new java.util.HashMap<>();
         vertexEntries.put("0", java.util.List.of(0, 0));
         vertexEntries.put("1", java.util.List.of(100, 0));
@@ -418,12 +418,12 @@ public class RegionConfigLoaderTest {
         setupDefaultMocks(parser);
 
         // Factory with defaults available
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory = new net.leaf.yaml.factory.Factory<>();
         shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
         shapeFactory.add("CIRCLE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle());
         FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
-        io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?>> vertFactory = new net.leaf.yaml.factory.Factory<>();
         vertFactory.add("LINEAR", new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>()));
         FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
 

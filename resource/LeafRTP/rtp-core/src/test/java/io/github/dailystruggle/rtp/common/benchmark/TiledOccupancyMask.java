@@ -4,7 +4,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
  * Extends a real {@link WorldOccupancyMask} to an unbounded domain by repeating its region
  * footprint outward.
  *
- * <p>Why this exists: the model decision needs occupancy statistics at ranges far beyond any save
+ * <p>The model decision needs occupancy statistics at ranges far beyond any save
  * that can be generated in reasonable time, and the exact block coordinates of a bad area are
  * irrelevant to every quantity being measured - run counts, blob sizes, reconciliation locality and
  * directory footprint all depend on the <i>shape and density</i> of clustering, not on where it

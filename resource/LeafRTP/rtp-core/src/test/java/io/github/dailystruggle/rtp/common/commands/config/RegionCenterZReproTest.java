@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -53,9 +53,9 @@ public class RegionCenterZReproTest {
         ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         Configs configs = ActiveConfigs.get();
 
-        io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb =
-                mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class
+        net.leaf.yaml.YamlFileCache mockDb =
+                mock(net.leaf.yaml.YamlFileCache.class);
+        Field cachedLookupField = net.leaf.yaml.YamlFileCache.class
                 .getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
@@ -65,7 +65,7 @@ public class RegionCenterZReproTest {
         regionConfig.reverse_language_mapping = new ConcurrentHashMap<>();
         regionConfig.name = "north.yml";
 
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class
+        Field myClassField = net.leaf.yaml.factory.FactoryValue.class
                 .getDeclaredField("myClass");
         myClassField.setAccessible(true);
         myClassField.set(regionConfig, RegionKeys.class);

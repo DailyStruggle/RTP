@@ -14,7 +14,7 @@ import java.util.List;
  * Replaceable persistence seam and format codec for learned state tables across curve changes
  * (ADR-085 criterion C9).
  *
- * <p>Why a replaceable seam: the same key space is what a shared cross-server database would key on,
+ * <p>The same key space is what a shared cross-server database would key on,
  * and the curve must not know which backend (local file, redis, sql, or network peer) it is talking
  * to. Note the database-sharing implication: servers sharing the same seed and region configuration
  * address identical chunk sets with identical keys, enabling shared learned state without key

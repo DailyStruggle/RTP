@@ -6,10 +6,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -24,15 +26,30 @@ import java.util.logging.Logger;
  * <p>No timer: an idle pool drains a single request at today's latency; a busy pool grows groups.
  * A group closes at {@link #MAX_GROUP} requests so one file cannot pin a pool thread. Futures complete
  * after the session is closed, so dependent callbacks never run while a handle is open. A failed chunk
- * completes only its own future exceptionally (S-004). Blocking I/O stays on the executor (S-005).</p>
+ * completes only its own future exceptionally (S-004). Blocking I/O stays on the caller-supplied
+ * executor (S-005).</p>
+ *
+ * <p>Lifecycle: implements {@link AutoCloseable}. Calling {@link #close()} or
+ * {@link #awaitDrain(long, TimeUnit)} rejects new submissions with
+ * {@link RejectedExecutionException} and awaits completion of all in-flight region-file drains so
+ * I/O cannot race with world unload or server shutdown (S-002).</p>
  *
  * <p>Square jobs (ADR-120) join the same groups. A job runs inside the drain, after the group's
  * probes, while the lease or session is held, and reads its {@link ChunkSquare}: each same-file
  * chunk it asks for is decoded on first access and shared by the drain's jobs over the same Y
  * window. Chunks a job never asks for are never decoded. A job must be pure, bounded and
  * non-blocking; its result completes its future after the session is closed.</p>
+ *
+ * @governedBy ADR-115
+ * @governedBy anvil-api-ADR-001
+ * @governedBy anvil-api-ADR-002
+ * @governedBy anvil-api-ADR-003
+ * @trace REQ-RTP-F-015
+ * @trace REQ-RTP-S-002
+ * @trace REQ-RTP-S-004
+ * @trace REQ-RTP-S-005
  */
-final class ColumnProbeCoalescer {
+public final class ColumnProbeCoalescer implements AutoCloseable {
 
   static final int MAX_GROUP = 64;
 
@@ -76,13 +93,54 @@ final class ColumnProbeCoalescer {
   private final AtomicLong requestsServed = new AtomicLong();
   private final AtomicLong squareJobs = new AtomicLong();
   private final AtomicLong squareDecodes = new AtomicLong();
+  private final Object drainLock = new Object();
+  private volatile boolean closed;
+  private int activeDrains;
 
-  ColumnProbeCoalescer(Executor executor) {
-    this.executor = executor;
+  public ColumnProbeCoalescer(Executor executor) {
+    this.executor = Objects.requireNonNull(executor, "executor");
+  }
+
+  /** Returns {@code true} once {@link #close()} or {@link #awaitDrain(long, TimeUnit)} has been called. */
+  public boolean isClosed() {
+    return closed;
+  }
+
+  /**
+   * Marks this coalescer closed, rejects new submissions, and waits up to {@code timeout} for all
+   * in-flight region-file drains to finish.
+   *
+   * @return {@code true} if all in-flight drains completed before the timeout expired
+   */
+  public boolean awaitDrain(long timeout, TimeUnit unit) throws InterruptedException {
+    Objects.requireNonNull(unit, "unit");
+    long deadlineNanos = System.nanoTime() + Math.max(0L, unit.toNanos(timeout));
+    synchronized (drainLock) {
+      closed = true;
+      while (activeDrains > 0) {
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        if (remainingNanos <= 0L) {
+          return false;
+        }
+        long millis = remainingNanos / 1_000_000L;
+        int nanos = (int) (remainingNanos % 1_000_000L);
+        drainLock.wait(millis, nanos);
+      }
+      return true;
+    }
+  }
+
+  @Override
+  public void close() {
+    try {
+      awaitDrain(5L, TimeUnit.SECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  CompletableFuture<ColumnProbe> submit(Path worldFolder, String dim, int cx, int cz, int minY, int maxY) {
+  public CompletableFuture<ColumnProbe> submit(Path worldFolder, String dim, int cx, int cz, int minY, int maxY) {
     return (CompletableFuture) enqueue(worldFolder, dim, new Request(cx, cz, minY, maxY, null, new CompletableFuture<>()));
   }
 
@@ -93,16 +151,24 @@ final class ColumnProbeCoalescer {
    * Anvil region file.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  <T> CompletableFuture<T> submitSquare(Path worldFolder, String dim, int cx, int cz, int minY, int maxY,
+  public <T> CompletableFuture<T> submitSquare(Path worldFolder, String dim, int cx, int cz, int minY, int maxY,
                                         Function<ChunkSquare, T> job) {
     if (job == null) throw new NullPointerException("job");
     return (CompletableFuture) enqueue(worldFolder, dim, new Request(cx, cz, minY, maxY, job, new CompletableFuture<>()));
   }
 
   private CompletableFuture<Object> enqueue(Path worldFolder, String dim, Request req) {
+    if (closed) {
+      req.future().completeExceptionally(new RejectedExecutionException("ColumnProbeCoalescer is closed"));
+      return req.future();
+    }
     int cx = req.cx(), cz = req.cz();
     Key key = new Key(worldFolder, dim, cx >> 5, cz >> 5);
     for (;;) {
+      if (closed) {
+        req.future().completeExceptionally(new RejectedExecutionException("ColumnProbeCoalescer is closed"));
+        return req.future();
+      }
       Group g = open.get(key);
       if (g != null) {
         synchronized (g) {
@@ -121,13 +187,32 @@ final class ColumnProbeCoalescer {
       Group fresh = new Group(key);
       fresh.requests.add(req);
       if (open.putIfAbsent(key, fresh) != null) continue;
+      synchronized (drainLock) {
+        if (closed) {
+          List<Request> stranded = close(fresh);
+          RejectedExecutionException ex = new RejectedExecutionException("ColumnProbeCoalescer is closed");
+          for (Request r : stranded) r.future().completeExceptionally(ex);
+          return req.future();
+        }
+        activeDrains++;
+      }
       try {
         executor.execute(() -> drain(fresh));
-      } catch (RejectedExecutionException e) {
+      } catch (RuntimeException e) {
         List<Request> stranded = close(fresh);
+        finishDrain();
         for (Request r : stranded) r.future().completeExceptionally(e);
       }
       return req.future();
+    }
+  }
+
+  private void finishDrain() {
+    synchronized (drainLock) {
+      activeDrains--;
+      if (activeDrains == 0) {
+        drainLock.notifyAll();
+      }
     }
   }
 
@@ -138,32 +223,36 @@ final class ColumnProbeCoalescer {
   }
 
   private void drain(Group g) {
-    long drainStart = System.nanoTime();
-    List<Request> batch = close(g);
-    groupsDrained.incrementAndGet();
-    requestsServed.addAndGet(batch.size());
-    Object[] results = new Object[batch.size()];
     try {
-      serve(g.key, batch, results);
-    } catch (Throwable t) {
+      long drainStart = System.nanoTime();
+      List<Request> batch = close(g);
+      groupsDrained.incrementAndGet();
+      requestsServed.addAndGet(batch.size());
+      Object[] results = new Object[batch.size()];
+      try {
+        serve(g.key, batch, results);
+      } catch (Throwable t) {
+        for (int i = 0; i < results.length; i++) {
+          if (results[i] == null) results[i] = t;
+        }
+      }
+      long elapsedNanos = System.nanoTime() - drainStart;
+      long perChunkNanos = batch.isEmpty() ? 0L : Math.max(1L, elapsedNanos / batch.size());
       for (int i = 0; i < results.length; i++) {
-        if (results[i] == null) results[i] = t;
+        CompletableFuture<Object> f = batch.get(i).future();
+        Object r = results[i];
+        if (r instanceof Throwable t) {
+          f.completeExceptionally(t);
+        } else if (r instanceof Done d) {
+          f.complete(d.value());
+        } else if (r instanceof ColumnProbe p) {
+          f.complete(p.withDrain(perChunkNanos, batch.size()));
+        } else {
+          f.complete(null);
+        }
       }
-    }
-    long elapsedNanos = System.nanoTime() - drainStart;
-    long perChunkNanos = batch.isEmpty() ? 0L : Math.max(1L, elapsedNanos / batch.size());
-    for (int i = 0; i < results.length; i++) {
-      CompletableFuture<Object> f = batch.get(i).future();
-      Object r = results[i];
-      if (r instanceof Throwable t) {
-        f.completeExceptionally(t);
-      } else if (r instanceof Done d) {
-        f.complete(d.value());
-      } else if (r instanceof ColumnProbe p) {
-        f.complete(p.withDrain(perChunkNanos, batch.size()));
-      } else {
-        f.complete(null);
-      }
+    } finally {
+      finishDrain();
     }
   }
 
@@ -305,22 +394,22 @@ final class ColumnProbeCoalescer {
   }
 
   /** Square jobs run so far. */
-  long squareJobs() {
+  public long squareJobs() {
     return squareJobs.get();
   }
 
   /** Chunks decoded for square jobs (first access per drain and Y window). */
-  long squareDecodes() {
+  public long squareDecodes() {
     return squareDecodes.get();
   }
 
   /** Drain tasks run so far (each one region-file group). */
-  long groupsDrained() {
+  public long groupsDrained() {
     return groupsDrained.get();
   }
 
   /** Requests served by drain tasks so far. */
-  long requestsServed() {
+  public long requestsServed() {
     return requestsServed.get();
   }
 }

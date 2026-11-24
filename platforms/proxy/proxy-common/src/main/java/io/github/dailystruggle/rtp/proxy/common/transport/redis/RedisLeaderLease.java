@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.WaitlistLeaderLease;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespPool;
 
 import java.time.Duration;
 import java.util.Collections;

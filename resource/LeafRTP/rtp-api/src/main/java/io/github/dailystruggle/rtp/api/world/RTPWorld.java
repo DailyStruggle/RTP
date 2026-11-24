@@ -439,8 +439,8 @@ public abstract class RTPWorld<T> {
   /**
    * Runs {@code job} over the chunks around (cx, cz) that share its {@code .mca} region file, each
    * decoded over world-Y {@code [minY, maxY]} only when the job first asks for it (ADR-120 terrain
-   * square). Runs on the Anvil I/O pool; never opens another region file, loads or generates a
-   * chunk, and does no I/O on the caller (S-005). Default: {@link
+   * square). Runs on the server's lifecycle-managed blocking-I/O executor; never opens another
+   * region file, loads or generates a chunk, and does no I/O on the caller (S-005). Default: {@link
    * io.github.dailystruggle.anvil.AnvilPrefilter#squareJobAsync} over {@link
    * #anvilWorldFolder()}.
    *
@@ -452,6 +452,7 @@ public abstract class RTPWorld<T> {
   public <R> CompletableFuture<R> probeChunkSquare(int cx, int cz, int minY, int maxY,
       java.util.function.Function<io.github.dailystruggle.anvil.ChunkSquare, R> job) {
     return io.github.dailystruggle.anvil.AnvilPrefilter.squareJobAsync(
+        io.github.dailystruggle.rtp.api.RTPAPI.columnProbeCoalescer(),
         anvilWorldFolder(), anvilDimensionSubpath(), cx, cz, minY, maxY, job);
   }
 
@@ -553,7 +554,7 @@ public abstract class RTPWorld<T> {
    * @param blocks original blocks to restore; never null
    * @return {@code true} if applied, {@code false} if unsupported or failed
    */
-  public boolean restoreBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+  public boolean restoreBlocks(java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     return false;
   }
 
@@ -564,7 +565,7 @@ public abstract class RTPWorld<T> {
    * @param blocks block-location map to write; never null
    * @return count of blocks placed (0 if unsupported or none)
    */
-  public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+  public int setBlocks(java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     return 0;
   }
 
@@ -576,7 +577,7 @@ public abstract class RTPWorld<T> {
    * @return count of containers/entities restored
    */
   public int restoreBlockEntities(
-      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+      java.util.List<net.leaf.schematics.schematic.PlacedBlockEntity> entities) {
     return 0;
   }
 

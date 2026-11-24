@@ -29,7 +29,7 @@ import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
 import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -53,7 +53,7 @@ import java.util.logging.Level;
  * Fabric platform implementation of {@link RTPServerAccessor}.
  *
  *
- * <p><b>Why fail-loud:</b> per <b>REQ-RTP-S-006</b> ("require-by-contract API entry
+ * <p><b>Fail-loud contract:</b> per <b>REQ-RTP-S-006</b> ("require-by-contract API entry
  * points"), addons calling an unimplemented method must see an immediate
  * {@code IllegalStateException}/{@code UnsupportedOperationException} rather than a
  * silent null/no-op. This is identical to the Bukkit-family contract.
@@ -1799,7 +1799,9 @@ public final class FabricServerAccessor
   @Override
   public void stop() {
     // Lifecycle drives this from RTPFabricMod via FabricEventBridge.
-    // Release world chunk tickets and clear scheduler tasks before SERVER_STOPPING finishes.
+    // Drain blocking region I/O first, then release world chunk tickets and clear scheduler tasks.
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.closeColumnProbeCoalescer();
+    shutdownBlockingIo(java.time.Duration.ofSeconds(5));
     for (io.github.dailystruggle.rtp.api.world.RTPWorld<?> w : worldsByName.values()) {
       try {
         w.forgetChunks();

@@ -202,7 +202,8 @@ class BiomeSourceAndProbeSupportTest {
         0, 0,
         12345L,
         java.util.Set.of(),
-        s -> { throw new RuntimeException("boom"); }
+        s -> { throw new RuntimeException("boom"); },
+        Runnable::run
     );
     AnvilPrefilter.ProbeResult res = fut.join();
     assertNotNull(res);

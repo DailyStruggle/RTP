@@ -390,9 +390,9 @@ public final class FabricEventBridge {
     @SuppressWarnings("unchecked")
     private void initLoginReserveCache(MinecraftServer server) {
         try {
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+            net.leaf.yaml.configuration.ConfigParser<
                     io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
-                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                    (net.leaf.yaml.configuration.ConfigParser<
                             io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
                             ActiveConfigs.get().getParser(
                                     io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);

@@ -1,0 +1,116 @@
+# GoldLeaf global configuration.
+# GoldLeaf preserves vanilla redstone and technical farm mechanics by default.
+# Settings in this file control hardware-envelope auto-tuning and diagnostics.
+
+config-version: 1
+threading:
+  auto-tune-workstation: true
+  min-auto-threads: 1
+  max-auto-threads: -1
+diagnostics:
+  log-hardware-envelope-on-startup: true
+  chunk-telemetry-spi: true
+  chunk-telemetry-max-listeners: 4
+  plugin-safety-preflight: true
+  plugin-safety-preflight-fail-closed: false
+  runtime-hazard-hooks: false
+  runtime-hazard-stall-threshold-ms: 100
+  watchdog-enriched-context: true
+  watchdog-max-players: 8
+  watchdog-top-hot-chunks: 5
+  live-region-hud-enabled: true
+  live-region-hud-interval-ticks: 20
+  startup-summary-enabled: true
+  boot-telemetry-enabled: true
+  boot-telemetry-slow-plugin-ms: 250
+  shutdown-non-daemon-thread-audit: true
+  plugin-io-prefetch-enabled: true
+  plugin-io-prefetch-threads: 4
+  plugin-io-prefetch-max-file-bytes: 67108864
+  plugin-io-prefetch-max-total-bytes: 536870912
+storage:
+  format: lca
+  lca-mode: mode-a
+  lca-mode-b-lcd2: false
+  auto-migrate-mca: false
+  backup-migrated-mca: true
+  max-open-regions: 256
+  lca-native-section-backing: true
+  lazy-entity-hydration: true
+  lazy-entity-refreeze: true
+  lca-hot-promote-dirty-threshold: 64
+  lca-compact-quiet-window-ticks: 200
+  lca-compact-pressure-quiet-window-ticks: 40
+  lca-compact-heap-pressure-ratio: 0.7
+  lca-compact-generated-chunks: false
+  skip-save-unmodified-cold-chunks: false
+  cold-chunk-min-inhabited-ticks: 200
+  cold-chunk-min-revisits: 2
+  cold-chunk-ignore-natural-ticks: false
+network:
+  lca-net-v1-enabled: false
+  require-lca-client: false
+  lca-net-batch-lcd2: true
+  lca-net-proxy-safe-stored-zlib: true
+  lca-net-max-session-cache-chunks: 4096
+  leafshard-tier4-rpc-enabled: false
+  leafshard-tier4-rpc-timeout-ms: 50
+  leafshard-tier4-max-in-flight-rpcs: 256
+  entity-tracker-allocation-free-purge: true
+  entity-tracker-shared-broadcast-threshold: 8
+  anti-xray-off-tick-encoding: false
+  anti-xray-lca-fast-path: true
+worldgen:
+  opencl-gpu-enabled: false
+  section-batched-do-fill: true
+  parity-mode: vanilla-exact
+  require-accelerator: false
+  wave-max-size: 24
+  wave-flush-deadline-ms: 2
+  auto-pace-generation-workers: true
+  apply-pool-threads: 0
+  gpu-surface-enabled: false
+  hilbert-ore-veins: false
+  gpu-light-enabled: false
+  gpu-carver-mask: true
+  macro-noise-octaves: false
+  gpu-in-vram-features: false
+  secure-seed:
+    enabled: false
+    allow-unsafe-migration: false
+protocols:
+  servux-enabled: false
+  servux-max-structure-radius: 128
+  syncmatica-enabled: false
+  syncmatica-max-file-bytes: 2097152
+  jade-enabled: false
+  appleskin-enabled: false
+  map-world-id-enabled: false
+  max-payload-bytes: 1048576
+  max-packets-per-second: 60
+anti-exploit:
+  chunk-gen-backpressure-enabled: true
+  chunk-gen-saturation-watermark: 64
+  chunk-gen-min-send-distance: 4
+  chunk-gen-debt-decay-seconds: 15
+  packet-hardening-enabled: true
+  serverbound-nbt-max-bytes: 2097152
+  serverbound-nbt-max-depth: 64
+  max-book-pages: 100
+  max-book-page-utf8-bytes: 1024
+  max-malformed-packets-per-second: 5
+bots:
+  enabled: false
+  max-total: 16
+  max-per-player: 2
+  allow-chunk-loading: false
+security:
+  disable-chat-signing: false
+compute:
+  enabled: true
+  allow-custom-opencl: false
+  custom-kernel-allowlist: []
+  max-vram-bytes-per-owner: 67108864
+  max-total-vram-bytes: 268435456
+  max-gpu-budget-ms-per-tick: 6
+  worker-threads: 2

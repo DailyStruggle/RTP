@@ -1,7 +1,7 @@
 package io.github.dailystruggle.yaml;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlMapping;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlMapping;
+import net.leaf.yaml.RtpYamlSection;
 
 /**
  * Pure-Java read/mutate handle on a YAML mapping section ({@code :yaml-api}).

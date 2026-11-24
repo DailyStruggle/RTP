@@ -196,6 +196,269 @@ public record RawChunkFrameSnapshot(
         return rewriteSectionFramePaletteHeaderBytes(rawSlice, palMap);
     }
 
+    /**
+     * Immutable direct-access view of an {@code LCA-ICD-3.0} {@code BLOCK_MODE_FLAT_BITPACK}
+     * ({@code mode 10}, little-endian YZX) section extracted directly from a chunk slab with zero
+     * voxel decoding, zero Hilbert curve remapping, and zero palette VarInt re-encoding.
+     */
+    public record FlatBitPackSection(
+            int[] paletteRuntimeIds,
+            int bitsPerVoxel,
+            byte[] flatBytes
+    ) {
+    }
+
+    /**
+     * Resolves the effective disk/slab-local palette index to host runtime {@code BlockState} ID
+     * mapping once per chunk so callers iterating all sections avoid re-parsing the slab-local
+     * micro-palette header on every section.
+     */
+    public int[] resolveEffectivePaletteToRuntimeIdMap(
+            java.util.function.Function<String, Integer> fallbackRuntimeLookup
+    ) {
+        return buildEffectivePaletteToRuntimeIdMap(fallbackRuntimeLookup);
+    }
+
+    /**
+     * Zero-unpack extractor for unmodified standard LCA Mode A block sections
+     * ({@code BLOCK_MODE_DELTA_ROARING}, {@code BLOCK_MODE_DELTA_ROARING_FULL_MASK}, and
+     * {@code BLOCK_MODE_FLAT_BITPACK} with {@code secExtFlags == 0}).
+     */
+    public LcaModeABlockSection tryExtractModeABlockSection(
+            int sectionIndex,
+            java.util.function.Function<String, Integer> fallbackRuntimeLookup
+    ) {
+        return tryExtractModeABlockSection(
+                sectionIndex,
+                computeSectionRelStarts(),
+                buildEffectivePaletteToRuntimeIdMap(fallbackRuntimeLookup));
+    }
+
+    /**
+     * Zero-unpack extractor reusing chunk-level precomputed {@code relStarts} and
+     * {@code palMap} across all sections of a chunk.
+     */
+    public LcaModeABlockSection tryExtractModeABlockSection(
+            int sectionIndex,
+            int[] relStarts,
+            int[] palMap
+    ) {
+        if (sectionIndex < 0 || sectionIndex >= sectionCount || relStarts == null || palMap == null) {
+            return null;
+        }
+        int entry16 = sectionDirectoryEntry16(sectionIndex);
+        if (entry16 == 0 || (entry16 & 0x8000) != 0) {
+            return null;
+        }
+        int start = relStarts[sectionIndex];
+        if (start < 0 || start >= chunkFrame.length) {
+            return null;
+        }
+        int limit = LcaRegionReader.findSectionRelEnd(
+                relStarts, sectionIndex, sectionCount, residualRelStart(), chunkFrame.length);
+        if (limit <= start + 2) {
+            return null;
+        }
+        return LcaModeABlockSection.tryExtractFromChunkFrame(chunkFrame, start, limit, palMap);
+    }
+
+    /**
+     * Zero-decode extractor for {@code BLOCK_MODE_FLAT_BITPACK} ({@code mode 10}, YZX) sections.
+     *
+     * <p>Reads the section's {@code VarInt[K]} palette directly into host runtime IDs and slices
+     * the exact packed {@code flatBytes} ({@code 512..2,048+ B}) directly from {@link #chunkFrame}
+     * without copying the section header, rewriting VarInts, or unpacking 4,096 voxels. Returns
+     * {@code null} (fail-closed, {@code S-004}) for uniform/empty entries, non-FlatBitPack
+     * (Delta-Roaring) sections, malformed headers, or unmapped state IDs.</p>
+     */
+    public FlatBitPackSection tryExtractFlatBitPackSection(
+            int sectionIndex,
+            java.util.function.Function<String, Integer> fallbackRuntimeLookup
+    ) {
+        return tryExtractFlatBitPackSection(
+                sectionIndex,
+                computeSectionRelStarts(),
+                buildEffectivePaletteToRuntimeIdMap(fallbackRuntimeLookup));
+    }
+
+    /**
+     * Zero-decode extractor reusing chunk-level precomputed {@code relStarts} and
+     * {@code effectivePalMap} across all sections of a chunk.
+     */
+    public FlatBitPackSection tryExtractFlatBitPackSection(
+            int sectionIndex,
+            int[] relStarts,
+            int[] palMap
+    ) {
+        if (sectionIndex < 0 || sectionIndex >= sectionCount || relStarts == null || palMap == null) {
+            return null;
+        }
+        int entry16 = sectionDirectoryEntry16(sectionIndex);
+        if (entry16 == 0 || (entry16 & 0x8000) != 0) {
+            return null;
+        }
+        int start = relStarts[sectionIndex];
+        if (start < 0 || start >= chunkFrame.length) {
+            return null;
+        }
+        int limit = LcaRegionReader.findSectionRelEnd(
+                relStarts, sectionIndex, sectionCount, residualRelStart(), chunkFrame.length);
+        if (limit <= start + 10) {
+            return null;
+        }
+        int pos = start;
+        int sectionHeader = chunkFrame[pos++] & 0xFF;
+        int blockMode = (sectionHeader >>> 4) & 3;
+        if (blockMode != LcaSectionCodec.BLOCK_MODE_FLAT_BITPACK) {
+            return null;
+        }
+        // Skip 8-byte octreeOccupancyMask64
+        pos += 8;
+        try {
+            int k = LcaSectionCodec.readVarInt(chunkFrame, pos, limit);
+            pos += LcaSectionCodec.varIntLen(k);
+            if (k < 2 || k > LcaSectionCodec.SECTION_VOXELS) {
+                return null;
+            }
+            int[] mappedIds = new int[k];
+            for (int i = 0; i < k; i++) {
+                int diskId = LcaSectionCodec.readVarInt(chunkFrame, pos, limit);
+                pos += LcaSectionCodec.varIntLen(diskId);
+                if (diskId < 0 || diskId >= palMap.length) {
+                    return null;
+                }
+                int runtimeId = palMap[diskId];
+                if (runtimeId < 0 || runtimeId > LcaSectionBacking.MAX_STATE_ID_19) {
+                    return null;
+                }
+                mappedIds[i] = runtimeId;
+            }
+            int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(k - 1));
+            int flatBytesLen = (LcaSectionCodec.SECTION_VOXELS * flatBits + 7) >>> 3;
+            if (flatBytesLen <= 0 || flatBytesLen > limit - pos) {
+                return null;
+            }
+            byte[] flatBytes = Arrays.copyOfRange(chunkFrame, pos, pos + flatBytesLen);
+            return new FlatBitPackSection(mappedIds, flatBits, flatBytes);
+        } catch (CorruptRegionEntryException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Slices only the block-state portion of the encoded {@code SectionFrame} for
+     * {@code sectionIndex} (stripping trailing biome and SkyLight/BlockLight bytes that the host
+     * server already stores separately), rewrites its {@code VarInt[K]} palette header to host
+     * runtime {@code BlockState} IDs, and clears the light mode bits in {@code sectionHeader}.
+     *
+     * <p>Returns {@link LcaSectionCodec#EMPTY_BYTES} for empty/inline-uniform directory entries,
+     * and returns {@code null} (fail-closed, {@code S-004}) if a non-uniform section slice is
+     * malformed, truncated, or contains an unmapped/negative runtime state ID.</p>
+     */
+    public byte[] sliceBlockOnlySectionFrameWithRuntimePalette(
+            int sectionIndex,
+            java.util.function.Function<String, Integer> fallbackRuntimeLookup
+    ) {
+        int entry16 = sectionDirectoryEntry16(sectionIndex);
+        if (entry16 == 0 || (entry16 & 0x8000) != 0) {
+            return LcaSectionCodec.EMPTY_BYTES;
+        }
+        byte[] rawSlice = sliceSectionFrame(sectionIndex);
+        if (rawSlice.length == 0) {
+            return null;
+        }
+        int[] palMap = buildEffectivePaletteToRuntimeIdMap(fallbackRuntimeLookup);
+        if (palMap == null) {
+            return null;
+        }
+        return rewriteBlockOnlySectionFramePaletteHeaderBytes(rawSlice, palMap);
+    }
+
+    static byte[] rewriteBlockOnlySectionFramePaletteHeaderBytes(
+            byte[] sectionFrame,
+            int[] paletteIdxToRuntimeId
+    ) {
+        if (sectionFrame == null || sectionFrame.length < 2 || paletteIdxToRuntimeId == null) {
+            return null;
+        }
+        try {
+            int pos = 0;
+            int sectionHeader = sectionFrame[pos++] & 0xFF;
+            int blockMode = (sectionHeader >>> 4) & 3;
+            if (blockMode != LcaSectionCodec.BLOCK_MODE_UNIFORM
+                    && blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+                if (pos + 8 > sectionFrame.length) {
+                    return null;
+                }
+                pos += 8;
+            }
+            int prefixLen = pos;
+            int secExtFlags = 0;
+            int k = LcaSectionCodec.readVarInt(sectionFrame, pos, sectionFrame.length);
+            pos += LcaSectionCodec.varIntLen(k);
+            if (k == 0) {
+                if ((blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                        && blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK)
+                        || pos >= sectionFrame.length) {
+                    return null;
+                }
+                secExtFlags = sectionFrame[pos++] & 0xFF;
+                if (!LcaV3Codec.isValidSecExtFlags(secExtFlags) || pos >= sectionFrame.length) {
+                    return null;
+                }
+                prefixLen = pos;
+                k = LcaSectionCodec.readVarInt(sectionFrame, pos, sectionFrame.length);
+                pos += LcaSectionCodec.varIntLen(k);
+                if (k < 2 || k > LcaSectionCodec.SECTION_VOXELS) {
+                    return null;
+                }
+            } else if (k < 1 || k > LcaSectionCodec.SECTION_VOXELS) {
+                return null;
+            }
+            int[] mappedIds = new int[k];
+            int newPalBytes = LcaSectionCodec.varIntLen(k);
+            for (int i = 0; i < k; i++) {
+                int diskId = LcaSectionCodec.readVarInt(sectionFrame, pos, sectionFrame.length);
+                pos += LcaSectionCodec.varIntLen(diskId);
+                if (diskId < 0 || diskId >= paletteIdxToRuntimeId.length) {
+                    return null;
+                }
+                int runtimeId = paletteIdxToRuntimeId[diskId];
+                if (runtimeId < 0 || runtimeId > LcaSectionBacking.MAX_STATE_ID_19) {
+                    return null;
+                }
+                mappedIds[i] = runtimeId;
+                newPalBytes += LcaSectionCodec.varIntLen(runtimeId);
+            }
+            int bodyStart = pos;
+            int blockEnd;
+            if (blockMode == LcaSectionCodec.BLOCK_MODE_UNIFORM || k == 1) {
+                blockEnd = bodyStart;
+            } else {
+                blockEnd = LcaSectionCodec.skipSectionBlockPayload(
+                        sectionFrame, bodyStart, sectionFrame.length, blockMode, secExtFlags, k);
+            }
+            int blockBodyLen = blockEnd - bodyStart;
+            if (blockBodyLen < 0 || blockEnd > sectionFrame.length) {
+                return null;
+            }
+            byte[] out = new byte[prefixLen + newPalBytes + blockBodyLen];
+            System.arraycopy(sectionFrame, 0, out, 0, prefixLen);
+            // Clear skyMode and blkMode bits (bits 3..0) to LIGHT_MODE_ABSENT for block-only frame
+            out[0] = (byte) (sectionHeader & 0xF0);
+            int writePos = LcaSectionCodec.writeVarIntToBuf(out, prefixLen, k);
+            for (int i = 0; i < k; i++) {
+                writePos = LcaSectionCodec.writeVarIntToBuf(out, writePos, mappedIds[i]);
+            }
+            if (blockBodyLen > 0) {
+                System.arraycopy(sectionFrame, bodyStart, out, writePos, blockBodyLen);
+            }
+            return out;
+        } catch (CorruptRegionEntryException e) {
+            return null;
+        }
+    }
+
     private int[] buildEffectivePaletteToRuntimeIdMap(
             java.util.function.Function<String, Integer> fallbackRuntimeLookup
     ) {

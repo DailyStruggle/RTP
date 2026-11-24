@@ -24,8 +24,19 @@ spotless {
     }
 }
 
+def rtpGroup = 'io.github.dailystruggle'
+def leafGroup = 'io.github.leafcraftdev'
+def rtpModulePaths = [
+        ':',
+        ':rtp-api',
+        ':rtp-core',
+        ':rtp-plugin',
+] as Set
+
 allprojects {
-    group = 'io.github.dailystruggle'
+    group = (rtpModulePaths.contains(project.path) || project.path.startsWith(':addons:'))
+            ? rtpGroup
+            : leafGroup
     version = providers.gradleProperty('version').get()
 
     // ENTERPRISE_READINESS.md Item 40: Reproducible builds.
@@ -927,9 +938,14 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                     // upload; JitPack / GitHub Packages ignore them, so adding
                     // them is safe for every channel.
                     pom {
+                        def isRtpModule = (project.group.toString() == 'io.github.dailystruggle')
                         name = project.name
-                        description = 'RTP addon-facing API module: ' + project.name
-                        url = 'https://github.com/DailyStruggle/RTP'
+                        description = isRtpModule
+                                ? ('RTP addon-facing API module: ' + project.name)
+                                : ('LeafCraftDev API module: ' + project.name)
+                        url = isRtpModule
+                                ? 'https://github.com/DailyStruggle/RTP'
+                                : 'https://github.com/LeafCraftDev/MC'
                         licenses {
                             license {
                                 name = 'GPL-3.0'
@@ -938,14 +954,20 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                         }
                         developers {
                             developer {
-                                id = 'DailyStruggle'
-                                name = 'DailyStruggle'
+                                id = isRtpModule ? 'DailyStruggle' : 'LeafCraftDev'
+                                name = isRtpModule ? 'DailyStruggle' : 'LeafCraftDev'
                             }
                         }
                         scm {
-                            connection = 'scm:git:https://github.com/DailyStruggle/RTP.git'
-                            developerConnection = 'scm:git:ssh://git@github.com/DailyStruggle/RTP.git'
-                            url = 'https://github.com/DailyStruggle/RTP'
+                            connection = isRtpModule
+                                    ? 'scm:git:https://github.com/DailyStruggle/RTP.git'
+                                    : 'scm:git:https://github.com/LeafCraftDev/MC.git'
+                            developerConnection = isRtpModule
+                                    ? 'scm:git:ssh://git@github.com/DailyStruggle/RTP.git'
+                                    : 'scm:git:ssh://git@github.com/LeafCraftDev/MC.git'
+                            url = isRtpModule
+                                    ? 'https://github.com/DailyStruggle/RTP'
+                                    : 'https://github.com/LeafCraftDev/MC'
                         }
                     }
                 }

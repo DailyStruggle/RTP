@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 /**
  * Seeded noise terrain standing in for a real save's pass/fail geometry, at chunk granularity.
  *
- * <p>Why this exists: every figure in the ADR-083/084/085 line of work was measured against one
+ * <p>Every figure in the ADR-083/084/085 line of work was measured against one
  * hand-copied save, tiled outward to reach border scale. Tiling repeats, so it cannot produce new
  * coastline, and {@link DensityTargetedOccupancyMask} only adds square blocks of ground - both
  * were flagged in those ADRs as the reason an absolute run count on that mask is not a claim about

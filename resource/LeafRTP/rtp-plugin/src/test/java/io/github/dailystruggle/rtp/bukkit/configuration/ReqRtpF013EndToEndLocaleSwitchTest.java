@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import net.leaf.yaml.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import java.io.File;
 import java.nio.file.Files;

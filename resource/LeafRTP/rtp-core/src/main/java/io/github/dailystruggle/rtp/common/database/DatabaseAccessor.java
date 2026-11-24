@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import net.leaf.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -146,8 +146,8 @@ public abstract class DatabaseAccessor<D> implements RegionLocationStore {
    */
   public boolean isSystemDatabaseLoggingEnabled() {
     if (ActiveConfigs.get() != null) {
-      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
-          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
+      net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
+          (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
               ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging != null) {
         Object o = logging.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_database, false);

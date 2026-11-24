@@ -7,11 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
@@ -23,8 +23,8 @@ import java.util.logging.Logger;
  * all other outcomes ({@link Verdict#ACCEPT} / {@link Verdict#UNKNOWN}) fall through
  * to the live chunk load, where {@code RTPChunk.isSafe(...)} remains authoritative.
  *
- * <p>The asynchronous {@code probeDetailed} entry point schedules I/O + NBT walk on
- * {@link ForkJoinPool#commonPool()}; do not block the returned future on a tick thread.
+ * <p>The asynchronous {@code probeDetailed} entry point schedules I/O + NBT walk on a
+ * caller-supplied {@link Executor}; do not block the returned future on a tick thread.
  * Only thread-safe platform accessors are touched (world folder, environment, generator).
  *
  * <p>Callers gate the probe behind the four checks from ADR-016 section 3 (config flag,
@@ -113,44 +113,30 @@ public final class AnvilPrefilter {
 
   /**
    * Asynchronously probe a chunk and return both the verdict and the
-   * decoded {@link AnvilChunkView} (on ACCEPT). Callers that want only the verdict
-   * use {@link #probeSync(Path, String, int, int, Set)}; callers that want the
-   * load-free chunk source use this entry point.
+   * decoded {@link AnvilChunkView} (on ACCEPT) using the specified {@link Executor}.
    *
    * <p>On {@link Verdict#REJECT} or {@link Verdict#UNKNOWN}, {@link ProbeResult#view()}
    * is {@code null} and the caller falls through to the live-load path. On
    * {@link Verdict#ACCEPT}, the view is the same one used to compute the verdict -
    * reusing it avoids a second region-file read.
-   *
-   * <p>Dispatches onto {@link AnvilIoPool#get()} by default to prevent blocking I/O
-   * starvation on {@link ForkJoinPool#commonPool()}.</p>
-   */
-  public static CompletableFuture<ProbeResult> probeDetailed(
-      Path worldFolder, String dimensionSubpath, int cx, int cz,
-      Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
-    return probeDetailed(worldFolder, dimensionSubpath, cx, cz, rawUnsafeBlocks, reconciler, AnvilIoPool.get());
-  }
-
-  /**
-   * Asynchronously probe a chunk using the specified executor.
    */
   public static CompletableFuture<ProbeResult> probeDetailed(
       Path worldFolder, String dimensionSubpath, int cx, int cz,
       Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler, Executor executor) {
+    Objects.requireNonNull(executor, "executor");
     if (worldFolder == null) {
       return CompletableFuture.completedFuture(new ProbeResult(Verdict.UNKNOWN, null));
     }
     final String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
     final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
-    final Executor exec = (executor == null) ? AnvilIoPool.get() : executor;
     return CompletableFuture.supplyAsync(
         () -> probeSyncDetailed(worldFolder, dim, cx, cz, rawUnsafeBlocks, r),
-        exec);
+        executor);
   }
 
   /**
-   * Synchronous probe entry point. Exposed for tests that want deterministic dispatch
-   * without the {@link ForkJoinPool} hop. Not intended for production callers.
+   * Synchronous probe entry point. Exposed for tests and off-tick callers that want deterministic
+   * inline execution without an executor hop.
    *
    * <p>Accepts the raw config-side unsafe list and reconciles it internally via the
    * platform reconciler so that tests and production callers follow the same
@@ -586,8 +572,8 @@ public final class AnvilPrefilter {
    * Center-column probe of absolute chunk {@code (cx, cz)} for every platform adapter's
    * {@code probeChunkColumn}. Reads only the chunk's own {@code .mca} sectors (ADR-016); returns
    * {@code null} when no {@code .mca} exists, the slot is empty, or the region uses another
-   * format (the caller falls back to the live path). Blocking I/O: run on {@link AnvilIoPool}
-   * (S-005).
+   * format (the caller falls back to the live path). Blocking I/O: run off-tick on a caller-owned
+   * blocking-I/O executor (S-005).
    *
    * @throws IOException on unreadable files or corrupt/unsupported payloads
    */
@@ -617,27 +603,36 @@ public final class AnvilPrefilter {
     return AnvilSectorReader.readColumnProbe(regionFile, cx, cz, minY, maxY);
   }
 
-  private static final ColumnProbeCoalescer COLUMN_PROBES = new ColumnProbeCoalescer(AnvilIoPool.get());
-
   /**
-   * Asynchronous {@link #probeColumn}: pending requests for the same region file are coalesced and
-   * served on {@link AnvilIoPool} through one channel open (group commit, at most 64 per group,
-   * no added delay). Answers equal
-   * {@link #probeColumn}; a failure completes only that request's future exceptionally (S-004).
-   * Performs no I/O on the calling thread (S-005); the future completes on a pool thread.
+   * Creates a lifecycle-managed {@link ColumnProbeCoalescer} backed by the caller-supplied
+   * blocking-I/O {@link Executor}. Callers should {@link ColumnProbeCoalescer#close()} the
+   * coalescer during server shutdown or world unload so in-flight region reads drain cleanly
+   * ({@code S-002}, {@code S-005}).
    */
-  public static CompletableFuture<ColumnProbe> probeColumnAsync(
-      Path worldFolder, String dimensionSubpath, int cx, int cz, int minY, int maxY) {
-    if (worldFolder == null || minY > maxY) return CompletableFuture.completedFuture(null);
-    String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
-    return COLUMN_PROBES.submit(worldFolder, dim, cx, cz, minY, maxY);
+  public static ColumnProbeCoalescer createColumnProbeCoalescer(Executor executor) {
+    return new ColumnProbeCoalescer(Objects.requireNonNull(executor, "executor"));
   }
 
   /**
-   * Runs {@code job} on {@link AnvilIoPool} in a coalesced drain of chunk (cx, cz)'s region file,
-   * with a {@link ChunkSquare} whose chunks are decoded over world-Y {@code [minY, maxY]} only when
-   * the job first asks for them (ADR-120 terrain square). Never opens another region file, loads
-   * or generates a chunk; no I/O on the calling thread (S-005).
+   * Asynchronous {@link #probeColumn}: pending requests for the same region file are coalesced and
+   * served on {@code coalescer}'s executor through one channel open (group commit, at most 64 per
+   * group, no added delay). Answers equal {@link #probeColumn}; a failure completes only that
+   * request's future exceptionally (S-004). Performs no I/O on the calling thread (S-005).
+   */
+  public static CompletableFuture<ColumnProbe> probeColumnAsync(
+      ColumnProbeCoalescer coalescer,
+      Path worldFolder, String dimensionSubpath, int cx, int cz, int minY, int maxY) {
+    Objects.requireNonNull(coalescer, "coalescer");
+    if (worldFolder == null || minY > maxY) return CompletableFuture.completedFuture(null);
+    String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
+    return coalescer.submit(worldFolder, dim, cx, cz, minY, maxY);
+  }
+
+  /**
+   * Runs {@code job} on {@code coalescer}'s executor in a coalesced drain of chunk (cx, cz)'s
+   * region file, with a {@link ChunkSquare} whose chunks are decoded over world-Y {@code [minY, maxY]}
+   * only when the job first asks for them (ADR-120 terrain square). Never opens another region file,
+   * loads or generates a chunk; no I/O on the calling thread (S-005).
    *
    * <p>Pre: {@code job} is pure, bounded and non-blocking (it runs while the drain holds the file).
    *
@@ -645,32 +640,14 @@ public final class AnvilPrefilter {
    *     window is empty, or the file is missing or not Anvil; exceptionally with the job's failure
    *     (S-004)
    */
-  public static <T> CompletableFuture<T> squareJobAsync(Path worldFolder, String dimensionSubpath, int cx,
-                                                        int cz, int minY, int maxY,
-                                                        java.util.function.Function<ChunkSquare, T> job) {
+  public static <T> CompletableFuture<T> squareJobAsync(
+      ColumnProbeCoalescer coalescer,
+      Path worldFolder, String dimensionSubpath, int cx, int cz, int minY, int maxY,
+      java.util.function.Function<ChunkSquare, T> job) {
+    Objects.requireNonNull(coalescer, "coalescer");
     if (worldFolder == null || minY > maxY) return CompletableFuture.completedFuture(null);
     String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
-    return COLUMN_PROBES.submitSquare(worldFolder, dim, cx, cz, minY, maxY, job);
-  }
-
-  /** Chunks decoded for {@link #squareJobAsync} so far (ADR-120 cost counter). */
-  public static long squareJobDecodes() {
-    return COLUMN_PROBES.squareDecodes();
-  }
-
-  /** Jobs run by {@link #squareJobAsync} so far. */
-  public static long squareJobs() {
-    return COLUMN_PROBES.squareJobs();
-  }
-
-  /** Region-file groups drained by {@link #probeColumnAsync} (opens are at most this). */
-  public static long columnProbeGroups() {
-    return COLUMN_PROBES.groupsDrained();
-  }
-
-  /** Requests served by {@link #probeColumnAsync}; divided by {@link #columnProbeGroups()} = mean group size. */
-  public static long columnProbeRequests() {
-    return COLUMN_PROBES.requestsServed();
+    return coalescer.submitSquare(worldFolder, dim, cx, cz, minY, maxY, job);
   }
 
   /**

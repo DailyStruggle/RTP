@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.selector;
 
-import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.DurationParser;
+import net.leaf.units.TemporalUnit;
 import io.github.dailystruggle.rtp.proxy.common.selector.curve.Curve;
 import io.github.dailystruggle.rtp.proxy.common.selector.curve.Curves;
 

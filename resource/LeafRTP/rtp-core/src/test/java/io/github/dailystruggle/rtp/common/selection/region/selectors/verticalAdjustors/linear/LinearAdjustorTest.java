@@ -449,14 +449,14 @@ public class LinearAdjustorTest {
     @Test
     void safetyRadius_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
         // Configure safetyRadius = 2 on the shared SafetyKeys parser the adjustor reads.
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+        net.leaf.yaml.configuration.ConfigParser<
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>
-                safety = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                safety = (net.leaf.yaml.configuration.ConfigParser<
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
                 io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         java.lang.reflect.Field dataField =
-                io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("data");
+                net.leaf.yaml.factory.FactoryValue.class.getDeclaredField("data");
         dataField.setAccessible(true);
         @SuppressWarnings("unchecked")
         java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys, Object>

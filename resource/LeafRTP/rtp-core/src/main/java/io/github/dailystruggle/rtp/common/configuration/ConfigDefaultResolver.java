@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import net.leaf.yaml.RtpYamlSection;
+import net.leaf.yaml.factory.FactoryValue;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Map;

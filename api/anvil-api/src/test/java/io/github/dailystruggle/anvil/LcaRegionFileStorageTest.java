@@ -1082,4 +1082,1516 @@ class LcaRegionFileStorageTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Concurrent lazy ENTITY_DATA stream reads survive writes, eviction, and compaction without CBIT T3b")
+    void concurrentLazyEntityStreamReadsSurviveWritesEvictionAndCompaction(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities_concurrent_lazy_compact");
+        Files.createDirectories(entitiesDir);
+
+        // Seed r.1.-2.lca with 128 chunks including (35,-62) [rx=3, rz=2, idx=67] and (39,-60) [rx=7, rz=4, idx=135]
+        try (LcaRegionFileStorage seed = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int i = 0; i < 128; i++) {
+                int cx = 32 + (i & 15);
+                int cz = -64 + (i >>> 4);
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {cx, cz});
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:villager");
+                ent.put("CustomName", "\"seed-" + i + "-" + "x".repeat(256 + ((i * 73) & 1023)) + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                seed.writeChunkCompound(cx, cz, root);
+            }
+            seed.flush();
+        }
+
+        Path lcaFile = entitiesDir.resolve("r.1.-2.lca");
+
+        // Set maxOpenRegions=1 and compactFragmentationThreshold=0.01 to trigger frequent eviction + compaction
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(
+                entitiesDir,
+                LcaRegionReader.STORAGE_KIND_ENTITIES,
+                -4, 24, 5023, 1,
+                false, false, 1, 0.01)) {
+
+            java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+            java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicInteger completedReads = new java.util.concurrent.atomic.AtomicInteger(0);
+
+            // Reader threads open LazyChunkNbtInputStream (and periodically invalidate header cache to exercise cachedHeader=false)
+            Thread[] readers = new Thread[6];
+            for (int r = 0; r < readers.length; r++) {
+                final int tid = r;
+                readers[r] = new Thread(() -> {
+                    int iter = 0;
+                    while (running.get() && failure.get() == null) {
+                        int idx = (iter + tid * 7) & 127;
+                        int cx = 32 + (idx & 15);
+                        int cz = -64 + (idx >>> 4);
+                        if ((iter & 3) == 0) {
+                            LcaRegionReader.invalidateFileCache(lcaFile);
+                        }
+                        try (java.io.DataInputStream dis = storage.getChunkDataInputStream(cx, cz)) {
+                            if (dis != null) {
+                                byte[] bytes = dis.readAllBytes();
+                                if (bytes.length == 0) {
+                                    failure.compareAndSet(null, new AssertionError("Empty entity stream for (" + cx + "," + cz + ")"));
+                                    return;
+                                }
+                                completedReads.incrementAndGet();
+                            }
+                        } catch (Throwable t) {
+                            failure.compareAndSet(null, t);
+                            return;
+                        }
+                        iter++;
+                    }
+                }, "entity-lazy-reader-" + r);
+                readers[r].start();
+            }
+
+            // Writer thread rotates slabs rapidly across r.1.-2.lca and triggers eviction + compaction via r.2.-2.lca
+            Thread writer = new Thread(() -> {
+                try {
+                    for (int round = 0; round < 40 && failure.get() == null; round++) {
+                        for (int k = 0; k < 16; k++) {
+                            int idx = (round * 11 + k) & 127;
+                            int cx = 32 + (idx & 15);
+                            int cz = -64 + (idx >>> 4);
+                            LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                            root.put("DataVersion", 5023);
+                            root.put("Position", new int[] {cx, cz});
+                            LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                            ent.put("id", "minecraft:villager");
+                            ent.put("CustomName", "\"round-" + round + "-" + k + "-" + "y".repeat(64 + ((round * 97 + k * 131) & 2047)) + "\"");
+                            root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                            storage.writeChunkCompound(cx, cz, root);
+                        }
+                        // Write to a second region (r.2.-2.lca) to evict r.1.-2.lca and trigger compactIfFragmented on close
+                        // while concurrent readers see regionCache.get == null and read via FileChannel!
+                        LinkedHashMap<String, Object> other = new LinkedHashMap<>();
+                        other.put("DataVersion", 5023);
+                        other.put("Position", new int[] {64, -64});
+                        other.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of()));
+                        storage.writeChunkCompound(64, -64, other);
+                    }
+                } catch (Throwable t) {
+                    failure.compareAndSet(null, t);
+                }
+            }, "entity-writer-compactor");
+            writer.start();
+
+            try {
+                writer.join(20_000);
+                assertFalse(writer.isAlive(), "Writer thread timed out");
+            } finally {
+                running.set(false);
+                for (Thread reader : readers) {
+                    reader.join(5_000);
+                }
+            }
+
+            if (failure.get() != null) {
+                throw new AssertionError("Concurrent lazy entity stream read failed", failure.get());
+            }
+            assertTrue(completedReads.get() > 0, "Expected at least one completed lazy entity read");
+        }
+    }
+
+    @Test
+    @DisplayName("Genuine on-disk slab self-tag corruption still fails closed with CorruptRegionEntryException")
+    void genuineOnDiskSlabTagCorruptionStillFailsClosedOnLazyStreamRead(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities_genuine_corruption");
+        Files.createDirectories(entitiesDir);
+        Path lcaFile = entitiesDir.resolve("r.1.-2.lca");
+
+        try (LcaRegionFileStorage seed = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int[] coord : new int[][] {{35, -62}, {39, -60}}) {
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", coord);
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:villager");
+                ent.put("CustomName", "\"chunk-" + coord[0] + "-" + coord[1] + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                seed.writeChunkCompound(coord[0], coord[1], root);
+            }
+            seed.flush();
+        }
+
+        // Point idx=67 (35,-62) to idx=135 (39,-60)'s slab on disk with valid SEC-DED
+        byte[] raw = Files.readAllBytes(lcaFile);
+        int idx67 = (3 & 31) | ((2 & 31) << 5);
+        int idx135 = (7 & 31) | ((4 & 31) << 5);
+        long ptr135 = LcaRegionReader.getVolatileLongBE(
+                raw, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idx135 << 3));
+        assertTrue(ptr135 != 0L);
+        int secDedTableOffset = LcaRegionReader.SUPERBLOCK_SIZE + LcaRegionReader.POINTER_DIRECTORY_SIZE;
+        LcaRegionReader.setVolatileLongBE(
+                raw, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idx67 << 3), ptr135);
+        raw[secDedTableOffset + idx67] = (byte) LcaSectionCodec.computeHammingSecDed8(ptr135);
+        Files.write(lcaFile, raw);
+        LcaRegionReader.invalidateFileCache(lcaFile);
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(entitiesDir, true)) {
+            org.junit.jupiter.api.Assertions.assertThrows(CorruptRegionEntryException.class, () -> {
+                try (java.io.DataInputStream dis = storage.getChunkDataInputStream(35, -62)) {
+                    assertNotNull(dis);
+                    dis.readAllBytes();
+                }
+            });
+        }
+    }
+
+    @Test
+    @DisplayName("Removing chunks before first allocation does not leak grace-ring slabs into free pool")
+    void removeChunkBeforeFirstAllocationDoesNotLeakGraceRingSlabsIntoFreePool(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities_remove_before_alloc");
+        Files.createDirectories(entitiesDir);
+        Path lcaFile = entitiesDir.resolve("r.0.0.lca");
+
+        // Seed 8 multi-slab entity chunks so removed slabs have 3-slab holes
+        try (LcaRegionFileStorage seed = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int i = 0; i < 8; i++) {
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {i, 0});
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:villager");
+                ent.put("CustomName", "\"seed-" + i + "-" + "a".repeat(600) + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                seed.writeChunkCompound(i, 0, root);
+            }
+            seed.flush();
+        }
+
+        List<String> refusedWarnings = java.util.Collections.synchronizedList(new ArrayList<>());
+        java.util.logging.Logger writerLogger = java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName());
+        java.util.logging.Handler capture = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                String msg = record.getMessage();
+                if (msg != null && (msg.contains("Refused to free slab range")
+                        || msg.contains("Refused duplicate free"))) {
+                    refusedWarnings.add(msg);
+                }
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        writerLogger.addHandler(capture);
+        try {
+            // Reopen freshly (freeSlabPoolInitialized == false), remove chunks BEFORE any allocation,
+            // then save 6 chunks to trigger lazy free-pool init + 4-epoch grace-ring eviction.
+            try (LcaRegionWriter.LcaLiveArchive live = LcaRegionWriter.openLiveArchive(lcaFile)) {
+                assertTrue(live.removeChunk(0, 0));
+                assertTrue(live.removeChunk(1, 0));
+
+                for (int k = 2; k < 8; k++) {
+                    LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                    root.put("DataVersion", 5023);
+                    root.put("Position", new int[] {k, 0});
+                    LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                    ent.put("id", "minecraft:villager");
+                    ent.put("CustomName", "\"updated-" + k + "-" + "b".repeat((k % 2 == 0) ? 350 : 600) + "\"");
+                    root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                    live.saveChunkCoW(k, 0, root);
+                }
+                live.flush();
+            }
+        } finally {
+            writerLogger.removeHandler(capture);
+        }
+
+        assertTrue(
+                refusedWarnings.isEmpty(),
+                "Expected zero Refused-to-free warnings after removeChunk before first allocation, got: "
+                        + refusedWarnings);
+
+        // Verify all remaining live chunks decode cleanly
+        LcaRegionReader.invalidateFileCache(lcaFile);
+        try (LcaRegionFileStorage verify = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int k = 2; k < 8; k++) {
+                try (java.io.DataInputStream dis = verify.getChunkDataInputStream(k, 0)) {
+                    assertNotNull(dis, "Chunk (" + k + ",0) missing after remove+write sequence");
+                    assertTrue(dis.readAllBytes().length > 0);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Buffered write-back coalesces overwrites, serves read-your-own-writes, and batches disk syscalls")
+    void bufferedWriteBackCoalescesOverwritesAndBatchesDiskWrites(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_buffered_writeback");
+        Files.createDirectories(regionDir);
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, true)) {
+            assertTrue(storage.isBufferedIoEnabled(), "Buffered I/O should be enabled by default in LcaRegionFileStorage");
+            LcaRegionWriter.LcaLiveArchive archive = storage.getOrOpenRegion(0, 0, true);
+            assertTrue(archive.isBufferedWriteBackEnabled());
+            long writesBefore = archive.diskChannelWriteCount();
+
+            // Overwrite the same chunk 10 times before flush: must coalesce into 1 staged entry with 0 disk writes
+            for (int rev = 0; rev < 10; rev++) {
+                String block = (rev == 9) ? "minecraft:diamond_block" : "minecraft:stone";
+                archive.saveChunkCoW(3, 4, buildChunkNbt(3, 4, block));
+            }
+            assertEquals(1, archive.pendingWriteCount(), "Repeated saves to the same chunk must coalesce");
+            assertEquals(9L, archive.coalescedWriteCount(), "9 repeated saves must be counted as coalesced");
+            assertEquals(writesBefore, archive.diskChannelWriteCount(),
+                    "Staged write-back must not issue positional disk writes before threshold or flush");
+
+            // Read-your-own-writes consistency BEFORE flush()
+            assertTrue(archive.hasChunk(3, 4));
+            byte[] nbtBeforeFlush = archive.readChunkNbtBytes(3, 4);
+            assertNotNull(nbtBeforeFlush);
+            assertNotNull(archive.readChunkEntry(3, 4));
+            assertNotNull(archive.readRawChunkFrame(3, 4, null));
+
+            // Stage 15 more distinct chunks, remove one before flush, then flush once
+            for (int rx = 0; rx < 15; rx++) {
+                archive.saveChunkCoW(rx, 0, buildChunkNbt(rx, 0, "minecraft:oak_planks"));
+            }
+            assertEquals(16, archive.pendingWriteCount());
+            assertTrue(archive.removeChunk(14, 0));
+            assertFalse(archive.hasChunk(14, 0), "Removed staged chunk must not appear present");
+            assertEquals(15, archive.pendingWriteCount());
+
+            archive.flush();
+            assertEquals(0, archive.pendingWriteCount());
+            long writesAfterFlush = archive.diskChannelWriteCount() - writesBefore;
+            assertTrue(writesAfterFlush <= 6L,
+                    "Flushing 15 batched chunks must coalesce into <= 6 channel writes (got " + writesAfterFlush + ")");
+        }
+
+        // Reopen cleanly from disk and verify adaptive sequential read-ahead promotes on cold reads
+        Path lcaFile = regionDir.resolve("r.0.0.lca");
+        LcaRegionReader.invalidateFileCache(lcaFile);
+        try (LcaRegionFileStorage readerStorage = new LcaRegionFileStorage(regionDir, true)) {
+            for (int rx = 0; rx < 14; rx++) {
+                byte[] nbt = readerStorage.readChunkNbtBytes(rx, 0);
+                assertNotNull(nbt, "Chunk (" + rx + ",0) must persist across buffered flush & reopen");
+            }
+            assertTrue(readerStorage.readOnlySequentialReadAheadCount() >= 1L,
+                    "Read-only channel path must promote to sequential read-ahead after trigger misses");
+            assertNotNull(readerStorage.readChunkNbtBytes(3, 4));
+            assertFalse(readerStorage.doesChunkExist(14, 0), "Removed staged chunk must remain absent on disk");
+        }
+    }
+
+    @Test
+    @DisplayName("Adaptive sequential read-ahead triggers on LcaLiveArchive and invalidates cleanly on write")
+    void adaptiveSequentialReadAheadOnLiveArchiveAndOptOut(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_readahead");
+        Files.createDirectories(regionDir);
+
+        try (LcaRegionFileStorage seed = new LcaRegionFileStorage(regionDir, true)) {
+            for (int rx = 0; rx < 12; rx++) {
+                seed.writeChunkCompound(rx, 0, buildChunkNbt(rx, 0, "minecraft:deepslate"));
+            }
+            seed.flush();
+        }
+
+        // Verify live-archive sequential read-ahead triggers after default 4 cold reads
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, true)) {
+            LcaRegionWriter.LcaLiveArchive live = storage.getOrOpenRegion(0, 0, false);
+            assertNotNull(live);
+            assertTrue(live.isSequentialReadAheadEnabled());
+            for (int rx = 0; rx < 12; rx++) {
+                assertNotNull(live.readChunkNbtBytes(rx, 0));
+            }
+            assertTrue(live.sequentialReadAheadCount() >= 1L,
+                    "Live archive must trigger sequential slab-pool read-ahead after cold reads");
+
+            // Opt-out disables both buffered write-back and read-ahead immediately
+            storage.setBufferedIoEnabled(false);
+            assertFalse(storage.isBufferedIoEnabled());
+            assertFalse(live.isBufferedWriteBackEnabled());
+            assertFalse(live.isSequentialReadAheadEnabled());
+        }
+    }
+
+    @Test
+    @DisplayName("readRawChunkFrameWithMetadata returns frame + lightweight metadata NBT omitting block_states")
+    void readRawChunkFrameWithMetadataOmitsBlockStatesAndPreservesMetadata(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_meta_only");
+        Files.createDirectories(regionDir);
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, true)) {
+            byte[] chunkNbt = Nbt.writeNamedRoot("", buildChunkNbt(2, 3, "minecraft:stone"));
+            writer.writeChunkNbtBytes(2, 3, chunkNbt);
+            writer.flush();
+        }
+
+        Map<String, Integer> runtimeLookup = Map.of(
+                "minecraft:air", 0,
+                "minecraft:stone", 1
+        );
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+            LcaRegionReader.RawChunkFrameWithMetadata paired =
+                    reader.readRawChunkFrameWithMetadata(2, 3, s -> runtimeLookup.getOrDefault(s, -1));
+            assertNotNull(paired);
+            assertNotNull(paired.frame());
+            assertNotNull(paired.metadataNbtBytes());
+
+            byte[] fullBytes = reader.readChunkNbtBytes(2, 3);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fullRoot = (Map<String, Object>) Nbt.readNamedRoot(fullBytes).value;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metaRoot = (Map<String, Object>) Nbt.readNamedRoot(paired.metadataNbtBytes()).value;
+            assertEquals(fullRoot.get("DataVersion"), metaRoot.get("DataVersion"));
+            assertEquals(fullRoot.get("Status"), metaRoot.get("Status"));
+            assertEquals(fullRoot.get("xPos"), metaRoot.get("xPos"));
+            assertEquals(fullRoot.get("zPos"), metaRoot.get("zPos"));
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> metaSections =
+                    (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) metaRoot.get("sections")).items;
+            assertFalse(metaSections.isEmpty());
+            for (Map<String, Object> sec : metaSections) {
+                assertNotNull(sec.get("Y"));
+                assertFalse(sec.containsKey("block_states"),
+                        "Metadata-only NBT must omit block_states to skip voxel NBT decode");
+            }
+            assertTrue(paired.metadataNbtBytes().length < fullBytes.length,
+                    "Metadata-only NBT should be strictly smaller than full voxel NBT");
+        }
+    }
+
+    @Test
+    @DisplayName("readRawChunkFrameWithMetadata promotes to sequential read-ahead and skips block payloads losslessly")
+    void readRawChunkFrameWithMetadataUsesReadAheadAndSkipsBlockPayloadLosslessly(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_meta_readahead");
+        Files.createDirectories(regionDir);
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, true)) {
+            for (int rx = 0; rx < 10; rx++) {
+                byte[] chunkNbt = Nbt.writeNamedRoot("", buildChunkNbt(rx, 1, "minecraft:stone"));
+                writer.writeChunkNbtBytes(rx, 1, chunkNbt);
+            }
+            writer.flush();
+        }
+
+        Map<String, Integer> runtimeLookup = Map.of(
+                "minecraft:air", 0,
+                "minecraft:stone", 1,
+                "minecraft:dirt", 2,
+                "minecraft:grass_block", 3
+        );
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+            for (int rx = 0; rx < 10; rx++) {
+                LcaRegionReader.RawChunkFrameWithMetadata paired =
+                        reader.readRawChunkFrameWithMetadata(rx, 1, s -> runtimeLookup.getOrDefault(s, 99));
+                assertNotNull(paired, "Paired metadata read must succeed for (" + rx + ",1)");
+                assertNotNull(paired.frame());
+                assertNotNull(paired.metadataNbtBytes());
+
+                byte[] fullBytes = reader.readChunkNbtBytes(rx, 1);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> fullRoot = (Map<String, Object>) Nbt.readNamedRoot(fullBytes).value;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> metaRoot = (Map<String, Object>) Nbt.readNamedRoot(paired.metadataNbtBytes()).value;
+                assertEquals(fullRoot.get("DataVersion"), metaRoot.get("DataVersion"));
+                assertEquals(fullRoot.get("Status"), metaRoot.get("Status"));
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> fullSections =
+                        (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) fullRoot.get("sections")).items;
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> metaSections =
+                        (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) metaRoot.get("sections")).items;
+                assertEquals(fullSections.size(), metaSections.size());
+                for (int i = 0; i < fullSections.size(); i++) {
+                    assertEquals(fullSections.get(i).get("Y"), metaSections.get(i).get("Y"));
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> fullBiomes = (Map<String, Object>) fullSections.get(i).get("biomes");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> metaBiomes = (Map<String, Object>) metaSections.get(i).get("biomes");
+                    assertNotNull(fullBiomes);
+                    assertNotNull(metaBiomes);
+                    assertEquals(
+                            ((Nbt.NbtList) fullBiomes.get("palette")).items,
+                            ((Nbt.NbtList) metaBiomes.get("palette")).items,
+                            "Biome palette after skipped block payload must match full decode exactly");
+                    org.junit.jupiter.api.Assertions.assertArrayEquals(
+                            (long[]) fullBiomes.get("data"),
+                            (long[]) metaBiomes.get("data"),
+                            "Biome data array after skipped block payload must match full decode exactly");
+                    assertFalse(metaSections.get(i).containsKey("block_states"));
+                }
+            }
+            assertTrue(reader.readOnlySequentialReadAheadCount() >= 1L,
+                    "readRawChunkFrameWithMetadata must promote sequential read-ahead on bulk warm reads");
+        }
+    }
+
+    @Test
+    @DisplayName("Starlight uniform zero light (state=1) round-trips without emitting 2048-byte zero arrays")
+    void starlightUniformZeroLightOmits2048ByteArrayOnDecode(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_starlight_zero_light");
+        Files.createDirectories(regionDir);
+
+        LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(4, 5);
+        root.put("starlight.light_version", 10);
+        root.put("isLightOn", (byte) 0);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections =
+                (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) root.get("sections")).items;
+        // Section 0 (underground dark): Starlight state=1 (all-zero, no byte array) for both sky & block light
+        Map<String, Object> darkSec = sections.get(0);
+        darkSec.remove("SkyLight");
+        darkSec.remove("BlockLight");
+        darkSec.put("starlight.skylight_state", 1);
+        darkSec.put("starlight.blocklight_state", 1);
+
+        // Section 1 (full sunlight, zero block light): SkyLight all-0xFF (state=2), BlockLight state=1 (no array)
+        Map<String, Object> litSec = sections.get(1);
+        byte[] fullSky = new byte[2048];
+        java.util.Arrays.fill(fullSky, (byte) 0xFF);
+        litSec.put("SkyLight", fullSky);
+        litSec.put("starlight.skylight_state", 2);
+        litSec.remove("BlockLight");
+        litSec.put("starlight.blocklight_state", 1);
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, true)) {
+            writer.writeChunkNbtBytes(4, 5, Nbt.writeNamedRoot("", root));
+            writer.flush();
+        }
+
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+            LcaRegionReader.RawChunkFrameWithMetadata paired =
+                    reader.readRawChunkFrameWithMetadata(4, 5, s -> 0);
+            assertNotNull(paired);
+            byte[] decodedBytes = paired.metadataNbtBytes();
+            assertNotNull(decodedBytes);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> decodedRoot = (Map<String, Object>) Nbt.readNamedRoot(decodedBytes).value;
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> decSections =
+                    (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) decodedRoot.get("sections")).items;
+
+            Map<String, Object> decDark = decSections.stream()
+                    .filter(s -> ((Number) s.get("Y")).intValue() == -4)
+                    .findFirst().orElseThrow();
+            assertFalse(decDark.containsKey("SkyLight"),
+                    "Starlight all-zero SkyLight must omit 2048-byte array on metadata-only load");
+            assertFalse(decDark.containsKey("BlockLight"),
+                    "Starlight all-zero BlockLight must omit 2048-byte array on metadata-only load");
+            assertEquals(1, ((Number) decDark.get("starlight.skylight_state")).intValue());
+            assertEquals(1, ((Number) decDark.get("starlight.blocklight_state")).intValue());
+
+            Map<String, Object> decLit = decSections.stream()
+                    .filter(s -> ((Number) s.get("Y")).intValue() == -3)
+                    .findFirst().orElseThrow();
+            assertNotNull(decLit.get("SkyLight"), "Full 0xFF SkyLight must still be emitted");
+            assertEquals(2, ((Number) decLit.get("starlight.skylight_state")).intValue());
+            assertFalse(decLit.containsKey("BlockLight"), "All-zero BlockLight in lit section must omit 2048-byte array");
+            assertEquals(1, ((Number) decLit.get("starlight.blocklight_state")).intValue());
+        }
+    }
+
+    @Test
+    @DisplayName("Block-only SectionFrame slice strips trailing biomes and light while preserving 4096-voxel parity and fail-closed checks")
+    void blockOnlySectionFrameStripsBiomesAndLightWithExactParityAndFailClosed(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_block_only_slice");
+        Files.createDirectories(regionDir);
+
+        LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(6, 7);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections =
+                (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) root.get("sections")).items;
+        // Attach non-uniform SkyLight + BlockLight to section 0 so trailing light bytes are substantial
+        byte[] gradSky = new byte[2048];
+        byte[] gradBlk = new byte[2048];
+        for (int i = 0; i < 2048; i++) {
+            gradSky[i] = (byte) ((i * 31) & 0xFF);
+            gradBlk[i] = (byte) ((i * 17 + 5) & 0xFF);
+        }
+        sections.get(0).put("SkyLight", gradSky);
+        sections.get(0).put("BlockLight", gradBlk);
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, true)) {
+            writer.writeChunkNbtBytes(6, 7, Nbt.writeNamedRoot("", root));
+            writer.flush();
+        }
+
+        Map<String, Integer> runtimeLookup = Map.of(
+                "minecraft:air", 0,
+                "minecraft:stone", 1,
+                "minecraft:dirt", 2,
+                "minecraft:grass_block", 3
+        );
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+            LcaRegionReader.RawChunkFrameWithMetadata paired =
+                    reader.readRawChunkFrameWithMetadata(6, 7, s -> runtimeLookup.getOrDefault(s, 99));
+            assertNotNull(paired);
+            RawChunkFrameSnapshot frame = paired.frame();
+            byte[] fullSlice = frame.sliceSectionFrameWithRuntimePalette(0, s -> runtimeLookup.getOrDefault(s, 99));
+            byte[] blockOnly = frame.sliceBlockOnlySectionFrameWithRuntimePalette(0, s -> runtimeLookup.getOrDefault(s, 99));
+            assertNotNull(blockOnly);
+            assertTrue(blockOnly.length > 0 && blockOnly.length < fullSlice.length,
+                    "Block-only slice (" + blockOnly.length + " B) must be strictly smaller than full slice (" + fullSlice.length + " B)");
+            assertEquals(0, blockOnly[0] & 0x0F, "Block-only header must clear skyMode and blkMode to LIGHT_MODE_ABSENT");
+
+            LcaSectionBacking fullBacking = LcaSectionBacking.fromColdSectionFrameWithBaseAndIndex(
+                    fullSlice, 0, id -> id != 0, id -> false, id -> false);
+            LcaSectionBacking blockOnlyBacking = LcaSectionBacking.fromColdSectionFrameWithBaseAndIndex(
+                    blockOnly, 0, id -> id != 0, id -> false, id -> false);
+            assertTrue(blockOnlyBacking.evictCompactBaseIndexToColdBaseFrame());
+            assertFalse(blockOnlyBacking.hasHydratedCompactBaseIndex());
+            assertTrue(blockOnlyBacking.hydrateCompactBaseIndexIfNeeded());
+
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        assertEquals(fullBacking.getStateId(x, y, z), blockOnlyBacking.getStateId(x, y, z),
+                                "Mismatch at (" + x + "," + y + "," + z + ")");
+                    }
+                }
+            }
+
+            // Fail-closed: truncated block-only frame must fail cleanly
+            byte[] truncated = java.util.Arrays.copyOf(blockOnly, Math.max(1, blockOnly.length - 3));
+            assertEquals(0, LcaSectionCodec.decodeSectionFrameBlockOrdinals(
+                    truncated, truncated.length, new int[4096], new byte[1]).length);
+
+            // Fail-closed: unmapped (-1) runtime ID must return null
+            int[] badMap = new int[] { -1, -1, -1, -1 };
+            org.junit.jupiter.api.Assertions.assertNull(
+                    RawChunkFrameSnapshot.rewriteBlockOnlySectionFramePaletteHeaderBytes(fullSlice, badMap));
+        }
+    }
+
+    @Test
+    @DisplayName("Direct zero-NBT chunk metadata decode matches full NBT across biomes (1..20), heightmaps, light, and residual tags")
+    void readRawChunkFrameWithDirectMetaMatchesFullNbtParity(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_direct_meta");
+        Files.createDirectories(regionDir);
+
+        LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(8, 9);
+        root.put("isLightOn", (byte) 1);
+        root.put("starlight.light_version", 9);
+        root.put("LastUpdate", 12345L);
+        root.put("InhabitedTime", 6789L);
+
+        // Add heightmaps
+        LinkedHashMap<String, Object> hm = new LinkedHashMap<>();
+        long[] hmData = new long[37];
+        for (int i = 0; i < hmData.length; i++) {
+            hmData[i] = 0x0102030405060708L ^ (i * 1315423911L);
+        }
+        hm.put("MOTION_BLOCKING", hmData);
+        hm.put("MOTION_BLOCKING_NO_LEAVES", hmData.clone());
+        hm.put("WORLD_SURFACE", hmData.clone());
+        root.put("Heightmaps", hm);
+
+        // Configure diverse biome palette sizes (1, 2, 4, 9, 20) and light modes across sections
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections =
+                (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) root.get("sections")).items;
+
+        int[] biomeCounts = { 1, 2, 4, 9, 20 };
+        for (int sIdx = 0; sIdx < biomeCounts.length; sIdx++) {
+            int bCount = biomeCounts[sIdx];
+            LinkedHashMap<String, Object> biomesTag = new LinkedHashMap<>();
+            List<Object> pal = new ArrayList<>(bCount);
+            for (int b = 0; b < bCount; b++) {
+                pal.add("minecraft:test_biome_" + b);
+            }
+            biomesTag.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, pal));
+            if (bCount > 1) {
+                int bits = BiomePaletteSection.biomeBitsPerEntry(bCount);
+                int perLong = 64 / bits;
+                int numLongs = (64 + perLong - 1) / perLong;
+                long[] packed = new long[numLongs];
+                for (int cell = 0; cell < 64; cell++) {
+                    int val = cell % bCount;
+                    packed[cell / perLong] |= ((long) val) << ((cell % perLong) * bits);
+                }
+                biomesTag.put("data", packed);
+            }
+            sections.get(sIdx).put("biomes", biomesTag);
+        }
+
+        // Section 0: dark underground (all-zero -> UNINIT_ZERO)
+        sections.get(0).put("SkyLight", new byte[2048]);
+        sections.get(0).put("starlight.skylight_state", 2);
+        sections.get(0).put("BlockLight", new byte[2048]);
+        sections.get(0).put("starlight.blocklight_state", 2);
+
+        // Section 1: full 0xFF SkyLight (FULL_15), gradient BlockLight (ARRAY)
+        byte[] fullSky = new byte[2048];
+        java.util.Arrays.fill(fullSky, (byte) 0xFF);
+        byte[] gradBlk = new byte[2048];
+        for (int i = 0; i < 2048; i++) {
+            gradBlk[i] = (byte) ((i * 23 + 7) & 0xFF);
+        }
+        sections.get(1).put("SkyLight", fullSky);
+        sections.get(1).put("starlight.skylight_state", 2);
+        sections.get(1).put("BlockLight", gradBlk);
+        sections.get(1).put("starlight.blocklight_state", 2);
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, true)) {
+            writer.writeChunkNbtBytes(8, 9, Nbt.writeNamedRoot("", root));
+            writer.flush();
+        }
+
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+            LcaRegionReader.RawChunkFrameWithDirectMeta paired =
+                    reader.readRawChunkFrameWithDirectMeta(8, 9, s -> 0);
+            assertNotNull(paired);
+            assertNotNull(paired.frame());
+            LcaDecodedChunkMeta direct = paired.directMeta();
+            assertNotNull(direct, "Direct zero-NBT metadata must succeed for v3 voxel chunk");
+            assertEquals(8, direct.chunkX());
+            assertEquals(9, direct.chunkZ());
+            assertEquals("minecraft:full", direct.statusName());
+            assertEquals(12345L, direct.lastUpdateTick());
+            assertEquals(6789L, direct.inhabitedTimeTicks());
+            assertTrue(direct.hasIsLightOn());
+            assertTrue(direct.hasStarlightVersion());
+            assertEquals(9, direct.starlightLightVersion());
+            assertTrue(direct.heightmapCodes().length >= 3, "Heightmaps must be decoded directly");
+
+            // Compare each section's biomes and light against full NBT decode
+            byte[] fullNbtBytes = reader.readChunkNbtBytes(8, 9);
+            assertNotNull(fullNbtBytes);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fullRoot = (Map<String, Object>) Nbt.readNamedRoot(fullNbtBytes).value;
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> fullSections =
+                    (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) fullRoot.get("sections")).items;
+
+            for (int sIdx = 0; sIdx < biomeCounts.length; sIdx++) {
+                int targetY = -4 + sIdx;
+                LcaDecodedChunkMeta.DecodedSectionMeta decSec = java.util.Arrays.stream(direct.sections())
+                        .filter(s -> s.sectionY() == targetY)
+                        .findFirst().orElseThrow();
+                assertNotNull(decSec.biomeGlobalDictIds());
+                assertEquals(biomeCounts[sIdx], decSec.biomeGlobalDictIds().length,
+                        "Biome palette count mismatch for section Y=" + targetY);
+                for (int b = 0; b < biomeCounts[sIdx]; b++) {
+                    assertEquals("minecraft:test_biome_" + b, direct.biomeKeys().get(decSec.biomeGlobalDictIds()[b]));
+                }
+                if (biomeCounts[sIdx] == 1) {
+                    org.junit.jupiter.api.Assertions.assertNull(decSec.biomePackedLongs());
+                } else {
+                    assertNotNull(decSec.biomePackedLongs());
+                }
+            }
+
+            LcaDecodedChunkMeta.DecodedSectionMeta sec0 = java.util.Arrays.stream(direct.sections())
+                    .filter(s -> s.sectionY() == -4).findFirst().orElseThrow();
+            assertEquals(LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO, sec0.skyLightKind());
+            assertEquals(1, sec0.skyLightStarlightState());
+            org.junit.jupiter.api.Assertions.assertNull(sec0.skyLightBytes());
+
+            LcaDecodedChunkMeta.DecodedSectionMeta sec1 = java.util.Arrays.stream(direct.sections())
+                    .filter(s -> s.sectionY() == -3).findFirst().orElseThrow();
+            assertEquals(LcaDecodedChunkMeta.LIGHT_FULL_15, sec1.skyLightKind());
+            assertEquals(2, sec1.skyLightStarlightState());
+            org.junit.jupiter.api.Assertions.assertNull(sec1.skyLightBytes());
+            assertEquals(LcaDecodedChunkMeta.LIGHT_ARRAY, sec1.blockLightKind());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(gradBlk, sec1.blockLightBytes());
+            assertEquals(2, sec1.blockLightStarlightState());
+        }
+    }
+
+    @Test
+    @DisplayName("DeferredChunkSlab decodes identically to synchronous direct-meta across Mode B, Mode A, and parallel worker threads")
+    void readDeferredChunkSlabMatchesDirectMetaConcurrently(@TempDir Path tempDir) throws Exception {
+        for (boolean modeB : new boolean[] { true, false }) {
+            Path regionDir = tempDir.resolve(modeB ? "deferred_mode_b" : "deferred_mode_a");
+            Files.createDirectories(regionDir);
+
+            try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, modeB)) {
+                for (int i = 0; i < 16; i++) {
+                    LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(i, 3);
+                    root.put("isLightOn", (byte) 1);
+                    root.put("starlight.light_version", 9);
+                    writer.writeChunkNbtBytes(i, 3, Nbt.writeNamedRoot("", root));
+                }
+                writer.flush();
+            }
+
+            LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+            try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, true)) {
+                List<LcaRegionReader.DeferredChunkSlab> slabs = new ArrayList<>(16);
+                for (int i = 0; i < 16; i++) {
+                    LcaRegionReader.DeferredChunkSlab slab = reader.readDeferredChunkSlab(i, 3, s -> 0);
+                    assertNotNull(slab, "Deferred slab must exist for chunk (" + i + ",3)");
+                    slabs.add(slab);
+                }
+
+                java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+                try {
+                    List<java.util.concurrent.Future<LcaRegionReader.RawChunkFrameWithDirectMeta>> futures = new ArrayList<>(16);
+                    for (LcaRegionReader.DeferredChunkSlab slab : slabs) {
+                        futures.add(pool.submit(slab::decodeToDirectMeta));
+                    }
+                    for (int i = 0; i < 16; i++) {
+                        LcaRegionReader.RawChunkFrameWithDirectMeta decoded = futures.get(i).get();
+                        LcaRegionReader.RawChunkFrameWithDirectMeta sync =
+                                reader.readRawChunkFrameWithDirectMeta(i, 3, s -> 0);
+                        assertNotNull(decoded);
+                        assertNotNull(sync);
+                        org.junit.jupiter.api.Assertions.assertArrayEquals(
+                                sync.frame().chunkFrame(), decoded.frame().chunkFrame());
+                        assertNotNull(decoded.directMeta());
+                        assertEquals(sync.directMeta().chunkX(), decoded.directMeta().chunkX());
+                        assertEquals(sync.directMeta().chunkZ(), decoded.directMeta().chunkZ());
+                        assertEquals(sync.directMeta().statusName(), decoded.directMeta().statusName());
+                        assertEquals(sync.directMeta().sections().length, decoded.directMeta().sections().length);
+                    }
+                } finally {
+                    pool.shutdownNow();
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("DeferredChunkSlab reads staged buffered write-back payloads before flush in Mode B and Mode A")
+    void readDeferredChunkSlabReadsUnflushedPendingPayloads(@TempDir Path tempDir) throws Exception {
+        for (boolean modeB : new boolean[] { true, false }) {
+            Path regionDir = tempDir.resolve(modeB ? "deferred_pending_mode_b" : "deferred_pending_mode_a");
+            Files.createDirectories(regionDir);
+
+            try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, modeB)) {
+                storage.configureBufferedIo(true, 64, 4 * 1024 * 1024, false, 4);
+
+                for (int i = 0; i < 4; i++) {
+                    LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(i, 5);
+                    root.put("LastUpdate", 1000L + i);
+                    root.put("isLightOn", (byte) 1);
+                    root.put("starlight.light_version", 9);
+                    storage.writeChunkNbtBytes(i, 5, Nbt.writeNamedRoot("", root));
+                }
+
+                // Read staged payloads BEFORE flush()
+                for (int i = 0; i < 4; i++) {
+                    LcaRegionReader.DeferredChunkSlab slab = storage.readDeferredChunkSlab(i, 5, s -> 0);
+                    assertNotNull(slab, "Deferred slab must read staged pending payload for chunk (" + i + ",5)");
+                    LcaRegionReader.RawChunkFrameWithDirectMeta decoded = slab.decodeToDirectMeta();
+                    LcaRegionReader.RawChunkFrameWithDirectMeta sync =
+                            storage.readRawChunkFrameWithDirectMeta(i, 5, s -> 0);
+                    assertNotNull(decoded);
+                    assertNotNull(sync);
+                    org.junit.jupiter.api.Assertions.assertArrayEquals(
+                            sync.frame().chunkFrame(), decoded.frame().chunkFrame());
+                    assertNotNull(decoded.directMeta());
+                    assertEquals(1000L + i, decoded.directMeta().lastUpdateTick());
+                }
+
+                // Flush to disk, then overwrite chunk (0,5) with a newer staged payload and verify RYOW
+                storage.flush();
+                LinkedHashMap<String, Object> updated = build24SectionNonUniformChunkNbt(0, 5);
+                updated.put("LastUpdate", 9999L);
+                updated.put("isLightOn", (byte) 1);
+                updated.put("starlight.light_version", 9);
+                storage.writeChunkNbtBytes(0, 5, Nbt.writeNamedRoot("", updated));
+
+                LcaRegionReader.DeferredChunkSlab overwrittenSlab = storage.readDeferredChunkSlab(0, 5, s -> 0);
+                assertNotNull(overwrittenSlab, "Deferred slab must return updated staged payload");
+                LcaRegionReader.RawChunkFrameWithDirectMeta overwrittenDecoded = overwrittenSlab.decodeToDirectMeta();
+                assertNotNull(overwrittenDecoded.directMeta());
+                assertEquals(9999L, overwrittenDecoded.directMeta().lastUpdateTick());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Direct FlatBitPack mode writes mode-10 YZX sections and extracts zero-decode across 1..5-bit palettes")
+    void directFlatBitPackModeRoundTripsLosslesslyAndExtractsZeroDecode(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("direct_flat_bitpack");
+        Files.createDirectories(regionDir);
+
+        int[] paletteSizes = {2, 4, 7, 12, 20};
+        int[] expectedBits = {1, 2, 3, 4, 5};
+        int[][] expectedVoxelsBySec = new int[paletteSizes.length][4096];
+
+        LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+        root.put("DataVersion", 4325);
+        root.put("xPos", 2);
+        root.put("zPos", 5);
+        root.put("yPos", -4);
+        root.put("Status", "minecraft:full");
+        root.put("isLightOn", (byte) 1);
+        root.put("starlight.light_version", 9);
+
+        List<Object> sections = new ArrayList<>();
+        for (int s = 0; s < paletteSizes.length; s++) {
+            int pSize = paletteSizes[s];
+            int bits = Math.max(4, 32 - Integer.numberOfLeadingZeros(pSize - 1));
+            int entriesPerLong = 64 / bits;
+            int numLongs = (4096 + entriesPerLong - 1) / entriesPerLong;
+            long[] packed = new long[numLongs];
+            List<Object> palette = new ArrayList<>(pSize);
+            for (int p = 0; p < pSize; p++) {
+                LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
+                entry.put("Name", "minecraft:test_flat_block_" + p);
+                palette.add(entry);
+            }
+            for (int i = 0; i < 4096; i++) {
+                // Make state 0 the majority, distribute remaining states across all 4096 positions
+                int ord = (i % 5 == 0) ? (1 + ((i / 5) % (pSize - 1))) : 0;
+                expectedVoxelsBySec[s][i] = ord;
+                int w = i / entriesPerLong;
+                int shift = (i % entriesPerLong) * bits;
+                packed[w] |= ((long) ord) << shift;
+            }
+            LinkedHashMap<String, Object> blockStates = new LinkedHashMap<>();
+            blockStates.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, palette));
+            blockStates.put("data", packed);
+
+            LinkedHashMap<String, Object> biomes = new LinkedHashMap<>();
+            biomes.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("minecraft:plains")));
+
+            LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+            sec.put("Y", (byte) (-4 + s));
+            sec.put("block_states", blockStates);
+            sec.put("biomes", biomes);
+            sections.add(sec);
+        }
+        root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, sections));
+
+        try (LcaRegionFileStorage writer = new LcaRegionFileStorage(regionDir, false)) {
+            writer.setDirectFlatBitPack(true);
+            writer.writeChunkNbtBytes(2, 5, Nbt.writeNamedRoot("", root));
+            writer.flush();
+        }
+
+        java.util.function.Function<String, Integer> lookup = name -> {
+            if (name != null && name.startsWith("minecraft:test_flat_block_")) {
+                return 100 + Integer.parseInt(name.substring("minecraft:test_flat_block_".length()));
+            }
+            return 0;
+        };
+
+        LcaRegionReader.invalidateFileCache(regionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage reader = new LcaRegionFileStorage(regionDir, false)) {
+            LcaRegionReader.DeferredChunkSlab slab = reader.readDeferredChunkSlab(2, 5, lookup);
+            assertNotNull(slab);
+            LcaRegionReader.RawChunkFrameWithDirectMeta decoded = slab.decodeToDirectMeta();
+            assertNotNull(decoded);
+            RawChunkFrameSnapshot frame = decoded.frame();
+
+            for (int s = 0; s < paletteSizes.length; s++) {
+                RawChunkFrameSnapshot.FlatBitPackSection flat = frame.tryExtractFlatBitPackSection(s, lookup);
+                assertNotNull(flat, "Section " + s + " must extract directly as FlatBitPack");
+                assertEquals(expectedBits[s], flat.bitsPerVoxel());
+                assertEquals((4096 * expectedBits[s] + 7) >>> 3, flat.flatBytes().length);
+                assertEquals(paletteSizes[s], flat.paletteRuntimeIds().length);
+
+                int bits = flat.bitsPerVoxel();
+                byte[] bytes = flat.flatBytes();
+                int[] palIds = flat.paletteRuntimeIds();
+                int mask = (1 << bits) - 1;
+                for (int i = 0; i < 4096; i++) {
+                    int bitPos = i * bits;
+                    int byteIdx = bitPos >>> 3;
+                    int bitOff = bitPos & 7;
+                    int raw = (bytes[byteIdx] & 0xFF)
+                            | ((byteIdx + 1 < bytes.length ? (bytes[byteIdx + 1] & 0xFF) : 0) << 8)
+                            | ((byteIdx + 2 < bytes.length ? (bytes[byteIdx + 2] & 0xFF) : 0) << 16);
+                    int localOrd = (raw >>> bitOff) & mask;
+                    int actualRuntimeId = palIds[localOrd];
+                    int expectedRuntimeId = 100 + expectedVoxelsBySec[s][i];
+                    assertEquals(expectedRuntimeId, actualRuntimeId,
+                            "Voxel mismatch at section " + s + " idx=" + i);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Direct FlatBitPack CoW splice emits mode-10 YZX sections without falling back to Delta-Roaring")
+    void directFlatBitPackCoWSpliceEmitsMode10Section(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("direct_flat_cow_splice");
+        Files.createDirectories(regionDir);
+
+        LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(1, 2);
+        java.util.function.Function<String, Integer> lookup = name -> {
+            if ("minecraft:air".equals(name)) {
+                return 0;
+            }
+            if ("minecraft:stone".equals(name)) {
+                return 1;
+            }
+            if ("minecraft:dirt".equals(name)) {
+                return 2;
+            }
+            if ("minecraft:oak_planks".equals(name)) {
+                return 3;
+            }
+            return 10;
+        };
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, false)) {
+            storage.setDirectFlatBitPack(true);
+            storage.writeChunkNbtBytes(1, 2, Nbt.writeNamedRoot("", root));
+
+            RawChunkFrameSnapshot base = storage.readRawChunkFrame(1, 2, lookup);
+            assertNotNull(base);
+            int stoneDict = storage.registerBlockStateInRegion(0, 0, "minecraft:stone");
+            int dirtDict = storage.registerBlockStateInRegion(0, 0, "minecraft:dirt");
+            int planksDict = storage.registerBlockStateInRegion(0, 0, "minecraft:oak_planks");
+            int[] dirtyVoxels = new int[4096];
+            java.util.Arrays.fill(dirtyVoxels, stoneDict);
+            // Sparse minority edits: Delta-Roaring would normally win unless directFlatBitPack=true is wired.
+            for (int i = 0; i < 8; i++) {
+                dirtyVoxels[i * 17] = dirtDict;
+                dirtyVoxels[i * 17 + 1] = planksDict;
+            }
+
+            byte[] committed = storage.commitAndGetSplicedChunkFrameCoW(
+                    1, 2, base.chunkFrame(), 1 << 0, secIdx -> secIdx == 0 ? dirtyVoxels : null, null, null, null);
+            assertNotNull(committed);
+
+            RawChunkFrameSnapshot after = storage.readRawChunkFrame(1, 2, lookup);
+            assertNotNull(after);
+            RawChunkFrameSnapshot.FlatBitPackSection flat = after.tryExtractFlatBitPackSection(0, lookup);
+            assertNotNull(flat, "CoW-spliced section must remain mode-10 FlatBitPack when directFlatBitPack=true");
+            assertEquals(2, flat.bitsPerVoxel());
+            assertEquals(1024, flat.flatBytes().length);
+        }
+    }
+
+    @Test
+    @DisplayName("Closing a flushed archive still compacts dead CoW tail slabs when above fragmentation threshold")
+    void closeCompactsFragmentedArchiveEvenAfterFlushClearsDirty(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("flush_then_close_compact");
+        Files.createDirectories(regionDir);
+        Path lcaFile = regionDir.resolve("r.0.0.lca");
+
+        long sizeBeforeClose;
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(
+                regionDir, 0, -4, 24, 4325, false, false, false, 16, 0.25)) {
+            storage.configureBufferedIo(false, 1, 4096, false, 4);
+            // Write 16 chunks, then remove 8 of them so free-slab fragmentation exceeds 25%
+            for (int c = 0; c < 16; c++) {
+                LinkedHashMap<String, Object> first = build24SectionNonUniformChunkNbt(c, 0);
+                storage.writeChunkNbtBytes(c, 0, Nbt.writeNamedRoot("", first));
+            }
+            for (int c = 0; c < 8; c++) {
+                storage.removeChunk(c, 0);
+            }
+            // flush() clears archive.isDirty(); close() must still compact the dead CoW tail
+            storage.flush();
+            sizeBeforeClose = Files.size(lcaFile);
+        }
+        long sizeAfterClose = Files.size(lcaFile);
+        assertTrue(sizeAfterClose < sizeBeforeClose,
+                "Expected close() after flush() to compact fragmented CoW slabs (before="
+                        + sizeBeforeClose + ", after=" + sizeAfterClose + ")");
+    }
+
+    @Test
+    @DisplayName("Clean CoW splice with unchanged residual is a zero-write no-op and metadata-only splice preserves sections")
+    void cleanCoWSpliceWithUnchangedResidualIsZeroWriteNoOpAndMetadataOnlySplicePreservesSections(
+            @TempDir Path tempDir
+    ) throws Exception {
+        Path regionDir = tempDir.resolve("clean_cow_noop");
+        Files.createDirectories(regionDir);
+        Path lcaFile = regionDir.resolve("r.0.0.lca");
+        java.util.function.Function<String, Integer> lookup = name -> "minecraft:air".equals(name) ? 0 : 1;
+
+        LinkedHashMap<String, Object> root = build24SectionNonUniformChunkNbt(3, 4);
+        byte[] customResidual1 = new byte[] {0x04, 0x00, 0x0A, 0x00, 0x00, 0x00}; // bpFlags=1024 + empty TAG_Compound
+        byte[] customResidual2 = new byte[] {
+                0x04, 0x40, 0x0A, // bpFlags=1024|64, starlightVersion=10
+                0x0A, 0x00, 0x00, 0x00 // empty TAG_Compound
+        };
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, false)) {
+            assertTrue(storage.isForceSyncOnClose(), "Standalone default must force-sync on close");
+            storage.setForceSyncOnClose(false);
+            assertFalse(storage.isForceSyncOnClose());
+            storage.configureBufferedIo(false, 1, 4096, false, 4);
+
+            storage.writeChunkNbtBytes(3, 4, Nbt.writeNamedRoot("", root));
+            RawChunkFrameSnapshot base = storage.readRawChunkFrame(3, 4, lookup);
+            assertNotNull(base);
+
+            // 1. Metadata-only CoW splice (dirtySectionMask == 0, different residual) -> fast path skips palette decode
+            byte[] afterRes1 = storage.commitAndGetSplicedChunkFrameCoW(
+                    3, 4, base.chunkFrame(), 0, sec -> null, null, null, customResidual1);
+            assertNotNull(afterRes1);
+            long sizeAfterRes1 = Files.size(lcaFile);
+
+            // 2. Identical residual with dirtySectionMask == 0 -> must be a zero-write no-op (no slab growth)
+            byte[] noopResult = storage.commitAndGetSplicedChunkFrameCoW(
+                    3, 4, afterRes1, 0, sec -> null, null, null, customResidual1);
+            assertSame(afterRes1, noopResult, "Unchanged clean CoW splice must return base frame without allocating");
+            assertEquals(sizeAfterRes1, Files.size(lcaFile), "Zero-write no-op must not grow region file");
+
+            // 3. Second metadata-only splice updates residual tail while preserving section directory entries
+            byte[] afterRes2 = storage.commitAndGetSplicedChunkFrameCoW(
+                    3, 4, afterRes1, 0, sec -> null, null, null, customResidual2);
+            assertNotNull(afterRes2);
+            assertTrue(afterRes1 != afterRes2);
+
+            RawChunkFrameSnapshot verify = storage.readRawChunkFrame(3, 4, lookup);
+            assertNotNull(verify);
+            assertEquals(base.sectionCount(), verify.sectionCount());
+            for (int s = 0; s < base.sectionCount(); s++) {
+                assertEquals(base.sectionDirectoryEntry16(s), verify.sectionDirectoryEntry16(s),
+                        "Section directory entry " + s + " must remain unchanged across metadata-only splice");
+            }
+        }
+
+        // Reopen after forceSyncOnClose=false close and verify chunk persisted cleanly
+        LcaRegionReader.invalidateFileCache(lcaFile);
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(regionDir, false)) {
+            LcaRegionReader.RawChunkFrameWithDirectMeta pair =
+                    reopened.readRawChunkFrameWithDirectMeta(3, 4, lookup);
+            assertNotNull(pair);
+            assertNotNull(pair.directMeta());
+            assertTrue(pair.directMeta().hasStarlightVersion());
+            assertEquals(10, pair.directMeta().starlightLightVersion());
+        }
+    }
+
+    @Test
+    @DisplayName("writeFreshChunkDirect round-trips uniform, multi-state, biome, light, and residual metadata with zero NBT section encode")
+    void writeFreshChunkDirectRoundTripParity(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("fresh_direct_roundtrip");
+        Files.createDirectories(regionDir);
+
+        int sectionCount = 24;
+        String[][] blockPalettes = new String[sectionCount][];
+        long[][] blockData = new long[sectionCount][];
+        String[][] biomePalettes = new String[sectionCount][];
+        long[][] biomeData = new long[sectionCount][];
+        byte[][] skyLight = new byte[sectionCount][];
+        byte[][] blockLight = new byte[sectionCount][];
+
+        // Section 0 (y=-4): uniform bedrock
+        blockPalettes[0] = new String[] {"minecraft:bedrock"};
+        biomePalettes[0] = new String[] {"minecraft:plains"};
+        skyLight[0] = LcaRegionFileStorage.allZeroLight2048();
+
+        // Section 1 (y=-3): 4-bit multi-state stone + deepslate + diamond_ore with non-uniform light
+        blockPalettes[1] = new String[] {"minecraft:stone", "minecraft:deepslate", "minecraft:diamond_ore"};
+        long[] s1Longs = new long[256]; // 4096 voxels * 4 bits = 256 longs (16 voxels per long)
+        for (int i = 0; i < s1Longs.length; i++) {
+            s1Longs[i] = 0x0120_1021_0210_1201L;
+        }
+        blockData[1] = s1Longs;
+        biomePalettes[1] = new String[] {"minecraft:plains", "minecraft:forest"};
+        biomeData[1] = new long[] {0xAAAA_5555_AAAA_5555L}; // 64 cells * 1 bit = 1 long
+        byte[] s1Sky = new byte[2048];
+        java.util.Arrays.fill(s1Sky, (byte) 0xF0);
+        skyLight[1] = s1Sky;
+        byte[] s1Blk = new byte[2048];
+        java.util.Arrays.fill(s1Blk, (byte) 0x3A);
+        blockLight[1] = s1Blk;
+
+        // Remaining sections: uniform air with full sky light
+        byte[] fullSky = new byte[2048];
+        java.util.Arrays.fill(fullSky, (byte) 0xFF);
+        for (int s = 2; s < sectionCount; s++) {
+            blockPalettes[s] = new String[] {"minecraft:air"};
+            biomePalettes[s] = new String[] {"minecraft:plains"};
+            skyLight[s] = fullSky;
+        }
+
+        byte[] residualTail = new byte[] {
+                0x04, 0x40, 0x0A, // bpFlags = 1024 | 64, starlightVersion = 10
+                0x0A, 0x00, 0x00, 0x00 // empty TAG_Compound
+        };
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, false)) {
+            int written = storage.writeFreshChunkDirect(
+                    5,
+                    -3,
+                    4671,
+                    12345L,
+                    678L,
+                    "minecraft:full",
+                    blockPalettes,
+                    blockData,
+                    biomePalettes,
+                    biomeData,
+                    skyLight,
+                    blockLight,
+                    residualTail
+            );
+            assertTrue(written > 0, "Expected non-zero .lca bytes written");
+            storage.flush();
+        }
+
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(regionDir, false)) {
+            byte[] nbtBytes = reopened.readChunkNbtBytes(5, -3);
+            assertNotNull(nbtBytes, "Fresh direct chunk must decode cleanly via readChunkNbtBytes");
+            Map<String, Object> root = Nbt.readRootCompound(nbtBytes);
+            assertEquals(4671, ((Number) root.get("DataVersion")).intValue());
+            assertEquals(12345L, ((Number) root.get("LastUpdate")).longValue());
+            assertEquals(678L, ((Number) root.get("InhabitedTime")).longValue());
+            assertEquals("minecraft:full", root.get("Status"));
+            assertEquals(10, ((Number) root.get("starlight.light_version")).intValue());
+
+            Nbt.NbtList sections = (Nbt.NbtList) root.get("sections");
+            assertNotNull(sections);
+            Map<Integer, Map<String, Object>> byY = new java.util.HashMap<>();
+            for (Object item : sections.items) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sec = (Map<String, Object>) item;
+                byY.put(((Number) sec.get("Y")).intValue(), sec);
+            }
+
+            // Section y=-4: uniform bedrock
+            Map<String, Object> sec0 = byY.get(-4);
+            assertNotNull(sec0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs0 = (Map<String, Object>) sec0.get("block_states");
+            Nbt.NbtList pal0 = (Nbt.NbtList) bs0.get("palette");
+            assertEquals(1, pal0.items.size());
+            assertEquals("minecraft:bedrock", ((Map<?, ?>) pal0.items.get(0)).get("Name"));
+
+            // Section y=-3: multi-state stone/deepslate/diamond_ore + biomes + lights
+            Map<String, Object> sec1 = byY.get(-3);
+            assertNotNull(sec1);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs1 = (Map<String, Object>) sec1.get("block_states");
+            Nbt.NbtList pal1 = (Nbt.NbtList) bs1.get("palette");
+            assertEquals(3, pal1.items.size());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(s1Sky, (byte[]) sec1.get("SkyLight"));
+            org.junit.jupiter.api.Assertions.assertArrayEquals(s1Blk, (byte[]) sec1.get("BlockLight"));
+        }
+    }
+
+    @Test
+    @DisplayName("writeFreshChunkDirectModeA splices Mode A, GPU FlatBitPack, and hot SimpleBitStorage zero-reencode with full round-trip parity")
+    void writeFreshChunkDirectModeAPassthroughRoundTripParity(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("fresh_modea_passthrough");
+        Files.createDirectories(regionDir);
+
+        int sectionCount = 24;
+        String[][] blockPalettes = new String[sectionCount][];
+        LcaModeABlockSection[] preModeA = new LcaModeABlockSection[sectionCount];
+        byte[][] preFlatBytes = new byte[sectionCount][];
+        int[] preFlatBits = new int[sectionCount];
+        long[][] blockData = new long[sectionCount][];
+        String[][] biomePalettes = new String[sectionCount][];
+        long[][] biomeData = new long[sectionCount][];
+        byte[][] skyLight = new byte[sectionCount][];
+        byte[][] blockLight = new byte[sectionCount][];
+
+        // Section 0 (y=-4): uniform bedrock with explicit Starlight zero sky light
+        blockPalettes[0] = new String[] {"minecraft:bedrock"};
+        biomePalettes[0] = new String[] {"minecraft:plains"};
+        skyLight[0] = LcaRegionFileStorage.allZeroLight2048();
+
+        // Section 1 (y=-3): pre-encoded LcaModeABlockSection (Delta-Roaring Mode A passthrough)
+        int[] s1Voxels = new int[4096];
+        for (int i = 0; i < 4096; i++) {
+            s1Voxels[i] = (i % 17 == 0) ? 2 : 1;
+        }
+        LcaModeABlockSection s1ModeA = LcaModeABlockSection.encodeFromRuntimeVoxels(s1Voxels);
+        assertNotNull(s1ModeA);
+        String[] s1Pal = new String[s1ModeA.paletteLength()];
+        for (int p = 0; p < s1Pal.length; p++) {
+            s1Pal[p] = s1ModeA.paletteRuntimeId(p) == 1 ? "minecraft:deepslate" : "minecraft:diamond_ore";
+        }
+        blockPalettes[1] = s1Pal;
+        preModeA[1] = s1ModeA;
+        biomePalettes[1] = new String[] {"minecraft:plains"};
+
+        // Section 2 (y=-2): pre-encoded GPU 4-bit FlatBitPack (mode 10) with 10-state palette (exact 1:1 copy)
+        String[] s2Pal = new String[] {
+                "minecraft:stone", "minecraft:granite", "minecraft:diorite", "minecraft:andesite",
+                "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:copper_ore", "minecraft:gold_ore",
+                "minecraft:redstone_ore", "minecraft:lapis_ore"
+        };
+        byte[] s2Flat = new byte[2048];
+        for (int i = 0; i < 2048; i++) {
+            s2Flat[i] = (byte) ((i % 10) | (((i + 3) % 10) << 4));
+        }
+        blockPalettes[2] = s2Pal;
+        preFlatBytes[2] = s2Flat;
+        preFlatBits[2] = 4;
+        biomePalettes[2] = new String[] {"minecraft:plains", "minecraft:forest"};
+        biomeData[2] = new long[] {0xAAAA_5555_AAAA_5555L};
+        byte[] s2Sky = new byte[2048];
+        java.util.Arrays.fill(s2Sky, (byte) 0xF0);
+        skyLight[2] = s2Sky;
+        byte[] s2Blk = new byte[2048];
+        java.util.Arrays.fill(s2Blk, (byte) 0x3A);
+        blockLight[2] = s2Blk;
+
+        // Section 3 (y=-1): pre-encoded GPU 4-bit FlatBitPack with 3-state palette (4-bit -> 2-bit repack)
+        blockPalettes[3] = new String[] {"minecraft:stone", "minecraft:dirt", "minecraft:grass_block"};
+        byte[] s3Flat4Bit = new byte[2048];
+        for (int i = 0; i < 2048; i++) {
+            s3Flat4Bit[i] = (byte) ((i % 3) | (((i + 1) % 3) << 4));
+        }
+        preFlatBytes[3] = s3Flat4Bit;
+        preFlatBits[3] = 4;
+        biomePalettes[3] = new String[] {"minecraft:plains"};
+
+        // Section 4 (y=0): hot SimpleBitStorage 4-bit longs (9 states -> exact 4-bit 1:1 copy)
+        blockPalettes[4] = new String[] {
+                "minecraft:air", "minecraft:stone", "minecraft:dirt", "minecraft:grass_block",
+                "minecraft:oak_log", "minecraft:oak_leaves", "minecraft:water", "minecraft:sand", "minecraft:gravel"
+        };
+        long[] s4Longs = new long[256];
+        for (int w = 0; w < 256; w++) {
+            s4Longs[w] = 0x8765_4321_0123_4567L;
+        }
+        blockData[4] = s4Longs;
+        biomePalettes[4] = new String[] {"minecraft:plains"};
+
+        // Remaining sections: uniform air with full sky light
+        byte[] fullSky = new byte[2048];
+        java.util.Arrays.fill(fullSky, (byte) 0xFF);
+        for (int s = 5; s < sectionCount; s++) {
+            blockPalettes[s] = new String[] {"minecraft:air"};
+            biomePalettes[s] = new String[] {"minecraft:plains"};
+            skyLight[s] = fullSky;
+        }
+
+        byte[] residualTail = new byte[] {
+                0x04, 0x40, 0x0A,
+                0x0A, 0x00, 0x00, 0x00
+        };
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, false)) {
+            int[] dictIds = storage.preRegisterBlockStates(7, -9, new String[] {"minecraft:air", "minecraft:stone", "minecraft:deepslate"});
+            assertEquals(3, dictIds.length);
+            assertTrue(dictIds[0] >= 0 && dictIds[1] > dictIds[0] && dictIds[2] > dictIds[1]);
+
+            int written = storage.writeFreshChunkDirectModeA(
+                    7,
+                    -9,
+                    4671,
+                    99999L,
+                    1234L,
+                    "minecraft:full",
+                    blockPalettes,
+                    preModeA,
+                    preFlatBytes,
+                    preFlatBits,
+                    blockData,
+                    biomePalettes,
+                    biomeData,
+                    skyLight,
+                    blockLight,
+                    residualTail
+            );
+            assertTrue(written > 0, "Expected non-zero .lca bytes written");
+            storage.flush();
+        }
+
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(regionDir, false)) {
+            byte[] nbtBytes = reopened.readChunkNbtBytes(7, -9);
+            assertNotNull(nbtBytes, "Mode A passthrough chunk must decode cleanly via readChunkNbtBytes");
+            Map<String, Object> root = Nbt.readRootCompound(nbtBytes);
+            assertEquals(4671, ((Number) root.get("DataVersion")).intValue());
+            assertEquals(99999L, ((Number) root.get("LastUpdate")).longValue());
+            assertEquals(1234L, ((Number) root.get("InhabitedTime")).longValue());
+            assertEquals("minecraft:full", root.get("Status"));
+            assertEquals(10, ((Number) root.get("starlight.light_version")).intValue());
+
+            Nbt.NbtList sections = (Nbt.NbtList) root.get("sections");
+            assertNotNull(sections);
+            Map<Integer, Map<String, Object>> byY = new java.util.HashMap<>();
+            for (Object item : sections.items) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sec = (Map<String, Object>) item;
+                byY.put(((Number) sec.get("Y")).intValue(), sec);
+            }
+
+            // Section y=-3 (pre-encoded Delta-Roaring Mode A passthrough)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs1 = (Map<String, Object>) byY.get(-3).get("block_states");
+            assertEquals(2, ((Nbt.NbtList) bs1.get("palette")).items.size());
+
+            // Section y=-2 (GPU 4-bit FlatBitPack + mixed light)
+            Map<String, Object> sec2 = byY.get(-2);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs2 = (Map<String, Object>) sec2.get("block_states");
+            assertEquals(10, ((Nbt.NbtList) bs2.get("palette")).items.size());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(s2Sky, (byte[]) sec2.get("SkyLight"));
+            org.junit.jupiter.api.Assertions.assertArrayEquals(s2Blk, (byte[]) sec2.get("BlockLight"));
+
+            // Section y=-1 (4-bit -> 2-bit repack)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs3 = (Map<String, Object>) byY.get(-1).get("block_states");
+            assertEquals(3, ((Nbt.NbtList) bs3.get("palette")).items.size());
+
+            // Section y=0 (hot SimpleBitStorage 9-state 4-bit 1:1 copy)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bs4 = (Map<String, Object>) byY.get(0).get("block_states");
+            assertEquals(9, ((Nbt.NbtList) bs4.get("palette")).items.size());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(s4Longs, (long[]) bs4.get("data"));
+        }
+    }
+
+    @Test
+    void writeFreshChunkDirectModeAWithDmaWorldgenDictionaryAndLegacyFallback(@TempDir Path tempDir) throws Exception {
+        Path freshDir = tempDir.resolve("region-dma-dict-fresh");
+        Files.createDirectories(freshDir);
+
+        String[] wgDict = new String[] {
+                "minecraft:air",
+                "minecraft:stone",
+                "minecraft:deepslate",
+                "minecraft:dirt",
+                "minecraft:grass_block",
+                "minecraft:water",
+                "minecraft:sand",
+                "minecraft:gravel",
+                "minecraft:bedrock"
+        };
+
+        int sectionCount = 24;
+        String[][] blockPalettes = new String[sectionCount][];
+        LcaModeABlockSection[] preModeA = new LcaModeABlockSection[sectionCount];
+        byte[][] preFlatBytes = new byte[sectionCount][];
+        int[] preFlatBits = new int[sectionCount];
+        int[][] preResolvedDictIds = new int[sectionCount][];
+        long[] preOctreeMasks = new long[sectionCount];
+        boolean[] hasPreOctreeMask = new boolean[sectionCount];
+        long[][] blockData = new long[sectionCount][];
+        String[][] biomePalettes = new String[sectionCount][];
+        long[][] biomeData = new long[sectionCount][];
+        byte[][] skyLight = new byte[sectionCount][];
+        byte[][] blockLight = new byte[sectionCount][];
+
+        // Section 0 (y=-4): GPU 1-bit compacted (air, bedrock) with pre-resolved dict IDs [0, 8] + negative octreeMask64
+        blockPalettes[0] = new String[] {"minecraft:air", "minecraft:bedrock"};
+        byte[] s0Flat1Bit = new byte[512];
+        java.util.Arrays.fill(s0Flat1Bit, (byte) 0xAA);
+        preFlatBytes[0] = s0Flat1Bit;
+        preFlatBits[0] = 1;
+        preResolvedDictIds[0] = new int[] {0, 8};
+        preOctreeMasks[0] = -1L; // all 64 octants set (tests bit-63 signed long handling)
+        hasPreOctreeMask[0] = true;
+        biomePalettes[0] = new String[] {"minecraft:plains"};
+
+        // Section 1 (y=-3): GPU 2-bit compacted (air, stone, deepslate) with pre-resolved dict IDs [0, 1, 2]
+        blockPalettes[1] = new String[] {"minecraft:air", "minecraft:stone", "minecraft:deepslate"};
+        byte[] s1Flat2Bit = new byte[1024];
+        java.util.Arrays.fill(s1Flat2Bit, (byte) 0x64); // 0, 1, 2, 1 repeating
+        preFlatBytes[1] = s1Flat2Bit;
+        preFlatBits[1] = 2;
+        preResolvedDictIds[1] = new int[] {0, 1, 2};
+        preOctreeMasks[1] = -1L;
+        hasPreOctreeMask[1] = true;
+        biomePalettes[1] = new String[] {"minecraft:plains"};
+
+        // Section 2 (y=-2): GPU 3-bit compacted (5 states: air, stone, dirt, grass_block, sand)
+        blockPalettes[2] = new String[] {
+                "minecraft:air", "minecraft:stone", "minecraft:dirt", "minecraft:grass_block", "minecraft:sand"
+        };
+        byte[] s2Flat3Bit = new byte[1536];
+        for (int row = 0; row < 256; row++) {
+            long word = 0L;
+            for (int px = 0; px < 16; px++) {
+                word |= ((long) (px % 5)) << (px * 3);
+            }
+            int off = row * 6;
+            for (int b = 0; b < 6; b++) {
+                s2Flat3Bit[off + b] = (byte) (word >>> (b * 8));
+            }
+        }
+        preFlatBytes[2] = s2Flat3Bit;
+        preFlatBits[2] = 3;
+        preResolvedDictIds[2] = new int[] {0, 1, 3, 4, 6};
+        preOctreeMasks[2] = -1L;
+        hasPreOctreeMask[2] = true;
+        biomePalettes[2] = new String[] {"minecraft:plains"};
+
+        // Section 3 (y=-1): CPU-edited section (no preResolvedDictIds) sharing states with GPU sections + new oak_log
+        blockPalettes[3] = new String[] {"minecraft:air", "minecraft:stone", "minecraft:oak_log"};
+        long[] s3Longs = new long[256];
+        java.util.Arrays.fill(s3Longs, 0x2102_1021_0210_2101L);
+        blockData[3] = s3Longs;
+        biomePalettes[3] = new String[] {"minecraft:plains"};
+
+        for (int s = 4; s < sectionCount; s++) {
+            blockPalettes[s] = new String[] {"minecraft:air"};
+            biomePalettes[s] = new String[] {"minecraft:plains"};
+        }
+
+        // 1) Fresh region: worldgen dictionary auto-binds with 1:1 direct match
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(freshDir, false)) {
+            storage.setWorldgenBlockDictionary(wgDict);
+            int written = storage.writeFreshChunkDirectModeA(
+                    2, 3, 4671, 100L, 10L, "minecraft:full",
+                    blockPalettes, preModeA, preFlatBytes, preFlatBits,
+                    preResolvedDictIds, preOctreeMasks, hasPreOctreeMask,
+                    blockData, biomePalettes, biomeData, skyLight, blockLight, new byte[0]);
+            assertTrue(written > 0);
+            storage.flush();
+        }
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(freshDir, false)) {
+            byte[] nbtBytes = reopened.readChunkNbtBytes(2, 3);
+            assertNotNull(nbtBytes);
+            Map<String, Object> root = Nbt.readRootCompound(nbtBytes);
+            Nbt.NbtList sections = (Nbt.NbtList) root.get("sections");
+            Map<Integer, Map<String, Object>> byY = new java.util.HashMap<>();
+            for (Object item : sections.items) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sec = (Map<String, Object>) item;
+                byY.put(((Number) sec.get("Y")).intValue(), sec);
+            }
+            @SuppressWarnings("unchecked")
+            Nbt.NbtList p0 = (Nbt.NbtList) ((Map<String, Object>) byY.get(-4).get("block_states")).get("palette");
+            assertEquals(2, p0.items.size());
+            assertEquals("minecraft:bedrock", ((Map<?, ?>) p0.items.get(1)).get("Name"));
+            @SuppressWarnings("unchecked")
+            Nbt.NbtList p2 = (Nbt.NbtList) ((Map<String, Object>) byY.get(-2).get("block_states")).get("palette");
+            assertEquals(5, p2.items.size());
+            assertEquals("minecraft:sand", ((Map<?, ?>) p2.items.get(4)).get("Name"));
+            @SuppressWarnings("unchecked")
+            Nbt.NbtList p3 = (Nbt.NbtList) ((Map<String, Object>) byY.get(-1).get("block_states")).get("palette");
+            assertEquals(3, p3.items.size());
+            assertEquals("minecraft:oak_log", ((Map<?, ?>) p3.items.get(2)).get("Name"));
+        }
+
+        // 2) Legacy mismatched region: obsidian pre-registered at ID 1 before wgDict is set -> fail-closed fallback
+        Path legacyDir = tempDir.resolve("region-dma-dict-legacy");
+        Files.createDirectories(legacyDir);
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(legacyDir, false)) {
+            int[] legacyIds = storage.preRegisterBlockStates(0, 0, new String[] {"minecraft:air", "minecraft:obsidian"});
+            assertEquals(1, legacyIds[1]);
+            storage.setWorldgenBlockDictionary(wgDict);
+            int written = storage.writeFreshChunkDirectModeA(
+                    0, 0, 4671, 100L, 10L, "minecraft:full",
+                    blockPalettes, preModeA, preFlatBytes, preFlatBits,
+                    preResolvedDictIds, preOctreeMasks, hasPreOctreeMask,
+                    blockData, biomePalettes, biomeData, skyLight, blockLight, new byte[0]);
+            assertTrue(written > 0);
+            storage.flush();
+        }
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(legacyDir, false)) {
+            byte[] nbtBytes = reopened.readChunkNbtBytes(0, 0);
+            assertNotNull(nbtBytes);
+            Map<String, Object> root = Nbt.readRootCompound(nbtBytes);
+            Nbt.NbtList sections = (Nbt.NbtList) root.get("sections");
+            Map<Integer, Map<String, Object>> byY = new java.util.HashMap<>();
+            for (Object item : sections.items) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sec = (Map<String, Object>) item;
+                byY.put(((Number) sec.get("Y")).intValue(), sec);
+            }
+            @SuppressWarnings("unchecked")
+            Nbt.NbtList p0 = (Nbt.NbtList) ((Map<String, Object>) byY.get(-4).get("block_states")).get("palette");
+            assertEquals("minecraft:bedrock", ((Map<?, ?>) p0.items.get(1)).get("Name"));
+        }
+    }
 }

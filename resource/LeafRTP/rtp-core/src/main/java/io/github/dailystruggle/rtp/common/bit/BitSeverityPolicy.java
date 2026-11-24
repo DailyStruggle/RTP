@@ -6,7 +6,7 @@ import io.github.dailystruggle.bit.BitLevels;
 import io.github.dailystruggle.bit.Vocabulary;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BitKeys;
 import java.lang.System.Logger.Level;
 import java.util.Locale;

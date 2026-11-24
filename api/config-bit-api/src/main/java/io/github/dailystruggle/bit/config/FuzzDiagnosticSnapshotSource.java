@@ -12,7 +12,7 @@ import java.util.List;
  * @trace REQ-CFG-ATLAS-003, REQ-SLEUTH-FUZZ-004, S-004, S-005
  */
 public interface FuzzDiagnosticSnapshotSource
-        extends io.github.dailystruggle.rtp.common.bit.config.FuzzDiagnosticSnapshotSource {
+        extends net.leaf.bit.config.FuzzDiagnosticSnapshotSource {
 
     @Override
     default List<FuzzScorecardSummaryRecord> diagnosticFuzzScorecards() {

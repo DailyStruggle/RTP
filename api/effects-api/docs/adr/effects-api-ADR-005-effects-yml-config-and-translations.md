@@ -7,7 +7,7 @@
 
 ## Amendment: Directory Layout & `MultiConfigParser` Fit
 
-### Why not a single file with admin keys?
+### Separate files vs. single file with admin keys
 
 `rtp-core`'s `ConfigParser<E extends Enum<E>>` and `MultiConfigParser<E extends Enum<E>>`
 both require an enum-typed keyset for the values they expose

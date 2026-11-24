@@ -10,7 +10,7 @@ Decodes a `.sparkprofile` produced by spark
 file) into a compact JSON summary suitable for AI analysis or markdown
 write-ups.
 
-### Why
+### Purpose
 
 Spark profiles are the canonical source of MSPT, per-tick TPS, per-window
 CPU%, and per-thread CPU breakdowns during a stress phase. The harness's

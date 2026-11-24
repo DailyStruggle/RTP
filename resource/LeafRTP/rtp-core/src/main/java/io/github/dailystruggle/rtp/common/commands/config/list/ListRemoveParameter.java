@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 public class ListRemoveParameter extends CommandParameter {
   private final Supplier<Set<String>> values;

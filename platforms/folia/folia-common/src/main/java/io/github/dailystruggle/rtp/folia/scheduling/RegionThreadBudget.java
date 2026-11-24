@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.folia.scheduling;
 
 import io.github.dailystruggle.rtp.common.governor.RegionShareAllocator;
-import io.github.dailystruggle.rtp.common.predict.TickTokenBucket;
+import net.leaf.predict.TickTokenBucket;
 
 import java.util.ArrayList;
 import java.util.Comparator;

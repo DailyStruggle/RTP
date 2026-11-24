@@ -15,10 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.TemporalUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -177,7 +177,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   @Override
   public int setBlocks(
-      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+      java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     return BukkitBlockWriter.setBlocks(world, blocks);
   }
 
@@ -188,7 +188,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   @Override
   public int restoreBlockEntities(
-      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+      java.util.List<net.leaf.schematics.schematic.PlacedBlockEntity> entities) {
     return BukkitBlockWriter.restoreBlockEntities(world, entities);
   }
 
@@ -276,7 +276,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
               s -> (RTPRuntime.serverAccessor() != null)
                   ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                  : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s),
+              RTPRuntime.blockingIoExecutor())
           .thenCompose(result -> {
             io.github.dailystruggle.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -337,9 +338,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * A null/empty return signals UNKNOWN - the caller falls back to the full
    * {@link #getChunkAt} pipeline, which remains the authoritative path.</p>
    *
-   * <p>S-005: file I/O is dispatched to {@link io.github.dailystruggle.anvil.AnvilIoPool}
-   * (dedicated blocking-I/O executor, sized for disk parallelism) to stay off the tick
-   * thread and avoid starving {@code ForkJoinPool.commonPool} with blocking reads. The
+   * <p>S-005: file I/O is dispatched to the server's lifecycle-managed blocking-I/O executor
+   * (sized for disk parallelism) to stay off the tick thread and avoid starving
+   * {@code ForkJoinPool.commonPool} with blocking reads. The
    * future never resolves on a live-region thread.</p>
    */
   @Override
@@ -352,9 +353,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
-    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    // Coalesced on the server's blocking-I/O executor: pending probes for one r.X.Z.mca share
+    // one open (S-005: no I/O on the caller; drained before shutdown/world unload).
     return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+        RTPRuntime.columnProbeCoalescer(),
         worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
         if (err != null) throw err;
@@ -389,7 +391,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * {@link io.github.dailystruggle.mapsapi.BiomeColorSource}'s dimension overrides
    * (keyed e.g. {@code "NETHER_WASTES"}) match.
    *
-   * <p>S-005: dispatched onto {@link io.github.dailystruggle.anvil.AnvilIoPool};
+   * <p>S-005: dispatched onto the server's blocking-I/O executor;
    * no tick-thread chunk I/O.
    */
   @Override
@@ -1213,7 +1215,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       int ly = location.getBlockY();
       int lz = location.getBlockZ();
 
-      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> diff =
+      java.util.List<net.leaf.schematics.platform.BlockDelta> diff =
           restoreSeconds >= 0
               ? new java.util.ArrayList<>()
               : null;
@@ -1223,7 +1225,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           for (int dy = -depth; dy < 0; dy++) {
             org.bukkit.block.Block b = world.getBlockAt(lx + dx, ly + dy, lz + dz);
             if (diff != null) {
-              diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+              diff.add(new net.leaf.schematics.platform.BlockDelta(
                   b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
             }
             b.setType(material);
@@ -1231,7 +1233,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           for (int dy = 0; dy < airHeight; dy++) {
             org.bukkit.block.Block b = world.getBlockAt(lx + dx, ly + dy, lz + dz);
             if (diff != null) {
-              diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+              diff.add(new net.leaf.schematics.platform.BlockDelta(
                   b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
             }
             b.setType(Material.AIR);
@@ -1252,9 +1254,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public boolean restoreBlocks(
-      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+      java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
     if (world == null || blocks == null || blocks.isEmpty()) return false;
-    for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+    for (net.leaf.schematics.platform.BlockDelta delta : blocks) {
       try {
         org.bukkit.block.data.BlockData data = Bukkit.createBlockData(delta.token());
         // applyPhysics=false: restoration is a bulk world rewrite, not a player edit.

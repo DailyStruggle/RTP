@@ -682,6 +682,211 @@ final class BytecodeParityAnalyzers {
       }
 
       /**
+       * Detects unmanaged thread, {@code java.util.Timer}, and {@code Executors.new*} pool
+       * creation bypassing the server scheduler SPI ({@code Rule F-001..F-003}, {@code S-002}).
+       *
+       * <p>Hot-path {@code COMMAND} and registered {@code EVENT} entry points reaching raw thread
+       * or executor creation within {@code k <= 4} hops emit {@link ConfidenceTier#CONFIRMED}.
+       * Lifecycle initialization methods ({@code onEnable}, {@code onLoad}, {@code onInitialize},
+       * {@code <init>}) creating an executor or {@code Timer} without any corresponding
+       * {@code shutdown}/{@code shutdownNow}/{@code cancel} in the owning class emit
+       * {@link ConfidenceTier#ADVISORY}.
+       */
+      static List<CausalFinding> detectUnmanagedThreadSpawns(
+              String artifactName,
+              int startingFindingSeq,
+              Map<String, ParsedClass> classesByName,
+              Map<String, MethodNode> methodsBySymbol,
+              Map<String, List<MethodNode>> methodsByName,
+              Set<String> allAsyncSpawnedLambdas,
+              Map<String, BytecodeCausalGraphScanner.ListenerRegistrationMode> listenerRegistrations
+      ) {
+          List<CausalFinding> findings = new ArrayList<>();
+          int seq = startingFindingSeq;
+          Set<String> reportedEntryPoints = new LinkedHashSet<>();
+
+          // Part A: Hot-path COMMAND and registered EVENT entry points (k <= 4 hops)
+          for (ParsedClass pc : classesByName.values()) {
+              if (!pc.isConcrete()) {
+                  continue;
+              }
+              for (MethodNode root : pc.methods().values()) {
+                  EntryPointKind epKind = BytecodeCausalGraphScanner.classifyEntryPoint(root, pc, allAsyncSpawnedLambdas);
+                  if (epKind != EntryPointKind.COMMAND && epKind != EntryPointKind.EVENT) {
+                      continue;
+                  }
+                  if (isShutdownLifecycleHandler(root)) {
+                      continue;
+                  }
+                  if (epKind == EntryPointKind.EVENT && listenerRegistrations != null) {
+                      BytecodeCausalGraphScanner.ListenerRegistrationMode mode =
+                              listenerRegistrations.get(pc.binaryClassName());
+                      if (mode == BytecodeCausalGraphScanner.ListenerRegistrationMode.UNREGISTERED) {
+                          continue;
+                      }
+                  }
+                  if (!reportedEntryPoints.add(root.symbol())) {
+                      continue;
+                  }
+
+                  Deque<SyncIoHop> queue = new ArrayDeque<>();
+                  Set<String> visited = new LinkedHashSet<>();
+                  queue.add(new SyncIoHop(root, 0, List.of(root.symbol())));
+                  visited.add(root.symbol());
+
+                  List<String> winningChain = null;
+                  Set<String> reachedSpawnSinks = new LinkedHashSet<>();
+
+                  while (!queue.isEmpty()) {
+                      SyncIoHop cur = queue.poll();
+                      MethodNode node = cur.node();
+
+                      List<String> localSpawns = collectUnmanagedThreadSpawnSinks(node);
+                      if (!localSpawns.isEmpty()) {
+                          reachedSpawnSinks.addAll(localSpawns);
+                          if (winningChain == null) {
+                              winningChain = cur.chain();
+                          }
+                      }
+
+                      if (cur.depth() >= MAX_SYNC_IO_HOPS || visited.size() >= 128) {
+                          continue;
+                      }
+
+                      for (String called : node.calledMethods()) {
+                          if (isAsyncSchedulerDispatchCall(called)) {
+                              continue;
+                          }
+                          MethodNode target = BytecodeCausalGraphScanner.findMethodNodeFlexible(
+                                  methodsBySymbol, methodsByName, node.ownerClass(), called);
+                          if (target == null) {
+                              continue;
+                          }
+                          if (visited.add(target.symbol())) {
+                              List<String> nextChain = new ArrayList<>(cur.chain().size() + 1);
+                              nextChain.addAll(cur.chain());
+                              nextChain.add(target.symbol());
+                              queue.add(new SyncIoHop(target, cur.depth() + 1, nextChain));
+                          }
+                      }
+                  }
+
+                  if (!reachedSpawnSinks.isEmpty() && winningChain != null) {
+                      List<String> hopSteps = new ArrayList<>(winningChain.size() + 1);
+                      for (int i = 0; i < winningChain.size(); i++) {
+                          hopSteps.add("Hop " + i + ": " + BytecodeCausalGraphScanner.simpleMethodRef(winningChain.get(i)));
+                      }
+                      hopSteps.add("UNMANAGED_THREAD_SPAWN: " + reachedSpawnSinks);
+
+                      String entryLabel = epKind == EntryPointKind.COMMAND
+                              ? ("Command handler " + BytecodeCausalGraphScanner.simpleMethodRef(root.symbol()))
+                              : ("Event handler " + BytecodeCausalGraphScanner.simpleMethodRef(root.symbol())
+                              + " (" + root.eventTypeSimpleName() + ")");
+
+                      findings.add(new CausalFinding(
+                              "CAUSAL-" + (seq++),
+                              artifactName,
+                              2,
+                              FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN,
+                              ConfidenceTier.CONFIRMED,
+                              90,
+                              root.symbol(),
+                              entryLabel + " invokes unmanaged thread or executor creation",
+                              "Reaches unmanaged thread/pool spawn " + reachedSpawnSinks
+                                      + " within " + (winningChain.size() - 1)
+                                      + " hop(s) per invocation, bypassing server scheduler lifecycle management (risks thread leaks, classloader retention on reload, and Folia incompatibility).",
+                              "Dispatch async or delayed tasks through the server scheduler SPI (ServerAccessor#scheduler() / Paper AsyncScheduler / Folia RegionScheduler) instead of spawning raw threads or executors per command/event.",
+                              hopSteps,
+                              ""
+                      ));
+                  }
+              }
+          }
+
+          // Part B: One-time lifecycle init creating Executors/Timer without shutdown/cancel in owning class
+          for (ParsedClass pc : classesByName.values()) {
+              if (!pc.isConcrete()) {
+                  continue;
+              }
+              boolean classHasTeardownCall = false;
+              for (MethodNode m : pc.methods().values()) {
+                  for (String called : m.calledMethods()) {
+                      if (called.endsWith("#shutdown")
+                              || called.endsWith("#shutdownNow")
+                              || called.endsWith("#cancel")
+                              || called.endsWith("#close")) {
+                          classHasTeardownCall = true;
+                          break;
+                      }
+                  }
+                  if (classHasTeardownCall) {
+                      break;
+                  }
+              }
+              if (classHasTeardownCall) {
+                  continue;
+              }
+              for (MethodNode m : pc.methods().values()) {
+                  String name = m.name();
+                  if (!"onEnable".equals(name)
+                          && !"onLoad".equals(name)
+                          && !"onInitialize".equals(name)
+                          && !"<init>".equals(name)) {
+                      continue;
+                  }
+                  List<String> initSpawns = collectUnmanagedThreadSpawnSinks(m);
+                  if (initSpawns.isEmpty() || !reportedEntryPoints.add(m.symbol())) {
+                      continue;
+                  }
+                  findings.add(new CausalFinding(
+                          "CAUSAL-" + (seq++),
+                          artifactName,
+                          2,
+                          FindingKind.CAUSAL_UNMANAGED_THREAD_SPAWN,
+                          ConfidenceTier.ADVISORY,
+                          60,
+                          m.symbol(),
+                          BytecodeCausalGraphScanner.simpleMethodRef(m.symbol())
+                                  + " creates unmanaged thread/pool " + initSpawns + " without class-level shutdown/cancel",
+                          "Lifecycle initializer spawns " + initSpawns
+                                  + " while " + BytecodeCausalGraphScanner.simpleClassName(pc.binaryClassName())
+                                  + " never calls shutdown(), shutdownNow(), close(), or cancel() on teardown (risks leaked worker threads across reloads).",
+                          "Prefer the platform scheduler SPI, or shut down dedicated daemon pools cleanly in onDisable()/close().",
+                          List.of(
+                                  "INIT: " + BytecodeCausalGraphScanner.simpleMethodRef(m.symbol()),
+                                  "UNMANAGED_THREAD_SPAWN: " + initSpawns
+                          ),
+                          ""
+                  ));
+              }
+          }
+
+          return findings;
+      }
+
+      private static List<String> collectUnmanagedThreadSpawnSinks(MethodNode node) {
+          List<String> sinks = new ArrayList<>();
+          if (node.instantiatedClasses().contains("java.lang.Thread")) {
+              sinks.add("java.lang.Thread#<init>");
+          }
+          if (node.instantiatedClasses().contains("java.util.Timer")) {
+              sinks.add("java.util.Timer#<init>");
+          }
+          for (String called : node.calledMethods()) {
+              if (called.equals("java.lang.Thread#start")
+                      || called.equals("java.lang.Thread#startVirtualThread")
+                      || (called.startsWith("java.lang.Thread$Builder") && called.endsWith("#start"))
+                      || (called.startsWith("java.util.concurrent.Executors#new")
+                      && (called.endsWith("ThreadPool") || called.endsWith("Executor")))) {
+                  if (!sinks.contains(called)) {
+                      sinks.add(called);
+                  }
+              }
+          }
+          return sinks;
+      }
+
+      /**
        * Detects intra-method {@code Closeable}, file stream/channel, and {@code ChunkTicket}
        * allocations that are neither returned to the caller nor closed/tracked across exit paths,
        * as well as session-entity ({@code Player} / {@code ServerPlayer}) collection fields whose
@@ -1170,7 +1375,7 @@ final class BytecodeParityAnalyzers {
                 continue;
             }
             switch (f.kind()) {
-                case CAUSAL_UNCLOSED_RESOURCE_LEAK -> {
+                case CAUSAL_UNCLOSED_RESOURCE_LEAK, CAUSAL_UNMANAGED_THREAD_SPAWN -> {
                     if (s002Violation == null) {
                         s002Violation = f.findingId() + ":" + f.kind().name();
                     }

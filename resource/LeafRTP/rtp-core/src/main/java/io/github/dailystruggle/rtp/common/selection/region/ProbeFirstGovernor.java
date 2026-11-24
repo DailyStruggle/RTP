@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.predict.BernoulliEstimator;
-import io.github.dailystruggle.rtp.common.predict.ComparativeCostGovernor;
-import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
-import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
+import net.leaf.predict.BernoulliEstimator;
+import net.leaf.predict.ComparativeCostGovernor;
+import net.leaf.predict.EwmaEstimator;
+import net.leaf.predict.EwmaLinearFit;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Locale;

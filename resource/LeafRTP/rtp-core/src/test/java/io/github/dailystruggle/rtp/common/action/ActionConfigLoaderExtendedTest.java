@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.action;
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.action.ParameterType;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -248,8 +248,8 @@ public class ActionConfigLoaderExtendedTest {
         assertEquals(1, manager.getAction("trigger_action").get().triggers().size());
 
         // Also test MultiConfigParser loading
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> parser =
-                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> parser =
+                new net.leaf.yaml.configuration.MultiConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class,
                         "actions",
                         "1.0",

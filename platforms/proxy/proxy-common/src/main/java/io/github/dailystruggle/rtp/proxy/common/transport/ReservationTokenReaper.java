@@ -25,7 +25,7 @@ import java.util.logging.Logger;
  * call with {@link ReleaseReason#TTL_EXPIRED} so the originating backend can
  * return the earmarked coordinate to its buffer (REQ-RTP-NET-011).
  *
- * <p>Why both calls. {@code reapExpired} is the atomic-state-transition slice
+ * <p>Two-step sweep. {@code reapExpired} is the atomic-state-transition slice
  * (row-count atomicity, REQ-RTP-PROXY-004) and is what stops a stale token
  * from being mistakenly redeemed at connect time. The per-token
  * {@code release(TTL_EXPIRED)} call is what propagates the event to whatever

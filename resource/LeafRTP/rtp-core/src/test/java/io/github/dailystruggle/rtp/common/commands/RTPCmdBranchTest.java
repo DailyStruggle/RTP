@@ -482,16 +482,16 @@ class RTPCmdBranchTest {
         ActiveSelection.get().permRegionLookup.put("paidRegion", paidRegion);
 
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
         EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
         io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =
                 io.github.dailystruggle.rtp.common.runtime.RTPRuntime.economy();
 
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages> msgParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages> msgParser =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class);
         Object prevNotEnough = msgParser.getData(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.notEnoughMoney);
 
@@ -552,8 +552,8 @@ class RTPCmdBranchTest {
         accessor.addPlayer(sender);
 
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
         EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
         io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =
@@ -621,8 +621,8 @@ class RTPCmdBranchTest {
         ActiveSelection.get().permRegionLookup.put("targetPaidRegion", paidRegion);
 
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
         EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
         io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =

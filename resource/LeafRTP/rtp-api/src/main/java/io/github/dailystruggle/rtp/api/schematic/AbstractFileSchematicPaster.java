@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.SchematicFileLoader;
+import net.leaf.schematics.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;

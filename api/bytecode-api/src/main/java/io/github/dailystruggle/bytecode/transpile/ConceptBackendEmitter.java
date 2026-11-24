@@ -118,7 +118,23 @@ public interface ConceptBackendEmitter {
          * corner in {@code NATIVE_FP64}) or {@code float} (1 word per corner in {@code FP32} /
          * {@code INT64_Q32_FP32}) into {@code 516}-word slice frames.
          */
-        CORNER_SLICE_5X49_PACKED
+        CORNER_SLICE_5X49_PACKED,
+
+        /**
+         * Batched 3D {@code DensityVolume} evaluation writing {@code float} samples in exact
+         * stride-1 {@code (lx + lz * size_x) * size_y + ly} order for {@code batch_count} volumes
+         * with configurable {@code (size_x, size_y, size_z)} and {@code (step_x, step_y, step_z)}.
+         */
+        DENSITY_VOLUME_BATCH_F32,
+
+        /**
+         * Fused 3D section-palette terrain fill writing 2-bit palette codes ({@code 0=AIR},
+         * {@code 1=DEFAULT_BLOCK}, {@code 2=DEFAULT_FLUID}, {@code 3=DEEP_FLUID}) packed in exact
+         * {@code (ly << 8) | (lz << 4) | lx} order ({@code 256} {@code uint32} words = {@code 1024 B}
+         * per {@code 16x16x16} section) plus per-section {@code ushort4(nonEmpty, fluid, codeMask, 0)}
+         * metadata headers for compact zero-allocation DMA writeback.
+         */
+        SECTION_PALETTE_FILL_U2
     }
 
     /**

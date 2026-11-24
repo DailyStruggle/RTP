@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -376,7 +376,7 @@ class MenuConfigSubtreeBuildersTest {
                 PerformanceKeys.class, "performance.yml", "1.0",
                 tempDir.toFile(), tempDir.toFile(), db);
 
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection root =
+        net.leaf.yaml.RtpYamlSection root =
                 parser.getYamlRoot();
         assertNotNull(root, "parser must have a loaded YAML root");
         assertNotNull(root.getComment("maxAttempts"),

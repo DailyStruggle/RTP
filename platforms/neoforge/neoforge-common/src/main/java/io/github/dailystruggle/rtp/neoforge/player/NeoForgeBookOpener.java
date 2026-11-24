@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec;
  * that can open a written-book modal for itself (NeoForge analogue of
  * {@code FabricBookOpener}).
  *
- * <p><b>Why this exists.</b> {@code NeoForgeBookMenuRenderer} (in
+ * <p>{@code NeoForgeBookMenuRenderer} (in
  * {@code rtp-neoforge-common}) needs to open the book on the viewer's underlying
  * {@code net.minecraft.server.level.ServerPlayer}. Rather than expose that raw
  * {@code ServerPlayer} to the renderer, the player object itself exposes a single

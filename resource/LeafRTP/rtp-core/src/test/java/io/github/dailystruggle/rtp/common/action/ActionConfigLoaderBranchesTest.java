@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -289,7 +289,7 @@ class ActionConfigLoaderBranchesTest {
     assertEquals("null_test", def.id());
     assertEquals(ActionDefinition.PlacementSpec.DEFAULT, def.placement());
 
-    ActionDefinition defNullParser = ActionConfigLoader.parseDefinition("null_parser", (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null);
+    ActionDefinition defNullParser = ActionConfigLoader.parseDefinition("null_parser", (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null);
     assertEquals("null_parser", defNullParser.id());
   }
 
@@ -370,10 +370,10 @@ class ActionConfigLoaderBranchesTest {
   @Test
   void testLoadActionsFromMultiConfigParser(@TempDir Path tempDir) {
     io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
-    ActionConfigLoader.loadActions((io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null, new ActionManager());
+    ActionConfigLoader.loadActions((net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null, new ActionManager());
 
-    io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> actionsParser =
-        new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+    net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys> actionsParser =
+        new net.leaf.yaml.configuration.MultiConfigParser<>(
             io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys.class,
             "actions", "1.0", tempDir.toFile(), "definitions/actions", "io/github/dailystruggle/rtp/common/configuration/defaults/actions");
     ActionManager mgr = new ActionManager();

@@ -201,13 +201,13 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     }
     String name = distribution.trim().toLowerCase(java.util.Locale.ROOT);
     try {
-      io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> factory =
-          (io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>>)
+      net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> factory =
+          (net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>>)
               FactoryRegistry.get(FactoryNames.shape);
       if (factory == null || !factory.contains(name)) {
         return null;
       }
-      io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fVal = factory.get(name);
+      net.leaf.yaml.factory.FactoryValue<?> fVal = factory.get(name);
       if (fVal instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape) {
         io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> clone = shape.clone();
         Map<String, Object> data = new LinkedHashMap<>();

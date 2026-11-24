@@ -18,10 +18,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -358,6 +354,31 @@ public final class RegionSimilarityAuditor {
             long refDeepLavaVoxels,
             long candDeepLavaVoxels) {}
 
+    /**
+     * Bidirectional chunk-border migration-seam continuity metrics quantifying whether migrating
+     * between Vanilla and Candidate regions introduces chunk-wall cliffs, biome border lines,
+     * sheared subterranean caves, or aquifer fluid leaks.
+     */
+    public record MigrationSeamStats(
+            long comparedSharedChunkEdges,
+            long borderColumnsChecked,
+            double borderSurfaceExactPct,
+            double borderSurfaceWithin1BlockPct,
+            double seamSurfaceMaeBlocks,
+            int seamMaxInducedCliffBlocks,
+            long seamInducedCliffEdges,
+            double borderExactBiomePct,
+            double borderStrictBlockPct,
+            double interiorStrictBlockPct,
+            double borderSubterraneanSolidAirAgreementPct,
+            long borderSubterraneanFluidLeakVoxels) {
+
+        /** Returns a zeroed placeholder instance for backward-compatible scorecard constructors. */
+        public static MigrationSeamStats empty() {
+            return new MigrationSeamStats(0L, 0L, 100.0, 100.0, 0.0, 0, 0L, 100.0, 100.0, 100.0, 100.0, 0L);
+        }
+    }
+
     /** Aggregated multi-axis similarity scorecard across all paired full chunks. */
     public record RegionSimilarityScorecard(
             String referenceLabel,
@@ -387,7 +408,70 @@ public final class RegionSimilarityAuditor {
             int candChunksWithStructureReferences,
             Map<String, Integer> refStructureStartCounts,
             Map<String, Integer> candStructureStartCounts,
-            WeightedParityEvaluator.WeightedParityReport weightedParity) {
+            WeightedParityEvaluator.WeightedParityReport weightedParity,
+            MigrationSeamStats migrationSeam) {
+
+        /** Backward-compatible 28-argument constructor populating an empty migration-seam summary if omitted. */
+        public RegionSimilarityScorecard(
+                String referenceLabel,
+                String candidateLabel,
+                int comparedFullChunks,
+                int refOnlyChunks,
+                int candOnlyChunks,
+                Map<String, HeightmapStats> heightmaps,
+                double strictBlockIdMatchPct,
+                double semanticCategoryMatchPct,
+                Map<SemanticMaterial, Long> refMaterialCounts,
+                Map<SemanticMaterial, Long> candMaterialCounts,
+                double exactBiomeQuartetMatchPct,
+                double climateClassQuartetMatchPct,
+                Map<ClimateBiomeClass, Long> refClimateCounts,
+                Map<ClimateBiomeClass, Long> candClimateCounts,
+                CaveFluidStats caveFluidStats,
+                Map<String, Long> refOreCounts,
+                Map<String, Long> candOreCounts,
+                Map<String, Map<String, Long>> refOreYBandCounts,
+                Map<String, Map<String, Long>> candOreYBandCounts,
+                long refFloraAndCanopyVoxels,
+                long candFloraAndCanopyVoxels,
+                int refChunksWithStructureStarts,
+                int candChunksWithStructureStarts,
+                int refChunksWithStructureReferences,
+                int candChunksWithStructureReferences,
+                Map<String, Integer> refStructureStartCounts,
+                Map<String, Integer> candStructureStartCounts,
+                WeightedParityEvaluator.WeightedParityReport weightedParity) {
+            this(
+                    referenceLabel,
+                    candidateLabel,
+                    comparedFullChunks,
+                    refOnlyChunks,
+                    candOnlyChunks,
+                    heightmaps,
+                    strictBlockIdMatchPct,
+                    semanticCategoryMatchPct,
+                    refMaterialCounts,
+                    candMaterialCounts,
+                    exactBiomeQuartetMatchPct,
+                    climateClassQuartetMatchPct,
+                    refClimateCounts,
+                    candClimateCounts,
+                    caveFluidStats,
+                    refOreCounts,
+                    candOreCounts,
+                    refOreYBandCounts,
+                    candOreYBandCounts,
+                    refFloraAndCanopyVoxels,
+                    candFloraAndCanopyVoxels,
+                    refChunksWithStructureStarts,
+                    candChunksWithStructureStarts,
+                    refChunksWithStructureReferences,
+                    candChunksWithStructureReferences,
+                    refStructureStartCounts,
+                    candStructureStartCounts,
+                    weightedParity,
+                    MigrationSeamStats.empty());
+        }
 
         /** Backward-compatible 27-argument constructor populating an empty weighted parity report if omitted. */
         public RegionSimilarityScorecard(
@@ -531,34 +615,13 @@ public final class RegionSimilarityAuditor {
         Objects.requireNonNull(referenceRegionDir, "referenceRegionDir");
         Objects.requireNonNull(candidateRegionDir, "candidateRegionDir");
         Collection<Path> safeSources = templateNbtSources == null ? List.of() : List.copyOf(templateNbtSources);
-        try {
-            return ForkJoinPool.commonPool()
-                    .submit(() -> compareDirectoriesOnWorker(
-                            referenceRegionDir,
-                            candidateRegionDir,
-                            referenceLabel,
-                            candidateLabel,
-                            maxChunks,
-                            safeSources))
-                    .get(10L, TimeUnit.MINUTES);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            LOGGER.log(Level.WARNING, "Interrupted during region similarity comparison", ex);
-            throw new IOException("Interrupted during region similarity comparison", ex);
-        } catch (TimeoutException ex) {
-            LOGGER.log(Level.WARNING, "Timed out during region similarity comparison", ex);
-            throw new IOException("Timed out during region similarity comparison", ex);
-        } catch (ExecutionException ex) {
-            Throwable cause = ex.getCause();
-            LOGGER.log(Level.WARNING, "Asynchronous region similarity comparison failed", cause);
-            if (cause instanceof IOException ioe) {
-                throw ioe;
-            }
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new IOException("Asynchronous region comparison failed", cause);
-        }
+        return compareDirectoriesOnWorker(
+                referenceRegionDir,
+                candidateRegionDir,
+                referenceLabel,
+                candidateLabel,
+                maxChunks,
+                safeSources);
     }
 
     private static RegionSimilarityScorecard compareDirectoriesOnWorker(
@@ -620,6 +683,23 @@ public final class RegionSimilarityAuditor {
         long candDeepLava;
         long refFloraVoxels;
         long candFloraVoxels;
+        long comparedSharedChunkEdges;
+        long seamDirectedColumnPairs;
+        long seamExcessCliffSum;
+        int seamMaxInducedCliffBlocks;
+        long seamInducedCliffEdges;
+        long borderColumnsChecked;
+        long borderSurfaceExactColumns;
+        long borderSurfaceWithin1Columns;
+        long borderBiomeQuartets;
+        long borderExactBiomeMatches;
+        long borderVoxels;
+        long borderStrictVoxelMatches;
+        long interiorVoxels;
+        long interiorStrictVoxelMatches;
+        long borderSubterraneanVoxels;
+        long borderSubterraneanSolidAirMatches;
+        long borderSubterraneanFluidLeakVoxels;
         int comparedFullChunks;
         int refOnlyChunks;
         int candOnlyChunks;
@@ -649,6 +729,8 @@ public final class RegionSimilarityAuditor {
             byte[] candBytes = readBytesSafe(candHandle);
             List<WeightedParityEvaluator.ChunkParityInput> regionRefChunks = new ArrayList<>();
             List<WeightedParityEvaluator.ChunkParityInput> regionCandChunks = new ArrayList<>();
+            int[][][] refSurfaceByChunk = new int[32][32][];
+            int[][][] candSurfaceByChunk = new int[32][32][];
             for (int localZ = 0; localZ < 32 && !limitReached; localZ++) {
                 for (int localX = 0; localX < 32; localX++) {
                     AnvilReader.ChunkEntry refEntry = readFullChunkSafe(refHandle, refBytes, localX, localZ);
@@ -661,13 +743,14 @@ public final class RegionSimilarityAuditor {
                         limitReached = true;
                         break;
                     }
-                    accumulatePairedChunk(refEntry, candEntry);
+                    accumulatePairedChunk(refEntry, candEntry, refSurfaceByChunk, candSurfaceByChunk, localX, localZ);
                     regionRefChunks.add(new WeightedParityEvaluator.ChunkParityInput(
                             localX, localZ, cloneSectionBlockIds(refScratch.sectionBlockIds), refEntry.root));
                     regionCandChunks.add(new WeightedParityEvaluator.ChunkParityInput(
                             localX, localZ, cloneSectionBlockIds(candScratch.sectionBlockIds), candEntry.root));
                 }
             }
+            accumulateRegionSharedSeamEdges(refSurfaceByChunk, candSurfaceByChunk);
             if (!regionRefChunks.isEmpty()) {
                 weightedAcc.evaluateRegionPair(rc.rx(), rc.rz(), regionRefChunks, regionCandChunks);
             }
@@ -690,7 +773,12 @@ public final class RegionSimilarityAuditor {
         }
 
         private void accumulatePairedChunk(
-                AnvilReader.ChunkEntry refEntry, AnvilReader.ChunkEntry candEntry) {
+                AnvilReader.ChunkEntry refEntry,
+                AnvilReader.ChunkEntry candEntry,
+                int[][][] refSurfaceByChunk,
+                int[][][] candSurfaceByChunk,
+                int localX,
+                int localZ) {
             comparedFullChunks++;
             refScratch.decode(refEntry.root);
             candScratch.decode(candEntry.root);
@@ -699,12 +787,105 @@ public final class RegionSimilarityAuditor {
                 int[] refHm = refScratch.extractHeightmap(refEntry.root, hmType);
                 int[] candHm = candScratch.extractHeightmap(candEntry.root, hmType);
                 hmAccumulators.get(hmType).recordChunk(refHm, candHm);
+                if ("WORLD_SURFACE_WG".equals(hmType)) {
+                    refSurfaceByChunk[localZ][localX] = refHm.clone();
+                    candSurfaceByChunk[localZ][localX] = candHm.clone();
+                    recordBorderSurfaceColumns(refHm, candHm);
+                }
             }
             for (int syIdx = 0; syIdx < SECTION_COUNT; syIdx++) {
                 accumulateSectionVoxels(syIdx);
                 accumulateSectionBiomes(syIdx);
             }
             accumulateChunkStructures(refEntry.root, candEntry.root);
+        }
+
+        private void recordBorderSurfaceColumns(int[] refSurface, int[] candSurface) {
+            for (int colIdx = 0; colIdx < 256; colIdx++) {
+                if (!isBorderColumn(colIdx)) {
+                    continue;
+                }
+                borderColumnsChecked++;
+                int delta = Math.abs(refSurface[colIdx] - candSurface[colIdx]);
+                if (delta == 0) {
+                    borderSurfaceExactColumns++;
+                    borderSurfaceWithin1Columns++;
+                } else if (delta <= 1) {
+                    borderSurfaceWithin1Columns++;
+                }
+            }
+        }
+
+        private void accumulateRegionSharedSeamEdges(int[][][] refSurface, int[][][] candSurface) {
+            for (int lz = 0; lz < 32; lz++) {
+                for (int lx = 0; lx < 32; lx++) {
+                    int[] rA = refSurface[lz][lx];
+                    int[] cA = candSurface[lz][lx];
+                    if (rA == null || cA == null) {
+                        continue;
+                    }
+                    if (lx + 1 < 32 && refSurface[lz][lx + 1] != null && candSurface[lz][lx + 1] != null) {
+                        recordEastWestSeam(rA, cA, refSurface[lz][lx + 1], candSurface[lz][lx + 1]);
+                    }
+                    if (lz + 1 < 32 && refSurface[lz + 1][lx] != null && candSurface[lz + 1][lx] != null) {
+                        recordNorthSouthSeam(rA, cA, refSurface[lz + 1][lx], candSurface[lz + 1][lx]);
+                    }
+                }
+            }
+        }
+
+        private void recordEastWestSeam(int[] refA, int[] candA, int[] refB, int[] candB) {
+            comparedSharedChunkEdges++;
+            for (int z = 0; z < 16; z++) {
+                int leftCol = (z << 4) | 15;
+                int rightCol = z << 4;
+                recordDirectionalSeamPair(refA[leftCol], candA[leftCol], refB[rightCol], candB[rightCol]);
+            }
+        }
+
+        private void recordNorthSouthSeam(int[] refA, int[] candA, int[] refB, int[] candB) {
+            comparedSharedChunkEdges++;
+            for (int x = 0; x < 16; x++) {
+                int northCol = (15 << 4) | x;
+                int southCol = x;
+                recordDirectionalSeamPair(refA[northCol], candA[northCol], refB[southCol], candB[southCol]);
+            }
+        }
+
+        private void recordDirectionalSeamPair(int refAY, int candAY, int refBY, int candBY) {
+            int dRef = Math.abs(refAY - refBY);
+            int dV2C = Math.abs(refAY - candBY);
+            int dC2V = Math.abs(candAY - refBY);
+            recordSingleSeamDirection(dRef, dV2C);
+            recordSingleSeamDirection(dRef, dC2V);
+        }
+
+        private void recordSingleSeamDirection(int dRef, int dMigrated) {
+            seamDirectedColumnPairs++;
+            int excess = Math.max(0, dMigrated - dRef);
+            seamExcessCliffSum += excess;
+            if (excess > seamMaxInducedCliffBlocks) {
+                seamMaxInducedCliffBlocks = excess;
+            }
+            if (dMigrated > Math.max(1, dRef)) {
+                seamInducedCliffEdges++;
+            }
+        }
+
+        private static boolean isBorderColumn(int colIdx) {
+            int lx = colIdx & 15;
+            int lz = colIdx >>> 4;
+            return lx == 0 || lx == 15 || lz == 0 || lz == 15;
+        }
+
+        private static int coarseSeamTopology(SemanticMaterial mat) {
+            if (mat == SemanticMaterial.AIR) {
+                return 0;
+            }
+            if (mat == SemanticMaterial.FLUID) {
+                return 1;
+            }
+            return 2;
         }
 
         private void accumulateSectionVoxels(int syIdx) {
@@ -727,11 +908,34 @@ public final class RegionSimilarityAuditor {
             SemanticMaterial cMat = candScratch.sectionMaterials[syIdx][vIdx];
 
             totalVoxels++;
-            if (rId.equals(cId)) {
+            boolean strictMatch = rId.equals(cId);
+            if (strictMatch) {
                 strictVoxelMatches++;
             }
             if (rMat == cMat) {
                 semanticVoxelMatches++;
+            }
+            if (isBorderColumn(colIdx)) {
+                borderVoxels++;
+                if (strictMatch) {
+                    borderStrictVoxelMatches++;
+                }
+                int subCeiling = Math.max(refScratch.solidCeilingY[colIdx], candScratch.solidCeilingY[colIdx]);
+                if (worldY < subCeiling) {
+                    borderSubterraneanVoxels++;
+                    int rTopo = coarseSeamTopology(rMat);
+                    int cTopo = coarseSeamTopology(cMat);
+                    if (rTopo == cTopo) {
+                        borderSubterraneanSolidAirMatches++;
+                    } else if ((rTopo == 1 && cTopo == 0) || (rTopo == 0 && cTopo == 1)) {
+                        borderSubterraneanFluidLeakVoxels++;
+                    }
+                }
+            } else {
+                interiorVoxels++;
+                if (strictMatch) {
+                    interiorStrictVoxelMatches++;
+                }
             }
             refMaterials.put(rMat, refMaterials.get(rMat) + 1L);
             candMaterials.put(cMat, candMaterials.get(cMat) + 1L);
@@ -797,8 +1001,17 @@ public final class RegionSimilarityAuditor {
                 ClimateBiomeClass cClim = classifyClimateBiome(cBiome);
 
                 totalBiomeQuartets++;
-                if (rBiome.equals(cBiome)) {
+                boolean exactBiome = rBiome.equals(cBiome);
+                if (exactBiome) {
                     exactBiomeMatches++;
+                }
+                int qx = q & 3;
+                int qz = (q >>> 2) & 3;
+                if (qx == 0 || qx == 3 || qz == 0 || qz == 3) {
+                    borderBiomeQuartets++;
+                    if (exactBiome) {
+                        borderExactBiomeMatches++;
+                    }
                 }
                 if (rClim == cClim) {
                     climateBiomeMatches++;
@@ -847,6 +1060,21 @@ public final class RegionSimilarityAuditor {
                     candDeepLava);
             WeightedParityEvaluator.WeightedParityReport weightedReport =
                     weightedAcc.finish(strictPct, refOres, candOres);
+            MigrationSeamStats seamStats = new MigrationSeamStats(
+                    comparedSharedChunkEdges,
+                    borderColumnsChecked,
+                    borderColumnsChecked > 0 ? (borderSurfaceExactColumns * 100.0) / borderColumnsChecked : 100.0,
+                    borderColumnsChecked > 0 ? (borderSurfaceWithin1Columns * 100.0) / borderColumnsChecked : 100.0,
+                    seamDirectedColumnPairs > 0 ? (double) seamExcessCliffSum / seamDirectedColumnPairs : 0.0,
+                    seamMaxInducedCliffBlocks,
+                    seamInducedCliffEdges,
+                    borderBiomeQuartets > 0 ? (borderExactBiomeMatches * 100.0) / borderBiomeQuartets : 100.0,
+                    borderVoxels > 0 ? (borderStrictVoxelMatches * 100.0) / borderVoxels : 100.0,
+                    interiorVoxels > 0 ? (interiorStrictVoxelMatches * 100.0) / interiorVoxels : 100.0,
+                    borderSubterraneanVoxels > 0
+                            ? (borderSubterraneanSolidAirMatches * 100.0) / borderSubterraneanVoxels
+                            : 100.0,
+                    borderSubterraneanFluidLeakVoxels);
 
             return new RegionSimilarityScorecard(
                     referenceLabel == null ? "reference" : referenceLabel,
@@ -876,7 +1104,8 @@ public final class RegionSimilarityAuditor {
                     candStructRefChunks,
                     Collections.unmodifiableMap(refStructCounts),
                     Collections.unmodifiableMap(candStructCounts),
-                    weightedReport);
+                    weightedReport,
+                    seamStats);
         }
     }
 
@@ -1050,6 +1279,24 @@ public final class RegionSimilarityAuditor {
             sb.append("\n");
         }
         sb.append("    ]\n");
+        sb.append("  },\n");
+        MigrationSeamStats ms = sc.migrationSeam() == null ? MigrationSeamStats.empty() : sc.migrationSeam();
+        sb.append("  \"migration_seam\": {\n");
+        sb.append("    \"compared_shared_chunk_edges\": ").append(ms.comparedSharedChunkEdges()).append(",\n");
+        sb.append("    \"border_columns_checked\": ").append(ms.borderColumnsChecked()).append(",\n");
+        sb.append("    \"border_surface_exact_pct\": ").append(fmtDouble(ms.borderSurfaceExactPct())).append(",\n");
+        sb.append("    \"border_surface_within_1_block_pct\": ")
+                .append(fmtDouble(ms.borderSurfaceWithin1BlockPct())).append(",\n");
+        sb.append("    \"seam_surface_mae_blocks\": ").append(fmtDouble(ms.seamSurfaceMaeBlocks())).append(",\n");
+        sb.append("    \"seam_max_induced_cliff_blocks\": ").append(ms.seamMaxInducedCliffBlocks()).append(",\n");
+        sb.append("    \"seam_induced_cliff_edges\": ").append(ms.seamInducedCliffEdges()).append(",\n");
+        sb.append("    \"border_exact_biome_pct\": ").append(fmtDouble(ms.borderExactBiomePct())).append(",\n");
+        sb.append("    \"border_strict_block_pct\": ").append(fmtDouble(ms.borderStrictBlockPct())).append(",\n");
+        sb.append("    \"interior_strict_block_pct\": ").append(fmtDouble(ms.interiorStrictBlockPct())).append(",\n");
+        sb.append("    \"border_subterranean_solid_air_agreement_pct\": ")
+                .append(fmtDouble(ms.borderSubterraneanSolidAirAgreementPct())).append(",\n");
+        sb.append("    \"border_subterranean_fluid_leak_voxels\": ")
+                .append(ms.borderSubterraneanFluidLeakVoxels()).append("\n");
         sb.append("  }\n");
         sb.append("}");
         return sb.toString();
@@ -1170,6 +1417,25 @@ public final class RegionSimilarityAuditor {
                     .append("x | ").append(fmtPct(cell.weightedPenaltyPoints()))
                     .append(" |\n");
         }
+
+        MigrationSeamStats ms = sc.migrationSeam() == null ? MigrationSeamStats.empty() : sc.migrationSeam();
+        sb.append("\n#### Axis 5: Migration Seam Continuity (Vanilla <-> Candidate Chunk Borders)\n\n");
+        sb.append("- **Shared Chunk Edges Evaluated:** `").append(ms.comparedSharedChunkEdges())
+                .append("` | **Perimeter Columns:** `").append(ms.borderColumnsChecked()).append("`\n");
+        sb.append("- **Border Surface Continuity:** exact `").append(fmtPct(ms.borderSurfaceExactPct()))
+                .append("%` | walkable (`|dY| <= 1`) `").append(fmtPct(ms.borderSurfaceWithin1BlockPct()))
+                .append("%` | mean induced cliff `").append(fmtDouble4(ms.seamSurfaceMaeBlocks()))
+                .append("` blocks | max induced cliff `").append(ms.seamMaxInducedCliffBlocks())
+                .append("` blocks | synthetic cliff edges (`>= 2` blocks) `")
+                .append(ms.seamInducedCliffEdges()).append("`\n");
+        sb.append("- **Border Biome Match:** `").append(fmtPct(ms.borderExactBiomePct())).append("%`\n");
+        sb.append("- **Perimeter vs. Interior Strict Block Match:** border `")
+                .append(fmtPct(ms.borderStrictBlockPct())).append("%` | interior `")
+                .append(fmtPct(ms.interiorStrictBlockPct())).append("%`\n");
+        sb.append("- **Subterranean Border Cave/Aquifer Continuity:** solid/air/fluid agreement `")
+                .append(fmtPct(ms.borderSubterraneanSolidAirAgreementPct()))
+                .append("%` | fluid-to-air seam leaks `")
+                .append(ms.borderSubterraneanFluidLeakVoxels()).append("` voxels\n");
         return sb.toString();
     }
 
@@ -1191,30 +1457,9 @@ public final class RegionSimilarityAuditor {
             return;
         }
         CliOptions opts = parseCliOptions(args);
-        try {
-            String primary = ForkJoinPool.commonPool()
-                    .submit(() -> executeCliOnWorker(opts))
-                    .get(10L, TimeUnit.MINUTES);
-            System.out.write((primary + "\n").getBytes(StandardCharsets.UTF_8));
-            System.out.flush();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            LOGGER.log(Level.WARNING, "Interrupted during CLI region similarity execution", ex);
-            throw new IOException("Interrupted during CLI region similarity execution", ex);
-        } catch (TimeoutException ex) {
-            LOGGER.log(Level.WARNING, "Timed out during CLI region similarity execution", ex);
-            throw new IOException("Timed out during CLI region similarity execution", ex);
-        } catch (ExecutionException ex) {
-            Throwable cause = ex.getCause();
-            LOGGER.log(Level.WARNING, "CLI region similarity execution failed", cause);
-            if (cause instanceof IOException ioe) {
-                throw ioe;
-            }
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new IOException("CLI execution failed", cause);
-        }
+        String primary = executeCliOnWorker(opts);
+        System.out.write((primary + "\n").getBytes(StandardCharsets.UTF_8));
+        System.out.flush();
     }
 
     private record CliOptions(

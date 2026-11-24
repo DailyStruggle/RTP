@@ -10,7 +10,7 @@ for building a menu or GUI on top of RTP.
 > page is for when you want to build your own GUI - a chest inventory, a custom book, a web panel -
 > and have RTP supply the data and perform the teleport.
 
-## Why this is a real API and not a hack
+## API boundary
 
 Legacy random-teleport plugins force integrators to either shell out to `/rtp` as the player
 (losing all type-safety and result feedback) or to copy the plugin's coordinate logic into the GUI

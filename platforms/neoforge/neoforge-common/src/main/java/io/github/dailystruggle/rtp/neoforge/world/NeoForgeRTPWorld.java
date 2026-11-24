@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -218,7 +218,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
                                     s -> (RTPRuntime.serverAccessor() != null)
                                             ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                                            : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                                            : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s),
+                                    RTPRuntime.blockingIoExecutor())
                             .thenCompose(result -> {
                                 if (inactive) {
                                     if (generationSlot != null) generationSlot.close();
@@ -559,8 +560,9 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        // Coalesced on the server's blocking-I/O executor: pending probes for one r.X.Z.mca share one open (S-005).
         return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+                RTPRuntime.columnProbeCoalescer(),
                 worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
                 if (err != null) throw err;
@@ -1137,7 +1139,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     /**
-     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * Native bulk block write (ADR-058). Parses each {@link net.leaf.schematics.platform.BlockDelta}
      * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
      * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
      * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
@@ -1150,7 +1152,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      * @return the number of blocks successfully placed
      */
     @Override
-    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    public int setBlocks(java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
         ServerLevel level = world;
         if (level == null || blocks == null || blocks.isEmpty()) return 0;
         net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
@@ -1165,7 +1167,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         }
         int placed = 0;
         String firstFailedToken = null;
-        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+        for (net.leaf.schematics.platform.BlockDelta delta : blocks) {
             try {
                 net.minecraft.world.level.block.state.BlockState state =
                         net.minecraft.commands.arguments.blocks.BlockStateParser

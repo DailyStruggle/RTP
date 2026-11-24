@@ -68,8 +68,8 @@ public class SubcommandBypassesTeleportGuardsTest {
         data.put(PlayerMessages.cooldownMessage, "cooldown active");
         data.forEach((k, v) -> {
             Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
-            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
-                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
+            if (fv instanceof net.leaf.yaml.configuration.ConfigParser) {
+                ((net.leaf.yaml.configuration.ConfigParser) fv).set((Enum) k, v);
             }
         });
 

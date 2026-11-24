@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.predict.DistributionSampler;
+import net.leaf.predict.DistributionSampler;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
 import java.util.EnumMap;

@@ -110,7 +110,7 @@ The Phase 2 devstack acceptance baseline is **2 proxies + 2 backends + 1 transpo
 
 **Coordinates are resolved on the destination backend before the player's server change**, not after arrival. The reservation token issued to the proxy carries the final `worldKey` + `x/y/z/yaw/pitch`, and the destination's join handler simply *consumes* the token rather than running a fresh pipeline.
 
-### Why this is trivial in practice
+### Implementation via the Existing Kept Cache
 
 The destination's existing **kept cache** (`RegionQueueManager.keptLocations` — the *Hot Queue* `LockFreeLocationBuffer` of pre-verified safe locations whose chunks are currently loaded with `keep(true)` applied) already produces ready-to-use coordinates as part of normal operation. A network teleport request becomes:
 
@@ -123,7 +123,7 @@ In other words: the network-mode reservation token table is a **thin allocation 
 
 > Note: the per-player cache (`RegionQueueManager.fastLocations` — `ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) and the ADR-023 Login Reserve Cache (`loginLocations`) are *not* the source for cross-network allocations. They serve **already-online players on the local backend** and are intentionally left untouched by network-mode bookkeeping. Cross-network allocations draw from the general region pool (`keptLocations` → `unkeptLocations`).
 
-### Why post-arrival was rejected
+### Pre-resolve vs. Post-arrival Trade-offs
 
 | Concern | Pre-resolve (chosen) | Post-arrival (rejected) |
 |--------|---------------------|------------------------|

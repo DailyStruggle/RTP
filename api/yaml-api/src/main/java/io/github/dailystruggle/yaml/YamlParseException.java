@@ -1,6 +1,6 @@
 package io.github.dailystruggle.yaml;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlParseException;
+import net.leaf.yaml.RtpYamlParseException;
 
 /**
  * Thrown when {@code :yaml-api} encounters a syntactic error or unsupported YAML construct.

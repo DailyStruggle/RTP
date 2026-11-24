@@ -301,8 +301,8 @@ class RTPTeleportCancelTest {
         MockRTPPlayer player = new MockRTPPlayer(id, "EcoStringP", new RTPLocation(world, 0, 64, 0));
         accessor.addPlayer(player);
 
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
-            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+            (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
                 ActiveConfigs.get().configParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
 
         AtomicInteger refundCalls = new AtomicInteger();

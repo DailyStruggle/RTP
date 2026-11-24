@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * Locates the boundary between the shipped global spiral and the layered index, as a function of
  * range, storage tier, heap headroom, mark load and cache residency.
  *
- * <p>Why this exists: every earlier report compared the two models axis by axis and then asserted a
+ * <p>Every earlier report compared the two models axis by axis and then asserted a
  * crossover near a 512-block radius by reading two byte columns. That is a projection of a
  * multi-input system onto one line. Here both models are costed under <b>one</b> objective, so the
  * boundary is computed - and because the objective contains a storage term and a cache term, the

@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code fabric.mod.json}) must not reference {@code net.minecraft}
  * chat / network-protocol types.
  *
- * <p><b>Why:</b> on MC 26.1 (the first deobfuscated release,
+ * <p>On MC 26.1 (the first deobfuscated release,
  * see rtp-fabric-ADR-007) the intermediary name
  * {@code class_2596} (i.e. {@code net.minecraft.network.protocol.Packet})
  * is no longer exposed on the runtime classpath the way prior

@@ -198,6 +198,7 @@ scripts/release/generated/
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.
 /site/
+/dist/
 
 # Node.js dependencies and devstack client artifacts
 node_modules/

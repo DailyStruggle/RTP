@@ -1226,6 +1226,66 @@ class LcaSectionBackingAndCompactionTest {
             assertEquals(4096, backing300.nonEmptyBlockCount());
             assertTrue(backing300.tickingBlockCount() > 0);
             assertEquals(10, backing300.getStateId(9, 0, 0));
+
+            // Verify fromColdSectionFrameHydrated retains CompactBaseIndex immediately and matches forEachMatchingCoordinate
+            LcaSectionBacking hydrated300 = LcaSectionBacking.fromColdSectionFrameHydrated(
+                    enc300.frameBytes, 0, id -> id != 0, id -> (id & 1) == 0, id -> false);
+            assertTrue(hydrated300.hasHydratedCompactBaseIndex(), "Hydrated cold section must retain CompactBaseIndex");
+            assertEquals(4096, hydrated300.nonEmptyBlockCount());
+            assertEquals(backing300.tickingBlockCount(), hydrated300.tickingBlockCount());
+
+            java.util.List<Integer> minorityMatches = new java.util.ArrayList<>();
+            hydrated300.forEachMatchingCoordinate(id -> id == 2 || id == 10, minorityMatches::add);
+            assertEquals(java.util.List.of(1, 9), minorityMatches);
+
+            java.util.List<Integer> majorityMatches = new java.util.ArrayList<>();
+            hydrated300.forEachMatchingCoordinate(id -> id == 1, majorityMatches::add);
+            assertEquals(4096 - 299, majorityMatches.size());
+
+            // Dirty overlay override must also be reflected by forEachMatchingCoordinate
+            hydrated300.setAndGetPreviousStateId(0, 0, 0, 10, 0L, null);
+            java.util.List<Integer> dirtyMatches = new java.util.ArrayList<>();
+            hydrated300.forEachMatchingCoordinate(id -> id == 10, dirtyMatches::add);
+            assertEquals(java.util.List.of(0, 9), dirtyMatches);
+
+            // Verify fromColdSectionFrameWithBaseAndIndex retains baseFrame so evictCompactBaseIndexToColdBaseFrame is O(1)
+            LcaSectionBacking withBase = LcaSectionBacking.fromColdSectionFrameWithBaseAndIndex(
+                    enc300.frameBytes, 0, id -> id != 0, id -> (id & 1) == 0, id -> false);
+            assertTrue(withBase.hasHydratedCompactBaseIndex());
+            assertTrue(withBase.evictCompactBaseIndexToColdBaseFrame());
+            assertTrue(withBase.isColdBaseFrameOnly());
+            assertFalse(withBase.hasHydratedCompactBaseIndex());
+            assertTrue(withBase.hydrateCompactBaseIndexIfNeeded());
+            assertTrue(withBase.hasHydratedCompactBaseIndex());
+            assertEquals(10, withBase.getStateId(9, 0, 0));
+
+            // Verify fromRuntimeVoxelsCold produces UNIFORM (0 B) and COLD_LCA (baseFrame-only) losslessly
+            int[] uniformVoxels = new int[4096];
+            java.util.Arrays.fill(uniformVoxels, 7);
+            LcaSectionBacking coldUniform = LcaSectionBacking.fromRuntimeVoxelsCold(
+                    uniformVoxels, id -> id != 0, id -> id == 7, id -> false);
+            assertTrue(coldUniform.isCleanUniform());
+            assertEquals(7, coldUniform.uniformStateId());
+            assertEquals(4096, coldUniform.nonEmptyBlockCount());
+            assertEquals(4096, coldUniform.tickingBlockCount());
+
+            int[] mixedVoxels = new int[4096];
+            java.util.Arrays.fill(mixedVoxels, 1);
+            mixedVoxels[0] = 0;
+            mixedVoxels[17] = 42;
+            mixedVoxels[4095] = 99;
+            LcaSectionBacking coldMixed = LcaSectionBacking.fromRuntimeVoxelsCold(
+                    mixedVoxels, id -> id != 0, id -> id == 42, id -> id == 99);
+            assertTrue(coldMixed.isColdBaseFrameOnly());
+            assertFalse(coldMixed.hasHydratedCompactBaseIndex());
+            assertEquals(4095, coldMixed.nonEmptyBlockCount());
+            assertEquals(1, coldMixed.tickingBlockCount());
+            assertEquals(1, coldMixed.tickingFluidCount());
+            assertTrue(coldMixed.hydrateCompactBaseIndexIfNeeded());
+            assertEquals(0, coldMixed.getStateId(0, 0, 0));
+            assertEquals(42, coldMixed.getStateId(1, 0, 1));
+            assertEquals(99, coldMixed.getStateId(15, 15, 15));
+            assertEquals(1, coldMixed.getStateId(5, 5, 5));
         }
     }
 }

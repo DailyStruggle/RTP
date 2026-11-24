@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.search;
 
+import net.leaf.yaml.search.FuzzySearchEngine;
+import net.leaf.yaml.search.SearchThesaurus;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.text.JsonText;
 import org.jetbrains.annotations.NotNull;

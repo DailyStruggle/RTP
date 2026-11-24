@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.bit.config;
 
+import net.leaf.bit.config.ConfigSnapshot;
+import net.leaf.bit.config.MessageKeyParity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -62,7 +62,7 @@ class DatabaseOptionsSerializationAndSchemaTest {
         db.cacheValue(data);
 
         // Verify connected database reads back the cached row after connect
-        Map<String, io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig> connected = db.connect();
+        Map<String, net.leaf.yaml.RtpYamlConfig> connected = db.connect();
         assertNotNull(connected);
     }
 
@@ -75,7 +75,7 @@ class DatabaseOptionsSerializationAndSchemaTest {
         map.put("enabled", true);
 
         db.cacheValue("regions.yml", map);
-        Map<String, io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig> connected = db.connect();
+        Map<String, net.leaf.yaml.RtpYamlConfig> connected = db.connect();
         assertNotNull(connected);
     }
 
@@ -140,7 +140,7 @@ class DatabaseOptionsSerializationAndSchemaTest {
     void yamlFileDatabase_delete_removesKeyFromSection() throws IOException {
         YamlFileDatabase db = new YamlFileDatabase(tempDir.toFile());
         Files.writeString(tempDir.resolve("test.yml"), "itemToKeep: 1\nitemToDelete: 2\n");
-        Map<String, io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig> connected = db.connect();
+        Map<String, net.leaf.yaml.RtpYamlConfig> connected = db.connect();
 
         db.delete(connected, "test.yml", new AbstractMap.SimpleEntry<>("itemToDelete", 2));
         assertFalse(connected.get("test.yml").contains("itemToDelete"));

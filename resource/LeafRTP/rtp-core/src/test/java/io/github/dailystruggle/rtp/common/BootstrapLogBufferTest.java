@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import net.leaf.yaml.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.server.api.ServerAccessor;

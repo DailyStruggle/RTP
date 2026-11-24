@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.tools.MiniMessageRenderer;
 import io.github.dailystruggle.server.api.BlockPos3i;
 import io.github.dailystruggle.server.api.BookMenuSpec;
 import io.github.dailystruggle.server.api.CallerLocation;
+import io.github.dailystruggle.server.api.ManagedBlockingIoExecutor;
 import io.github.dailystruggle.server.api.MiniMessageColorExpander;
 import io.github.dailystruggle.server.api.PlayerLifecycleHook;
 import io.github.dailystruggle.server.api.PlayerSleepSnapshot;
@@ -22,6 +23,7 @@ import io.github.dailystruggle.server.api.WorldEventHook;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -33,6 +35,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
@@ -106,6 +109,8 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   private final AtomicLong lastRepeatingTickWallNanos = new AtomicLong(Long.MIN_VALUE);
   private volatile double sampledTickIntervalNanos = 50_000_000.0;
   private volatile double sampledWorkDurationNanos = 500_000.0;
+  private final ManagedBlockingIoExecutor blockingIoExecutor =
+      new ManagedBlockingIoExecutor("LeafBukkit");
 
   /** No-arg constructor for subclasses that bind a {@link Plugin} later via {@link #bindPlugin}. */
   protected BukkitPluginServerAccessor() {
@@ -358,10 +363,14 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
                 return noopTaskHandle();
               } catch (RuntimeException ex) {
-                logger().log(Level.WARNING, "Async task dispatch fallback", ex);
+                logger().log(Level.WARNING, "Async task dispatch failed", ex);
+                return noopTaskHandle();
               }
             }
-            task.run();
+            logger()
+                .log(
+                    Level.WARNING,
+                    "Rejected async task submission because plugin is disabled (S-005)");
             return noopTaskHandle();
           }
 
@@ -428,6 +437,21 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
             return BukkitPluginServerAccessor.this.isPrimaryThread();
           }
         });
+  }
+
+  @Override
+  public Executor blockingIoExecutor() {
+    return blockingIoExecutor;
+  }
+
+  @Override
+  public boolean shutdownBlockingIo(Duration timeout) {
+    return blockingIoExecutor.shutdownAndDrain(timeout);
+  }
+
+  /** Re-opens the managed blocking-I/O executor after a prior shutdown on plugin reload. */
+  protected void reopenBlockingIo() {
+    blockingIoExecutor.reopen();
   }
 
   private static TaskHandle noopTaskHandle() {

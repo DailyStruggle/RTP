@@ -41,14 +41,14 @@ to `FabricVersionAdapter`. Each per-version submodule that compiles against Loom
 | `rtp-fabric-v1_20_R1` | 1.20.x | n/a | Inherits SPI default → reflective fallback. May be promoted to typed in a future revision; not required for current production runtimes. |
 | `rtp-fabric-v26_1_R1` | 26.1.x | n/a | Stub adapter; inherits SPI default → reflective fallback (which already handles the obf/unobf 26.1 surface). |
 
-## Why per-version > reflection here
+## Per-version adapters over reflection
 
 - **Compile-time verification.** Loom resolves `BuiltInRegistries.BLOCK`, `Registry.getKey`, `Block.builtInRegistryHolder()`, `Holder.Reference.tags()`, `TagKey.location()`, and `ResourceLocation`/`Identifier`'s namespace/path getters against that version's mappings. Mojang renames break the build, not production.
 - **No method-name drift.** A typed call site needs no Mojang-vs-intermediary fallback, no signature-based last-resort, no `findMethodAny` helper. The three reflective patches added in 48 hours collapse to a single typed loop.
 - **Performance.** Typed iteration replaces ~5 `MethodHandle.invoke` calls per block per `/rtp reload`. Not on the teleport hot path, but a free win.
 - **Reuse of existing SPI infrastructure.** `FabricVersionAdapter` and `FabricVersionAdapterRegistry` already split per-version concerns (chunk tickets, biome lookup, chunk-future dispatch). This is the same pattern, applied to one more registry-walking operation.
 
-## Why reflection still has a role (smaller)
+## Remaining role of reflection
 
 - **Bootstrap ordering.** `FabricServerAccessor.buildBlockTagSnapshot()` can be invoked before `FabricVersionAdapterRegistry` has a registered adapter on certain code paths (mod entry vs. server-started). The reflective fallback covers that gap with no behavioural regression.
 - **Future MC versions before a per-version module ships.** When 1.21.12 (or 1.22) releases before we cut a matching `rtp-fabric-v1_21_R12` module, the reflective walk keeps `#tag` token expansion *working* (degraded, but working) instead of *broken*. Reflection is the safety net, not the primary path on versions we ship a module for.

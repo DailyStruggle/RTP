@@ -10,12 +10,11 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.io.IOException;
@@ -37,7 +36,7 @@ public class SubConfigCmdTest {
     private ConfigParser<PerformanceKeys> performanceConfig;
     private EnumMap<PerformanceKeys, Object> performanceData;
     private ConfigParser lang;
-    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
+    private net.leaf.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -46,8 +45,8 @@ public class SubConfigCmdTest {
 
         Configs configs = ActiveConfigs.get();
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
+        mockDb = mock(net.leaf.yaml.YamlFileCache.class);
+        Field cachedLookupField = net.leaf.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
 
@@ -56,7 +55,7 @@ public class SubConfigCmdTest {
         performanceConfig.reverse_language_mapping = new ConcurrentHashMap<>();
         performanceConfig.name = "performance";
 
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("myClass");
+        Field myClassField = net.leaf.yaml.factory.FactoryValue.class.getDeclaredField("myClass");
         myClassField.setAccessible(true);
         myClassField.set(performanceConfig, PerformanceKeys.class);
 
@@ -423,13 +422,13 @@ public class SubConfigCmdTest {
         // Region file ships `shape: "@config"`; the menu emits a dotted edit
         // `shape.radius`. Without materialization, set("shape.radius", ...)
         // would clobber the scalar with a one-key mapping (the reported bug).
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
-                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+        net.leaf.yaml.RtpYamlConfig yaml =
+                net.leaf.yaml.RtpYamlConfig.parse(
                         "shape: \"@config\"\n");
 
         // Loaded, resolved shape value: a FactoryValue with name + sub-params.
-        io.github.dailystruggle.rtp.common.factory.FactoryValue<?> shapeValue =
-                mock(io.github.dailystruggle.rtp.common.factory.FactoryValue.class);
+        net.leaf.yaml.factory.FactoryValue<?> shapeValue =
+                mock(net.leaf.yaml.factory.FactoryValue.class);
         shapeValue.name = "CIRCLE";
         EnumMap<PerformanceKeys, Object> shapeData = new EnumMap<>(PerformanceKeys.class);
         shapeData.put(PerformanceKeys.viewDistanceSelect, 256L);
@@ -455,8 +454,8 @@ public class SubConfigCmdTest {
 
     @Test
     void materializeSectionParent_noOpWhenParentAlreadySection() {
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
-                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+        net.leaf.yaml.RtpYamlConfig yaml =
+                net.leaf.yaml.RtpYamlConfig.parse(
                         "shape:\n  name: SQUARE\n  radius: 100\n");
 
         ConfigParser regionConfig = mock(ConfigParser.class);

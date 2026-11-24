@@ -13,25 +13,25 @@ import java.util.List;
 public final class ConfigBackups {
 
     public static final int DEFAULT_BAK_RETENTION =
-            io.github.dailystruggle.rtp.common.configuration.ConfigBackups.DEFAULT_BAK_RETENTION;
+            net.leaf.yaml.configuration.ConfigBackups.DEFAULT_BAK_RETENTION;
     public static final String BAK_INFIX =
-            io.github.dailystruggle.rtp.common.configuration.ConfigBackups.BAK_INFIX;
+            net.leaf.yaml.configuration.ConfigBackups.BAK_INFIX;
 
     private ConfigBackups() {}
 
     public static Path backup(File target, int retention) throws IOException {
-        return io.github.dailystruggle.rtp.common.configuration.ConfigBackups.backup(target, retention);
+        return net.leaf.yaml.configuration.ConfigBackups.backup(target, retention);
     }
 
     public static List<Path> listBaks(File target) {
-        return io.github.dailystruggle.rtp.common.configuration.ConfigBackups.listBaks(target);
+        return net.leaf.yaml.configuration.ConfigBackups.listBaks(target);
     }
 
     public static Path restoreLatest(File target) throws IOException {
-        return io.github.dailystruggle.rtp.common.configuration.ConfigBackups.restoreLatest(target);
+        return net.leaf.yaml.configuration.ConfigBackups.restoreLatest(target);
     }
 
     public static int pruneBaks(File target, int keep) {
-        return io.github.dailystruggle.rtp.common.configuration.ConfigBackups.pruneBaks(target, keep);
+        return net.leaf.yaml.configuration.ConfigBackups.pruneBaks(target, keep);
     }
 }

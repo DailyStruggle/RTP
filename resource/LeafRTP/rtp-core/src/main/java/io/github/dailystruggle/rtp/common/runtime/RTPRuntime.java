@@ -1,11 +1,14 @@
 package io.github.dailystruggle.rtp.common.runtime;
 
+import io.github.dailystruggle.anvil.ColumnProbeCoalescer;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.server.api.ServerAccessors;
 
+import java.time.Duration;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -83,10 +86,66 @@ public final class RTPRuntime {
   }
 
   public static void setServerAccessor(RTPServerAccessor accessor) {
+    closeColumnProbeCoalescer();
     serverAccessor = accessor;
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     ServerAccessors.set(accessor);
     ServerAccessors.setLogSink(RTPRuntime::log);
+  }
+
+  /**
+   * Returns the lifecycle-managed blocking-I/O {@link Executor} owned by the active
+   * {@link RTPServerAccessor} (or falls back to {@link #scheduler()}'s async dispatch if installed).
+   *
+   * @throws IllegalStateException if neither a server accessor nor a scheduler is initialized
+   */
+  public static Executor blockingIoExecutor() {
+    RTPServerAccessor accessor = serverAccessor;
+    if (accessor != null) {
+      try {
+        Executor exec = accessor.blockingIoExecutor();
+        if (exec != null) {
+          return exec;
+        }
+      } catch (IllegalStateException ignored) {
+        // Fall through to RTPScheduler if bound separately (e.g. in unit tests).
+      }
+    }
+    RTPScheduler sched = scheduler;
+    if (sched != null) {
+      return task -> sched.runAsync(java.util.Objects.requireNonNull(task, "task"));
+    }
+    return ServerAccessors.blockingIoExecutor()
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "RTPRuntime has no ServerAccessor or RTPScheduler installed for blocking I/O"));
+  }
+
+  /**
+   * Returns the runtime-owned {@link ColumnProbeCoalescer} bound to {@link #blockingIoExecutor()}.
+   * Closed and drained during server/plugin shutdown via {@link #closeColumnProbeCoalescer()}.
+   */
+  public static ColumnProbeCoalescer columnProbeCoalescer() {
+    return io.github.dailystruggle.rtp.api.RTPAPI.columnProbeCoalescer();
+  }
+
+  /**
+   * Closes and drains the runtime-owned {@link ColumnProbeCoalescer} so in-flight region probes
+   * complete before world unload or server shutdown ({@code S-002}, {@code S-005}).
+   */
+  public static void closeColumnProbeCoalescer() {
+    io.github.dailystruggle.rtp.api.RTPAPI.closeColumnProbeCoalescer();
+  }
+
+  /**
+   * Closes the active {@link ColumnProbeCoalescer} and drains the installed server accessor's
+   * blocking-I/O executor within {@code timeout} ({@code S-002}, {@code S-005}).
+   */
+  public static boolean shutdownBlockingIo(Duration timeout) {
+    closeColumnProbeCoalescer();
+    RTPServerAccessor accessor = serverAccessor;
+    return accessor == null || accessor.shutdownBlockingIo(timeout);
   }
 
   public static RTPScheduler scheduler() {

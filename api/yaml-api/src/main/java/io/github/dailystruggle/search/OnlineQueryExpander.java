@@ -10,11 +10,11 @@ import java.util.Set;
 public final class OnlineQueryExpander {
 
     private static final OnlineQueryExpander DEFAULT = new OnlineQueryExpander(
-            io.github.dailystruggle.rtp.common.search.OnlineQueryExpander.defaultInstance());
+            net.leaf.yaml.search.OnlineQueryExpander.defaultInstance());
 
-    private final io.github.dailystruggle.rtp.common.search.OnlineQueryExpander delegate;
+    private final net.leaf.yaml.search.OnlineQueryExpander delegate;
 
-    private OnlineQueryExpander(io.github.dailystruggle.rtp.common.search.OnlineQueryExpander delegate) {
+    private OnlineQueryExpander(net.leaf.yaml.search.OnlineQueryExpander delegate) {
         this.delegate = delegate;
     }
 
@@ -22,7 +22,7 @@ public final class OnlineQueryExpander {
         return DEFAULT;
     }
 
-    io.github.dailystruggle.rtp.common.search.OnlineQueryExpander delegate() {
+    net.leaf.yaml.search.OnlineQueryExpander delegate() {
         return delegate;
     }
 

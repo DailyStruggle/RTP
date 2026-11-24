@@ -13,7 +13,7 @@ import java.util.concurrent.CompletableFuture;
  * cannot be dispatched immediately.
  * Design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
  *
- * <p><strong>Why this is a sibling SPI to {@link NetworkRequestQueue}.</strong>
+ * <p><strong>Sibling SPI to {@link NetworkRequestQueue}.</strong>
  * {@code NetworkRequestQueue} is a strict FIFO whose hot path is BLPOP-style
  * one-at-a-time dequeue. The waitlist needs three operations it cannot model:
  * <ul>

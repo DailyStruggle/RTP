@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import net.leaf.yaml.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

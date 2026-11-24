@@ -81,7 +81,7 @@ The previously reported figure of ~215 to 230 ms of "Process CPU per Attempt" co
    Over 65% to 70% of total JVM CPU time is consumed by Paper's `cpu_chunk_system_ms` threads decompressing, parsing, and lighting the ~81 landing chunks.
 3. **Marginal Server Thread Cost is ~10 to 11 ms per Teleport:**
    When a player is detached, repositioned, synchronized across the network, and re-registered with tracking chunks, Paper spends ~10 to 11 ms of main tick thread time.
-4. **Why Raw Server CPU / Attempt Varies with Rate:**
+4. **Rate Dependence of Raw Server CPU / Attempt:**
    Because idle bots burn ~23.5 seconds of server CPU per 60s window:
    - At 5 TP/s (299 attempts): `(23.5s idle + 2.3s RTP) / 299 = 86.2 ms / attempt`
    - At 20 TP/s (1,199 attempts): `(23.5s idle + 12.7s RTP) / 1,199 = 30.2 ms / attempt`

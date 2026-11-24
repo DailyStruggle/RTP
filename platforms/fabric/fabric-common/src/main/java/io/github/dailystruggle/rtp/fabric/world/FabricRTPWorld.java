@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -160,7 +160,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     /**
-     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * Native bulk block write (ADR-058). Parses each {@link net.leaf.schematics.platform.BlockDelta}
      * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
      * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
      * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
@@ -173,7 +173,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * @return the number of blocks successfully placed
      */
     @Override
-    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    public int setBlocks(java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
         ServerLevel level = world;
         if (level == null || blocks == null || blocks.isEmpty()) return 0;
         net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
@@ -187,7 +187,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         }
         int placed = 0;
         String firstFailedToken = null;
-        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+        for (net.leaf.schematics.platform.BlockDelta delta : blocks) {
             try {
                 net.minecraft.world.level.block.state.BlockState state =
                         net.minecraft.commands.arguments.blocks.BlockStateParser
@@ -245,7 +245,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * attributes every attempt to {@code nullChunk/asyncLoadNull}, which is
      * exactly what we observed in the 2026-05-03 Fabric 1.21.1 smoke test.
      *
-     * <p><b>Why not the non-blocking {@code getChunkFutureMainThread} path?</b>
+     * <p><b>Avoidance of reflective {@code getChunkFutureMainThread}.</b>
      * An earlier revision routed through reflective {@code getChunkFutureMainThread}
      * to avoid blocking the tick thread on generation, but that method's
      * intermediary mapping varies across MC patch releases AND it can resolve
@@ -325,7 +325,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
                                     s -> (RTPRuntime.serverAccessor() != null)
                                             ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                                            : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                                            : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s),
+                                    RTPRuntime.blockingIoExecutor())
                             .thenCompose(result -> {
                                 io.github.dailystruggle.anvil.AnvilChunkView view = result.view();
                                 if (view != null) {
@@ -827,7 +828,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     /**
      * Fabric-only override of {@link RTPWorld#getOrLoadChunk(int, int)}.
      *
-     * <p><b>Why this exists.</b> The world adapter is the canonical owner
+     * <p>The world adapter is the canonical owner
      * of any per-chunk deadline (per the 2026-05-08 architectural decision
      * to remove orchestration-level {@code .orTimeout} from
      * {@code rtp-core}'s {@code QueueTask}/{@code PregenTask}). On Fabric
@@ -927,7 +928,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * {@code thenCombine}/{@code allOf}/{@code whenComplete} to {@code done()}
      * is released and its dependent-stage graph becomes GC-eligible.
      *
-     * <p><b>Why this matters.</b> Prior to 2026-05-08 the {@code done} future
+     * <p>Prior to 2026-05-08 the {@code done} future
      * was deliberately left uncompleted because the Fabric pipeline did not
      * consume it. But {@code rtp-core} is platform-agnostic - any future
      * cross-platform feature attaching to {@code done} would silently leak its
@@ -1009,9 +1010,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * fall back to the live-load path - preserving the
      * {@code .mca}-as-advisory invariant of ADR-016.
      *
-     * <p>S-005: file I/O is dispatched onto
-     * {@link io.github.dailystruggle.anvil.AnvilIoPool} (the same dedicated
-     * blocking-I/O executor Spigot/Folia use), never on the server tick thread.</p>
+     * <p>S-005: file I/O is dispatched onto the server's lifecycle-managed blocking-I/O executor
+     * (the same contract Spigot/Folia use), never on the server tick thread.</p>
      */
     @Override
     public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
@@ -1040,10 +1040,11 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMaxY = maxY;
 
         // Mirrors the Spigot dispatch contract: pending probes for one r.X.Z.mca are
-        // coalesced onto AnvilIoPool and share one open (S-005: no I/O on the caller).
+        // coalesced onto the server's blocking-I/O executor and share one open (S-005).
         // Probe-cache hit / miss metrics are owned by ScanTask's probeOutcome* counters
         // and the anvil module's own diagLog channel - no per-call counter is owned here.
         return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+                RTPRuntime.columnProbeCoalescer(),
                 worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
                 if (err != null) throw err;
@@ -1068,7 +1069,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * <p>Fabric mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}: reads
      * {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease via {@link
      * io.github.dailystruggle.anvil.AnvilRegionSampler#readAllBiomes} on the
-     * {@link io.github.dailystruggle.anvil.AnvilIoPool} and samples each chunk's
+     * server's blocking-I/O executor and samples each chunk's
      * biome at chunk-local {@code (8, y, 8)}.
      * Canonicalises to the same uppercase, {@code minecraft:}-stripped form
      * {@code MemoryShape.addBiomeLocation} stores under. S-005: no tick-thread
@@ -1345,7 +1346,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * thread, equivalent in lifetime to Bukkit's {@code addPluginChunkTicket} /
      * {@code removePluginChunkTicket}.
      *
-     * <p><b>Why not {@link ServerLevel#setChunkForced(int, int, boolean)}?</b>
+     * <p><b>Avoidance of {@link ServerLevel#setChunkForced(int, int, boolean)}.</b>
      * Vanilla {@code setChunkForced} writes through to
      * {@code level.dat#ForcedChunks}, so a watchdog crash mid-pipeline (or any
      * unclean shutdown) leaves RTP-owned forced flags persisted to disk and

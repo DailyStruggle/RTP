@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * Prototype measurement for a period-modulated ("frequency") hazard/usage container, driven by the
  * <b>real shipped L3 selection path</b>.
  *
- * <p>Why the earlier probe was wrong. A generic Haar transform on a terrain-derived bad set, or a
+ * <p>A generic Haar transform on a terrain-derived bad set, or a
  * monotone scan sweep, both destroy the structure that makes this idea work. The L3 primary path
  * (over 95% of servers) does not scan; it emits candidates through {@code selectL3Candidate} -
  * dyadic-stride binning plus a keyed Feistel PRP - which lands roughly 2-4 non-repeating locations

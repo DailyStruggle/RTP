@@ -41,7 +41,7 @@ import java.util.logging.Level;
  * MC 1.21.9+ implementation of {@link FabricVersionAdapter} - covers the
  * post-{@code TicketUse} refactor. See {@code rtp-fabric-ADR-007}.
  *
- * <p><b>Why a separate module from {@code v1_21_R5}:</b> Mojang refactored
+ * <p><b>Module split from {@code v1_21_R5}:</b> Mojang refactored
  * {@code TicketType} in 1.21.9. The previous record shape
  * {@code TicketType(long timeout, boolean persist, TicketUse use)} (1.21.5-1.21.8)
  * was replaced by {@code TicketType(long timeout, int flags)} where

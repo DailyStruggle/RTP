@@ -2,12 +2,14 @@ package io.github.dailystruggle.anvil;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.SoftReference;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
 
@@ -56,8 +58,30 @@ public final class LcaSectionBacking {
     private static final OverlayTable EMPTY_OVERLAY = new OverlayTable();
     private static final ThreadLocal<long[]> THREAD_LOCAL_WORD_MASKS_64 =
             ThreadLocal.withInitial(() -> new long[64]);
-    private static final ThreadLocal<CompactEncodeScratch> THREAD_ENCODE_SCRATCH =
-            ThreadLocal.withInitial(CompactEncodeScratch::new);
+    private static final ThreadLocal<SoftReference<int[]>> THREAD_DECODE_YZX_4096 =
+            new ThreadLocal<>();
+    private static final ThreadLocal<SoftReference<CompactEncodeScratch>> THREAD_ENCODE_SCRATCH =
+            new ThreadLocal<>();
+
+    private static int[] decodeYzx4096Scratch() {
+        SoftReference<int[]> ref = THREAD_DECODE_YZX_4096.get();
+        int[] buf = ref != null ? ref.get() : null;
+        if (buf == null) {
+            buf = new int[BULK_4096_CAPACITY];
+            THREAD_DECODE_YZX_4096.set(new SoftReference<>(buf));
+        }
+        return buf;
+    }
+
+    private static CompactEncodeScratch encodeScratch() {
+        SoftReference<CompactEncodeScratch> ref = THREAD_ENCODE_SCRATCH.get();
+        CompactEncodeScratch scratch = ref != null ? ref.get() : null;
+        if (scratch == null) {
+            scratch = new CompactEncodeScratch();
+            THREAD_ENCODE_SCRATCH.set(new SoftReference<>(scratch));
+        }
+        return scratch;
+    }
 
     /**
      * Consumer for {@code (pos12, stateId19)} pairs or {@code (stateId19, count)} pairs.
@@ -735,6 +759,278 @@ public final class LcaSectionBacking {
         );
     }
 
+    /**
+     * Constructs an immediately hydrated {@link LcaSectionBacking} from a runtime-palette `.lca`
+     * `SectionFrame` slice, parsing {@link CompactBaseIndex} exactly once, computing predicate
+     * counts from it, and dropping the temporary {@code coldSectionFrame} byte array
+     * ({@code baseFrame == null}) so it is never retained alongside {@link CompactBaseIndex}
+     * (`goldleaf-ADR-005` Stage 4, `leafanvil-ADR-006`).
+     */
+    public static LcaSectionBacking fromColdSectionFrameHydrated(
+            byte[] coldSectionFrame,
+            int fallbackUniformStateId,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate
+    ) {
+        IntPredicate nonEmptyPred = nonEmptyPredicate != null ? nonEmptyPredicate : (id -> id != 0);
+        IntPredicate tickBlockPred = tickingBlockPredicate != null ? tickingBlockPredicate : (id -> false);
+        IntPredicate tickFluidPred = tickingFluidPredicate != null ? tickingFluidPredicate : (id -> false);
+        int resolvedUniformId = fallbackUniformStateId;
+
+        if (coldSectionFrame == null || coldSectionFrame.length == 0) {
+            int nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            int tickBlocks = tickBlockPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            int tickFluids = tickFluidPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            return new LcaSectionBacking(
+                    EMPTY_BYTES,
+                    resolvedUniformId,
+                    null,
+                    nonEmpty,
+                    tickBlocks,
+                    tickFluids,
+                    nonEmptyPred,
+                    tickBlockPred,
+                    tickFluidPred,
+                    null
+            );
+        }
+
+        CompactBaseIndex parsed = CompactBaseIndex.tryParse(coldSectionFrame);
+        if (parsed != null) {
+            if (resolvedUniformId == 0) {
+                resolvedUniformId = parsed.majorityStateId;
+            }
+            int ne = 0;
+            int tb = 0;
+            int tf = 0;
+            int[] pal = parsed.paletteStateIds;
+            int[] counts = parsed.paletteCounts;
+            for (int i = 0; i < pal.length; i++) {
+                int c = counts[i];
+                if (c > 0) {
+                    int st = pal[i];
+                    if (nonEmptyPred.test(st)) ne += c;
+                    if (tickBlockPred.test(st)) tb += c;
+                    if (tickFluidPred.test(st)) tf += c;
+                }
+            }
+            if (pal.length <= 1) {
+                int singleId = pal.length == 1 ? pal[0] : resolvedUniformId;
+                return new LcaSectionBacking(
+                        EMPTY_BYTES,
+                        singleId,
+                        null,
+                        ne,
+                        tb,
+                        tf,
+                        nonEmptyPred,
+                        tickBlockPred,
+                        tickFluidPred,
+                        null
+                );
+            }
+            return new LcaSectionBacking(
+                    parsed,
+                    resolvedUniformId,
+                    ne,
+                    tb,
+                    tf,
+                    nonEmptyPred,
+                    tickBlockPred,
+                    tickFluidPred
+            );
+        }
+
+        int nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        int tickBlocks = tickBlockPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        int tickFluids = tickFluidPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        return new LcaSectionBacking(
+                coldSectionFrame,
+                resolvedUniformId,
+                null,
+                nonEmpty,
+                tickBlocks,
+                tickFluids,
+                nonEmptyPred,
+                tickBlockPred,
+                tickFluidPred,
+                null
+        );
+    }
+
+    /**
+     * Parses a compressed {@code .lca} {@code SectionFrame} once into a hydrated {@link CompactBaseIndex}
+     * while retaining {@code coldSectionFrame} as {@code baseFrame}. Callers can immediately run
+     * block-counting / ticking-coordinate extraction in a single pass and then invoke
+     * {@link #evictCompactBaseIndexToColdBaseFrame()} in O(1) with zero re-encoding to park the
+     * section in {@code COLD_LCA} residency ({@code goldleaf-ADR-005} Stage 4, {@code leafanvil-ADR-006}).
+     */
+    public static LcaSectionBacking fromColdSectionFrameWithBaseAndIndex(
+            byte[] coldSectionFrame,
+            int fallbackUniformStateId,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate
+    ) {
+        IntPredicate nonEmptyPred = nonEmptyPredicate != null ? nonEmptyPredicate : (id -> id != 0);
+        IntPredicate tickBlockPred = tickingBlockPredicate != null ? tickingBlockPredicate : (id -> false);
+        IntPredicate tickFluidPred = tickingFluidPredicate != null ? tickingFluidPredicate : (id -> false);
+        int resolvedUniformId = fallbackUniformStateId;
+
+        if (coldSectionFrame == null || coldSectionFrame.length == 0) {
+            int nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            int tickBlocks = tickBlockPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            int tickFluids = tickFluidPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            return new LcaSectionBacking(
+                    EMPTY_BYTES,
+                    resolvedUniformId,
+                    null,
+                    nonEmpty,
+                    tickBlocks,
+                    tickFluids,
+                    nonEmptyPred,
+                    tickBlockPred,
+                    tickFluidPred,
+                    null
+            );
+        }
+
+        CompactBaseIndex parsed = CompactBaseIndex.tryParse(coldSectionFrame);
+        if (parsed != null) {
+            if (resolvedUniformId == 0) {
+                resolvedUniformId = parsed.majorityStateId;
+            }
+            int ne = 0;
+            int tb = 0;
+            int tf = 0;
+            int[] pal = parsed.paletteStateIds;
+            int[] counts = parsed.paletteCounts;
+            for (int i = 0; i < pal.length; i++) {
+                int c = counts[i];
+                if (c > 0) {
+                    int st = pal[i];
+                    if (nonEmptyPred.test(st)) ne += c;
+                    if (tickBlockPred.test(st)) tb += c;
+                    if (tickFluidPred.test(st)) tf += c;
+                }
+            }
+            if (pal.length <= 1) {
+                int singleId = pal.length == 1 ? pal[0] : resolvedUniformId;
+                return new LcaSectionBacking(
+                        EMPTY_BYTES,
+                        singleId,
+                        null,
+                        ne,
+                        tb,
+                        tf,
+                        nonEmptyPred,
+                        tickBlockPred,
+                        tickFluidPred,
+                        null
+                );
+            }
+            return new LcaSectionBacking(
+                    coldSectionFrame,
+                    resolvedUniformId,
+                    parsed,
+                    ne,
+                    tb,
+                    tf,
+                    nonEmptyPred,
+                    tickBlockPred,
+                    tickFluidPred,
+                    null
+            );
+        }
+
+        int nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        int tickBlocks = tickBlockPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        int tickFluids = tickFluidPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+        return new LcaSectionBacking(
+                coldSectionFrame,
+                resolvedUniformId,
+                null,
+                nonEmpty,
+                tickBlocks,
+                tickFluids,
+                nonEmptyPred,
+                tickBlockPred,
+                tickFluidPred,
+                null
+        );
+    }
+
+    /**
+     * Encodes a 4,096-voxel YZX runtime block-state array directly into a cold {@code UNIFORM}
+     * ({@code 0 B}) or {@code COLD_LCA} (compressed {@code baseFrame} only, {@code compactIndex == null})
+     * {@link LcaSectionBacking} suitable for off-tick compaction of {@code HOT_MUTABLE} or freshly
+     * generated sections ({@code goldleaf-ADR-005} Stage 4, {@code leafanvil-ADR-006}).
+     */
+    public static LcaSectionBacking fromRuntimeVoxelsCold(
+            int[] voxels4096,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate
+    ) {
+        if (voxels4096 == null || voxels4096.length != BULK_4096_CAPACITY) {
+            throw new IllegalArgumentException(
+                    "voxels4096 must have length " + BULK_4096_CAPACITY
+                            + ", got " + (voxels4096 == null ? "null" : voxels4096.length));
+        }
+        IntPredicate nonEmptyPred = nonEmptyPredicate != null ? nonEmptyPredicate : (id -> id != 0);
+        IntPredicate tickBlockPred = tickingBlockPredicate != null ? tickingBlockPredicate : (id -> false);
+        IntPredicate tickFluidPred = tickingFluidPredicate != null ? tickingFluidPredicate : (id -> false);
+
+        CompactBaseIndex index = CompactBaseIndex.fromVoxelsSinglePass(voxels4096, 15, 0);
+        if (index == null) {
+            int uniformId = Math.max(0, voxels4096[0]);
+            int ne = nonEmptyPred.test(uniformId) ? BULK_4096_CAPACITY : 0;
+            int tb = tickBlockPred.test(uniformId) ? BULK_4096_CAPACITY : 0;
+            int tf = tickFluidPred.test(uniformId) ? BULK_4096_CAPACITY : 0;
+            return new LcaSectionBacking(
+                    EMPTY_BYTES,
+                    uniformId,
+                    null,
+                    ne,
+                    tb,
+                    tf,
+                    nonEmptyPred,
+                    tickBlockPred,
+                    tickFluidPred,
+                    null
+            );
+        }
+
+        int ne = 0;
+        int tb = 0;
+        int tf = 0;
+        int[] pal = index.paletteStateIds;
+        int[] counts = index.paletteCounts;
+        for (int i = 0; i < pal.length; i++) {
+            int c = counts[i];
+            if (c > 0) {
+                int st = pal[i];
+                if (nonEmptyPred.test(st)) ne += c;
+                if (tickBlockPred.test(st)) tb += c;
+                if (tickFluidPred.test(st)) tf += c;
+            }
+        }
+        byte[] coldBase = index.getOrEncodeBaseFrame();
+        return new LcaSectionBacking(
+                coldBase,
+                index.majorityStateId,
+                null,
+                ne,
+                tb,
+                tf,
+                nonEmptyPred,
+                tickBlockPred,
+                tickFluidPred,
+                null
+        );
+    }
+
     private static int peekSectionFrameDominantStateId(byte[] frame) {
         if (frame == null || frame.length < 3) {
             return -1;
@@ -1227,6 +1523,51 @@ public final class LcaSectionBacking {
     }
 
     /**
+     * Emits every 12-bit YZX coordinate {@code pos12} whose current block state ID satisfies
+     * {@code stateIdPredicate}. For clean hydrated sections where the majority state does not
+     * match (e.g. random-ticking block scans on air/stone/deepslate sections), walks only the
+     * {@link CompactBaseIndex} minority bitmasks without materializing a 4,096-int array.
+     */
+    public void forEachMatchingCoordinate(IntPredicate stateIdPredicate, IntConsumer pos12Consumer) {
+        Objects.requireNonNull(stateIdPredicate, "stateIdPredicate");
+        Objects.requireNonNull(pos12Consumer, "pos12Consumer");
+        OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
+        SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        OverlayTable frozen = snap.frozenOverlay;
+        int activeDirty = active != null ? active.dirtyCount() : 0;
+        int frozenDirty = frozen != null ? frozen.dirtyCount() : 0;
+
+        if (snap.isUniformBase() && activeDirty == 0 && frozenDirty == 0) {
+            if (stateIdPredicate.test(Math.max(0, snap.uniformStateId))) {
+                for (int pos12 = 0; pos12 < BULK_4096_CAPACITY; pos12++) {
+                    pos12Consumer.accept(pos12);
+                }
+            }
+            return;
+        }
+
+        CompactBaseIndex idx = snap.compactIndex;
+        if (idx != null && activeDirty == 0 && frozenDirty == 0) {
+            idx.forEachMatchingCoordinate(stateIdPredicate, pos12Consumer);
+            return;
+        }
+
+        int[] voxels = materializeStateIdsInternal(null, null);
+        int lastId = -1;
+        boolean lastMatch = false;
+        for (int pos12 = 0; pos12 < BULK_4096_CAPACITY; pos12++) {
+            int id = voxels[pos12];
+            if (id != lastId) {
+                lastId = id;
+                lastMatch = stateIdPredicate.test(id);
+            }
+            if (lastMatch) {
+                pos12Consumer.accept(pos12);
+            }
+        }
+    }
+
+    /**
      * Evaluates {@code stateIdPredicate} against the distinct block state IDs present in this
      * section in $O(|P| + |\text{dirty}|)$ time (`1..20` palette entries) without materializing
      * 4,096 voxels when backed by {@link CompactBaseIndex}.
@@ -1572,7 +1913,7 @@ public final class LcaSectionBacking {
         }
 
         int[] voxels = materializeStateIdsInternal(null, null);
-        CompactEncodeScratch scratch = THREAD_ENCODE_SCRATCH.get();
+        CompactEncodeScratch scratch = encodeScratch();
         int epoch = ++scratch.currentEpoch;
         if (epoch <= 0) {
             Arrays.fill(scratch.hashSlotEpoch, 0);
@@ -1672,7 +2013,7 @@ public final class LcaSectionBacking {
         }
 
         int[] voxels = materializeStateIdsInternal(null, null);
-        CompactEncodeScratch scratch = THREAD_ENCODE_SCRATCH.get();
+        CompactEncodeScratch scratch = encodeScratch();
         int epoch = ++scratch.currentEpoch;
         if (epoch <= 0) {
             Arrays.fill(scratch.hashSlotEpoch, 0);
@@ -2405,7 +2746,7 @@ public final class LcaSectionBacking {
             if (voxels4096 == null || voxels4096.length < BULK_4096_CAPACITY) {
                 return null;
             }
-            CompactEncodeScratch scratch = THREAD_ENCODE_SCRATCH.get();
+            CompactEncodeScratch scratch = encodeScratch();
             int epoch = ++scratch.currentEpoch;
             if (epoch <= 0) {
                 Arrays.fill(scratch.hashSlotEpoch, 0);
@@ -2802,7 +3143,7 @@ public final class LcaSectionBacking {
                 }
                 paletteStateIds[m] = stateId;
             }
-            int[] yzxOrd = THREAD_ENCODE_SCRATCH.get().nextPos;
+            int[] yzxOrd = encodeScratch().nextPos;
             int endCursor = LcaSectionCodec.decodeSectionBlockContainersV2(
                     baseFrame, cursor, len, paletteLen, yzxOrd);
             if (endCursor != len) {
@@ -2910,7 +3251,7 @@ public final class LcaSectionBacking {
             if (baseFrame == null || baseFrame.length < 3 || baseFrame.length == BULK_4096_CAPACITY) {
                 return null;
             }
-            int[] yzxOrd = THREAD_ENCODE_SCRATCH.get().nextPos;
+            int[] yzxOrd = decodeYzx4096Scratch();
             byte[] lightBox = new byte[1];
             int[] paletteStateIds = LcaSectionCodec.decodeSectionFrameBlockOrdinals(
                     baseFrame, baseFrame.length, yzxOrd, lightBox);
@@ -2930,7 +3271,7 @@ public final class LcaSectionBacking {
                 this.lazyBaseFrame = EMPTY_BYTES;
                 return EMPTY_BYTES;
             }
-            CompactEncodeScratch scratch = THREAD_ENCODE_SCRATCH.get();
+            CompactEncodeScratch scratch = encodeScratch();
             int[] yzxOrd = scratch.nextPos;
             Arrays.fill(yzxOrd, 0, BULK_4096_CAPACITY, 0);
 
@@ -3175,6 +3516,66 @@ public final class LcaSectionBacking {
                     voxMask &= (voxMask - 1L);
                     int ord = readOrdinalAtRank(rank++);
                     consumer.accept(basePos | b, this.paletteStateIds[ord]);
+                }
+            }
+        }
+
+        void forEachMatchingCoordinate(IntPredicate stateIdPredicate, IntConsumer pos12Consumer) {
+            int palLen = this.paletteStateIds.length;
+            boolean[] matches = new boolean[palLen];
+            boolean anyMatch = false;
+            for (int i = 0; i < palLen; i++) {
+                if (this.paletteCounts[i] > 0 && stateIdPredicate.test(this.paletteStateIds[i])) {
+                    matches[i] = true;
+                    anyMatch = true;
+                }
+            }
+            if (!anyMatch) {
+                return;
+            }
+            if (!matches[0]) {
+                long wordMask = this.nonUniformWordMask64;
+                int slot = 0;
+                while (wordMask != 0L) {
+                    int w = Long.numberOfTrailingZeros(wordMask);
+                    wordMask &= (wordMask - 1L);
+                    int basePos = w << 6;
+                    long voxMask = this.minorityBitmasks[slot];
+                    int rank = this.wordRankOffsets[slot] & 0xFFFF;
+                    slot++;
+                    while (voxMask != 0L) {
+                        int b = Long.numberOfTrailingZeros(voxMask);
+                        voxMask &= (voxMask - 1L);
+                        int ord = readOrdinalAtRank(rank++);
+                        if (matches[ord]) {
+                            pos12Consumer.accept(basePos | b);
+                        }
+                    }
+                }
+                return;
+            }
+            long wordMask = this.nonUniformWordMask64;
+            int slot = 0;
+            for (int w = 0; w < 64; w++) {
+                int basePos = w << 6;
+                if (((wordMask >>> w) & 1L) == 0L) {
+                    for (int b = 0; b < 64; b++) {
+                        pos12Consumer.accept(basePos | b);
+                    }
+                } else {
+                    long voxMask = this.minorityBitmasks[slot];
+                    int rank = this.wordRankOffsets[slot] & 0xFFFF;
+                    slot++;
+                    for (int b = 0; b < 64; b++) {
+                        if (((voxMask >>> b) & 1L) == 0L) {
+                            pos12Consumer.accept(basePos | b);
+                        } else {
+                            int ord = readOrdinalAtRank(rank++);
+                            if (matches[ord]) {
+                                pos12Consumer.accept(basePos | b);
+                            }
+                        }
+                    }
                 }
             }
         }

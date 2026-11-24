@@ -93,7 +93,7 @@ public final class RTPTestSetup {
                 ActiveConfigs.get().fileDatabase.disconnect(java.util.Collections.emptyMap());
             }
             if (ActiveConfigs.get().configParserMap != null) {
-                for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : ActiveConfigs.get().configParserMap.values()) {
+                for (net.leaf.yaml.configuration.ConfigParser<?> cp : ActiveConfigs.get().configParserMap.values()) {
                     if (cp != null && cp.fileDatabase != null && cp.fileDatabase != ActiveConfigs.get().fileDatabase) {
                         cp.fileDatabase.processQueries(Long.MAX_VALUE);
                         cp.fileDatabase.disconnect(java.util.Collections.emptyMap());
@@ -101,14 +101,14 @@ public final class RTPTestSetup {
                 }
             }
             if (ActiveConfigs.get().multiConfigParserMap != null) {
-                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : ActiveConfigs.get().multiConfigParserMap.values()) {
+                for (net.leaf.yaml.configuration.MultiConfigParser<?> mcp : ActiveConfigs.get().multiConfigParserMap.values()) {
                     if (mcp != null) {
                         if (mcp.fileDatabase != null) {
                             mcp.fileDatabase.processQueries(Long.MAX_VALUE);
                             mcp.fileDatabase.disconnect(java.util.Collections.emptyMap());
                         }
                         if (mcp.configParserFactory != null && mcp.configParserFactory.map != null) {
-                            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : mcp.configParserFactory.map.values()) {
+                            for (net.leaf.yaml.configuration.ConfigParser<?> cp : mcp.configParserFactory.map.values()) {
                                 if (cp != null && cp.fileDatabase != null && cp.fileDatabase != mcp.fileDatabase) {
                                     cp.fileDatabase.processQueries(Long.MAX_VALUE);
                                     cp.fileDatabase.disconnect(java.util.Collections.emptyMap());

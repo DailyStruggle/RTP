@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import java.io.File;
 import java.nio.file.Files;
@@ -56,7 +56,7 @@ class ActionConfigLoaderCoverageTest {
   @Test
   @DisplayName("Null YAML root yields default definition")
   void nullRootDefaults() {
-    ActionDefinition def = ActionConfigLoader.parseDefinition("cov", (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) null);
+    ActionDefinition def = ActionConfigLoader.parseDefinition("cov", (net.leaf.yaml.RtpYamlSection) null);
     assertEquals("cov", def.alias());
     assertEquals("rtp.action.cov", def.permission());
     assertSame(ActionDefinition.PlacementSpec.DEFAULT, def.placement());
@@ -67,7 +67,7 @@ class ActionConfigLoaderCoverageTest {
   @DisplayName("Null ConfigParser delegates to default definition")
   void nullConfigParserDefaults() {
     ActionDefinition def = ActionConfigLoader.parseDefinition("cov",
-        (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null);
+        (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys>) null);
     assertEquals("cov", def.id());
     assertTrue(def.triggers().isEmpty());
   }
