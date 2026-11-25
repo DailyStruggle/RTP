@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -491,6 +492,14 @@ class LcaV3FormatAndBenchmarkTest {
             }
         }
         assertTrue(!coords.isEmpty(), "Expected generated chunks in benchmark fixture");
+        if (coords.size() < 64) {
+            expandSingleChunkFixture(coords, roots, 64);
+            rawNbtList.clear();
+            for (LinkedHashMap<String, Object> root : roots) {
+                rawNbtList.add(Nbt.writeNamedRoot("", root));
+            }
+            label = label + " (expanded 64-chunk fixture)";
+        }
         int n = coords.size();
         int dataVersion = AnvilReader.getDataVersion(roots.get(0));
 
@@ -810,6 +819,14 @@ class LcaV3FormatAndBenchmarkTest {
                         rawNbtList.add(Nbt.writeNamedRoot("", e.root));
                     }
                 }
+            }
+        }
+        assertTrue(!coords.isEmpty(), "Expected generated chunks in benchmark fixture");
+        if (coords.size() < 64) {
+            expandSingleChunkFixture(coords, roots, 64);
+            rawNbtList.clear();
+            for (LinkedHashMap<String, Object> root : roots) {
+                rawNbtList.add(Nbt.writeNamedRoot("", root));
             }
         }
         int n = coords.size();
@@ -1157,5 +1174,216 @@ class LcaV3FormatAndBenchmarkTest {
         };
         assertThrows(CorruptRegionEntryException.class, () -> LcaV3Codec.decodeGrayBitplaneBlocks(
                 outOfRangeGray, 0, outOfRangeGray.length, 3, LcaSectionCodec.CURVE_YZX, -1L, new long[256], 4));
+    }
+
+    @Test
+    @DisplayName("Standalone 1_21_R1 expanded 64-chunk fallback satisfies v3-Default Mode B size gate")
+    void standaloneFallback64ChunkFixtureBeatsMcaSize() throws Exception {
+        byte[] sourceMca = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+        AnvilReader.ChunkEntry origin = AnvilReader.readChunkEntry(sourceMca, 0, 0);
+        assertNotNull(origin);
+        List<int[]> coords = new ArrayList<>();
+        List<LinkedHashMap<String, Object>> roots = new ArrayList<>();
+        coords.add(new int[] {0, 0});
+        roots.add(origin.root);
+        expandSingleChunkFixture(coords, roots, 64);
+        assertEquals(64, coords.size());
+
+        List<byte[]> rawNbtList = new ArrayList<>(64);
+        for (LinkedHashMap<String, Object> root : roots) {
+            rawNbtList.add(Nbt.writeNamedRoot("", root));
+        }
+        int dataVersion = AnvilReader.getDataVersion(roots.get(0));
+        byte[] benchMca = buildMcaFromRawNbt(coords, rawNbtList);
+        LcaRegionWriter.LcaLiveArchive v3DefBArch = createPopulatedArchive(
+                coords, roots, dataVersion, 1, LcaRegionReader.LCA_FORMAT_VERSION_V3, LcaV3Codec.DEFAULT_V3_FEATURES);
+        byte[] v3DefBBytes = v3DefBArch.toByteArray();
+
+        assertTrue(
+                v3DefBBytes.length < benchMca.length,
+                "Standalone 64-chunk fallback v3-Default Mode B (" + v3DefBBytes.length
+                        + " B) must be smaller than vanilla .mca (" + benchMca.length + " B)");
+    }
+
+    private static final String[] FALLBACK_TERRAIN_STATES = {
+        "minecraft:air",
+        "minecraft:deepslate",
+        "minecraft:stone",
+        "minecraft:tuff",
+        "minecraft:granite",
+        "minecraft:diorite",
+        "minecraft:andesite",
+        "minecraft:gravel",
+        "minecraft:dirt",
+        "minecraft:grass_block",
+        "minecraft:coal_ore",
+        "minecraft:iron_ore",
+        "minecraft:copper_ore",
+        "minecraft:gold_ore",
+        "minecraft:redstone_ore",
+        "minecraft:lapis_ore",
+        "minecraft:cobblestone"
+    };
+
+    /**
+     * Deterministically expands a single-chunk template into {@code targetCount} distinct terrain
+     * chunks (up to 1,024) so standalone SDK exports without the 8.6 MiB Overworld fixture exercise
+     * realistic multi-chunk regions.
+     */
+    static void expandSingleChunkFixture(
+            List<int[]> coords, List<LinkedHashMap<String, Object>> chunkRoots, int targetCount) {
+        if (chunkRoots.isEmpty()) {
+            throw new IllegalArgumentException("Template chunk list must not be empty");
+        }
+        int count = Math.min(1024, Math.max(1, targetCount));
+        int gridWidth = count <= 64 ? 8 : 32;
+        LinkedHashMap<String, Object> template = chunkRoots.get(0);
+        coords.clear();
+        chunkRoots.clear();
+
+        for (int idx = 0; idx < count; idx++) {
+            int rx = idx % gridWidth;
+            int rz = idx / gridWidth;
+            LinkedHashMap<String, Object> copy = new LinkedHashMap<>(template);
+            copy.put("xPos", rx);
+            copy.put("zPos", rz);
+            copy.put("LastUpdate", 1700000000L + idx * 37L);
+            copy.put("InhabitedTime", 120L + idx * 19L);
+
+            Object hmObj = template.get("Heightmaps");
+            if (hmObj instanceof Map<?, ?> hmMap) {
+                LinkedHashMap<String, Object> newHm = new LinkedHashMap<>();
+                int keyIdx = 0;
+                for (Map.Entry<?, ?> entry : hmMap.entrySet()) {
+                    String k = String.valueOf(entry.getKey());
+                    Object v = entry.getValue();
+                    if (v instanceof long[] arr) {
+                        long[] modArr = new long[arr.length];
+                        for (int w = 0; w < arr.length; w++) {
+                            long noise = mix64(
+                                    (idx + 1L) * 0x9E3779B97F4A7C15L ^ (keyIdx * 64L + w) * 0xBF58476D1CE4E5B9L);
+                            modArr[w] = arr[w] ^ (noise & 0x001F_0F87_C3E1_F078L);
+                        }
+                        newHm.put(k, modArr);
+                    } else {
+                        newHm.put(k, v);
+                    }
+                    keyIdx++;
+                }
+                copy.put("Heightmaps", newHm);
+            }
+
+            Object secsObj = template.get("sections");
+            if (secsObj instanceof Nbt.NbtList origSecs) {
+                List<Object> newSecItems = new ArrayList<>(origSecs.items.size());
+                for (int s = 0; s < origSecs.items.size(); s++) {
+                    Object item = origSecs.items.get(s);
+                    if (!(item instanceof Map<?, ?> secMap)) {
+                        newSecItems.add(item);
+                        continue;
+                    }
+                    LinkedHashMap<String, Object> secCopy = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> e : secMap.entrySet()) {
+                        secCopy.put(String.valueOf(e.getKey()), e.getValue());
+                    }
+                    int secY = secCopy.get("Y") instanceof Number n ? n.intValue() : (s - 4);
+                    if (secY >= -4 && secY <= 11) {
+                        secCopy.put("block_states", buildSynthesizedTerrainBlockStates(idx, secY));
+                        byte[] sky = new byte[2048];
+                        if (secY >= 4) {
+                            Arrays.fill(sky, (byte) 0xFF);
+                        }
+                        secCopy.put("SkyLight", sky);
+                        secCopy.remove("BlockLight");
+                    }
+                    newSecItems.add(secCopy);
+                }
+                copy.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, newSecItems));
+            }
+
+            coords.add(new int[] {rx, rz});
+            chunkRoots.add(copy);
+        }
+    }
+
+    private static LinkedHashMap<String, Object> buildSynthesizedTerrainBlockStates(int chunkIdx, int secY) {
+        int palSize = FALLBACK_TERRAIN_STATES.length;
+        int[] order = new int[palSize];
+        for (int i = 0; i < palSize; i++) {
+            order[i] = i;
+        }
+        long seed = mix64((chunkIdx + 1L) * 0x9E3779B97F4A7C15L ^ (secY + 16L) * 0xBF58476D1CE4E5B9L);
+        for (int i = palSize - 1; i > 0; i--) {
+            seed = mix64(seed + i);
+            int j = (int) Long.remainderUnsigned(seed, i + 1);
+            int tmp = order[i];
+            order[i] = order[j];
+            order[j] = tmp;
+        }
+        String dominantName = secY < 0 ? "minecraft:deepslate" : "minecraft:stone";
+        int domLocalIdx = 0;
+        for (int i = 0; i < palSize; i++) {
+            if (FALLBACK_TERRAIN_STATES[order[i]].equals(dominantName)) {
+                domLocalIdx = i;
+                break;
+            }
+        }
+        if (domLocalIdx == 0) {
+            int swapWith = 1 + (Math.abs(chunkIdx * 5 + secY * 3) % (palSize - 1));
+            int tmp = order[0];
+            order[0] = order[swapWith];
+            order[swapWith] = tmp;
+            domLocalIdx = swapWith;
+        }
+
+        List<Object> paletteList = new ArrayList<>(palSize);
+        for (int i = 0; i < palSize; i++) {
+            LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
+            entry.put("Name", FALLBACK_TERRAIN_STATES[order[i]]);
+            paletteList.add(entry);
+        }
+
+        int[] voxels = new int[4096];
+        Arrays.fill(voxels, domLocalIdx);
+        int cursor = (int) Long.remainderUnsigned(seed, 97) + 16;
+        for (int round = 0; round < 2; round++) {
+            for (int p = 0; p < palSize; p++) {
+                if (p == domLocalIdx) {
+                    continue;
+                }
+                seed = mix64(seed + p * 31L + round * 131L);
+                int gap = 36 + (int) Long.remainderUnsigned(seed, 72);
+                int runLen = 10 + (int) Long.remainderUnsigned(seed >>> 16, 7);
+                cursor += gap;
+                if (cursor + runLen >= 4096) {
+                    cursor = (cursor + runLen) & 4095;
+                }
+                if (cursor + runLen <= 4096) {
+                    Arrays.fill(voxels, cursor, cursor + runLen, p);
+                    cursor += runLen;
+                }
+            }
+        }
+
+        long[] packed = new long[342];
+        int vIdx = 0;
+        for (int w = 0; w < packed.length && vIdx < 4096; w++) {
+            long word = 0L;
+            for (int slot = 0; slot < 12 && vIdx < 4096; slot++, vIdx++) {
+                word |= ((long) (voxels[vIdx] & 0x1F)) << (slot * 5);
+            }
+            packed[w] = word;
+        }
+
+        LinkedHashMap<String, Object> bs = new LinkedHashMap<>();
+        bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, paletteList));
+        bs.put("data", packed);
+        return bs;
+    }
+
+    private static long mix64(long z) {
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
     }
 }

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -48,18 +50,64 @@ class HddBufferedLinearVsMcaBenchmarkTest {
 
     private record ChunkSample(int rx, int rz, byte[] rawNbt) {}
 
-    private static Path resolveOverworldFixture() {
-        Path[] candidates = new Path[] {
-            Path.of("resource/LeafRTP/rtp-core/src/test/resources/fixtures/regions/overworld_mountain_r.0.0.mca"),
-            Path.of("../../resource/LeafRTP/rtp-core/src/test/resources/fixtures/regions/overworld_mountain_r.0.0.mca"),
+    private static final class FixtureData {
+        final byte[] mcaBytes;
+        final boolean fullRealRegion;
+
+        FixtureData(byte[] mcaBytes, boolean fullRealRegion) {
+            this.mcaBytes = mcaBytes;
+            this.fullRealRegion = fullRealRegion;
+        }
+    }
+
+    private static FixtureData loadOverworldFixture(boolean forceStandaloneFallback) throws IOException {
+        if (!forceStandaloneFallback) {
+            Path[] fullCandidates = new Path[] {
+                Path.of("resource/LeafRTP/rtp-core/src/test/resources/fixtures/regions/overworld_mountain_r.0.0.mca"),
+                Path.of("../../resource/LeafRTP/rtp-core/src/test/resources/fixtures/regions/overworld_mountain_r.0.0.mca"),
+            };
+            for (Path p : fullCandidates) {
+                if (Files.isRegularFile(p)) {
+                    return new FixtureData(Files.readAllBytes(p.toAbsolutePath().normalize()), true);
+                }
+            }
+        }
+        Path[] fallbackCandidates = new Path[] {
+            Path.of("src/test/resources/anvil/real/1_21_R1/r.0.0.mca"),
+            Path.of("api/anvil-api/src/test/resources/anvil/real/1_21_R1/r.0.0.mca"),
             Path.of("src/test/resources/anvil/real/26_3_R1/r.0.0.mca"),
         };
-        for (Path p : candidates) {
+        for (Path p : fallbackCandidates) {
             if (Files.isRegularFile(p)) {
-                return p.toAbsolutePath().normalize();
+                return new FixtureData(Files.readAllBytes(p.toAbsolutePath().normalize()), false);
+            }
+        }
+        try (InputStream is = HddBufferedLinearVsMcaBenchmarkTest.class.getResourceAsStream("/anvil/real/1_21_R1/r.0.0.mca")) {
+            if (is != null) {
+                return new FixtureData(is.readAllBytes(), false);
             }
         }
         throw new IllegalStateException("Could not locate real .mca benchmark fixture from " + Path.of("").toAbsolutePath());
+    }
+
+    private static List<ChunkSample> loadOrExpandChunks(FixtureData fixture, int targetCount) throws IOException {
+        List<ChunkSample> extracted = extractChunksFromMca(fixture.mcaBytes, targetCount);
+        if (extracted.isEmpty() || extracted.size() >= targetCount) {
+            return extracted;
+        }
+        LinkedHashMap<String, Object> template = Nbt.readRootCompound(extracted.get(0).rawNbt);
+        List<int[]> coords = new ArrayList<>(targetCount);
+        List<LinkedHashMap<String, Object>> roots = new ArrayList<>(targetCount);
+        coords.add(new int[] {extracted.get(0).rx, extracted.get(0).rz});
+        roots.add(template);
+        LcaV3FormatAndBenchmarkTest.expandSingleChunkFixture(coords, roots, targetCount);
+
+        List<ChunkSample> expanded = new ArrayList<>(coords.size());
+        for (int i = 0; i < coords.size(); i++) {
+            int[] c = coords.get(i);
+            expanded.add(new ChunkSample(c[0], c[1], Nbt.writeNamedRoot("", roots.get(i))));
+        }
+        return expanded;
     }
 
     private static List<ChunkSample> extractChunksFromMca(byte[] mcaBytes, int limit) throws IOException {
@@ -83,11 +131,18 @@ class HddBufferedLinearVsMcaBenchmarkTest {
                         | ((mcaBytes[sectorOff + 2] & 0xFF) << 8)
                         | (mcaBytes[sectorOff + 3] & 0xFF);
                 int compType = mcaBytes[sectorOff + 4] & 0xFF;
-                if (compType != 2 || len <= 1 || sectorOff + 4 + len > mcaBytes.length) {
+                if (len <= 1 || sectorOff + 4 + len > mcaBytes.length) {
                     continue;
                 }
-                byte[] inflated = inflateZlib(mcaBytes, sectorOff + 5, len - 1);
-                out.add(new ChunkSample(rx, rz, inflated));
+                if (compType == 2) {
+                    byte[] inflated = inflateZlib(mcaBytes, sectorOff + 5, len - 1);
+                    out.add(new ChunkSample(rx, rz, inflated));
+                } else {
+                    AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(mcaBytes, rx, rz);
+                    if (entry != null && entry.root != null) {
+                        out.add(new ChunkSample(rx, rz, Nbt.writeNamedRoot("", entry.root)));
+                    }
+                }
             }
         }
         return out;
@@ -411,15 +466,18 @@ class HddBufferedLinearVsMcaBenchmarkTest {
     @Test
     @DisplayName("Measure HDD write & cold-read latency across .mca, .b_linear v3, current .lca, and sequential .lca")
     void measureHddPerformance(@TempDir Path tempDir) throws Exception {
+        runMeasureHddPerformance(tempDir, false);
+    }
+
+    private void runMeasureHddPerformance(Path tempDir, boolean forceStandaloneFallback) throws Exception {
         String customDirProp = System.getProperty("hdd.bench.dir", System.getenv("HDD_BENCH_DIR"));
-        boolean realHddMode = customDirProp != null && !customDirProp.isBlank();
+        boolean realHddMode = !forceStandaloneFallback && customDirProp != null && !customDirProp.isBlank();
         Path workDir = realHddMode ? Path.of(customDirProp) : tempDir;
         Files.createDirectories(workDir);
 
-        Path fixture = resolveOverworldFixture();
-        byte[] mcaBytes = Files.readAllBytes(fixture);
+        FixtureData fixture = loadOverworldFixture(forceStandaloneFallback);
         int maxChunks = realHddMode ? 1024 : 32;
-        List<ChunkSample> allChunks = extractChunksFromMca(mcaBytes, maxChunks);
+        List<ChunkSample> allChunks = loadOrExpandChunks(fixture, maxChunks);
         assertTrue(allChunks.size() >= 16, "Expected real chunks in fixture");
 
         // Prepare random read order (simulating scattered player movement / RTP probes)
@@ -724,6 +782,17 @@ class HddBufferedLinearVsMcaBenchmarkTest {
     @Test
     @DisplayName("Prove fresh-slab CoW pointer moves, non-full-region rewrites, and kernel-measured flash write savings")
     void proveCowPointerMoveAndFlashWriteSavings() throws Exception {
+        runCowPointerMoveAndFlashWriteSavings(false);
+    }
+
+    @Test
+    @DisplayName("Standalone fallback fixture passes HDD benchmark and 1,024-chunk CoW/IO proof without LeafRTP fixture")
+    void standaloneFallbackPassesHddAndCowIoProofs(@TempDir Path tempDir) throws Exception {
+        runMeasureHddPerformance(tempDir, true);
+        runCowPointerMoveAndFlashWriteSavings(true);
+    }
+
+    private void runCowPointerMoveAndFlashWriteSavings(boolean forceStandaloneFallback) throws Exception {
         Path workDir = Path.of("build/tmp/io-proof-" + System.nanoTime()).toAbsolutePath().normalize();
         Files.createDirectories(workDir);
         Path cowLcaFile = workDir.resolve("cow_proof.lca");
@@ -733,10 +802,9 @@ class HddBufferedLinearVsMcaBenchmarkTest {
         Path lcaBufFile = workDir.resolve("io_proof_buf.lca");
 
         try {
-        Path fixture = resolveOverworldFixture();
-        byte[] mcaBytes = Files.readAllBytes(fixture);
-        List<ChunkSample> allChunks = extractChunksFromMca(mcaBytes, 1024);
-        assertEquals(1024, allChunks.size(), "Expected full 1,024-chunk real Overworld region");
+        FixtureData fixture = loadOverworldFixture(forceStandaloneFallback);
+        List<ChunkSample> allChunks = loadOrExpandChunks(fixture, 1024);
+        assertEquals(1024, allChunks.size(), "Expected full 1,024-chunk Overworld region");
 
         List<ChunkSample> sparse8 = allChunks.subList(0, 8);
         List<ChunkSample> churn32 = allChunks.subList(0, 32);
@@ -1043,9 +1111,15 @@ class HddBufferedLinearVsMcaBenchmarkTest {
         // Hard assertions on Linux kernel /proc/self/io measurements
         if (sparseLcaBuf.wchar >= 0) {
             // 1. Neither Vanilla .mca nor .lca rewrites the full region on sparse 8-chunk save; ONLY .b_linear does
-            assertTrue(sparseMca.wchar < 200_000L, "Vanilla .mca must NOT rewrite full 8.35 MB region");
-            assertTrue(sparseLcaBuf.wchar < 200_000L, "Buffered .lca must NOT rewrite full 4.11 MB region");
-            assertTrue(sparseBLinear.wchar > 5_000_000L, "BufferedLinear .b_linear MUST rewrite full ~5.8 MB region");
+            assertTrue(sparseMca.wchar < 200_000L, "Vanilla .mca must NOT rewrite full region");
+            assertTrue(sparseLcaBuf.wchar < 200_000L, "Buffered .lca must NOT rewrite full region");
+            long minExpectedBLinearRewrite = fixture.fullRealRegion
+                    ? 5_000_000L
+                    : Math.max(Files.size(bLinearFile), sparseLcaBuf.wchar * 10L);
+            assertTrue(
+                    sparseBLinear.wchar >= minExpectedBLinearRewrite,
+                    "BufferedLinear .b_linear MUST rewrite full region (wchar="
+                            + sparseBLinear.wchar + ", minExpected=" + minExpectedBLinearRewrite + ")");
 
             // 2. When hot chunks coalesce in RAM (4x32 <= 64-chunk buffer), Buffered .lca cuts writes drastically
             assertEquals(96L, churn32Coalesced, "Expected 96 coalesced saves in 4x32 hot churn");
