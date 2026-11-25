@@ -182,10 +182,12 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private volatile int readAheadTriggerReads = LcaRegionWriter.LcaLiveArchive.DEFAULT_READ_AHEAD_TRIGGER_READS;
     private volatile int readAheadMaxBytes = LcaRegionWriter.LcaLiveArchive.DEFAULT_READ_AHEAD_MAX_BYTES;
 
+    /** Fixed lock stripe count (power of 2) bounding per-region synchronization memory. */
+    private static final int REGION_LOCK_STRIPE_COUNT = 256;
+
     private final ConcurrentHashMap<Long, LcaRegionWriter.LcaLiveArchive> regionCache =
             new ConcurrentHashMap<>(64);
-    private final ConcurrentHashMap<Long, Object> regionLocks =
-            new ConcurrentHashMap<>(64);
+    private final Object[] regionLockStripes = createRegionLockStripes();
     private final Set<Long> recentRegionKeys = ConcurrentHashMap.newKeySet();
     private final ConcurrentLinkedQueue<Long> regionEvictionQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, FileChannel> readChannelCache =
@@ -1172,8 +1174,20 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         return archive.readChunkNbtBytes(rx, rz);
     }
 
+    private static Object[] createRegionLockStripes() {
+        Object[] stripes = new Object[REGION_LOCK_STRIPE_COUNT];
+        for (int i = 0; i < stripes.length; i++) {
+            stripes[i] = new Object();
+        }
+        return stripes;
+    }
+
     private Object regionLock(long key) {
-        return regionLocks.computeIfAbsent(key, k -> new Object());
+        long h = key;
+        h = (h ^ (h >>> 30)) * 0xBF58476D1CE4E5B9L;
+        h = (h ^ (h >>> 27)) * 0x94D049BB133111EBL;
+        h ^= (h >>> 31);
+        return regionLockStripes[(int) h & (REGION_LOCK_STRIPE_COUNT - 1)];
     }
 
     /**

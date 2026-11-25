@@ -88,7 +88,9 @@ public final class RtpBStats {
     static String readDistributionFromManifest(Manifest manifest) {
         if (manifest == null || manifest.getMainAttributes() == null) return null;
         String val = manifest.getMainAttributes().getValue(MANIFEST_DISTRIBUTION_ATTR);
-        return (val != null && !val.trim().isEmpty()) ? val.trim() : null;
+        if (val == null || val.isBlank()) return null;
+        String trimmed = val.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     static String readDistributionFromStream(InputStream in) throws IOException {

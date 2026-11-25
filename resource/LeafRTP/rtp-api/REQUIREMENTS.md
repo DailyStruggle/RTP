@@ -12,7 +12,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 - **REQ-API-F-006 — Bare-Command Root Action:** The API shall provide a single-binding hook through which an external addon may override the behaviour of a bare random-teleport command (no arguments) without affecting any subcommand. When no override is bound the system shall perform the classic random teleport, and an override that fails shall not suppress the classic behaviour.
 
 ### 1.2 Data Structures and Models
-- **REQ-API-F-004 — Agnostic Representation:** Shared models (e.g., `RTPLocation`, `RTPWorld`, `RTPPlayer`) shall be platform-agnostic to ensure compatibility across Bukkit, Paper, Folia, and potential future server implementations.
+- **REQ-API-F-004 — Agnostic Representation:** Shared models (e.g., `RTPLocation`, `RTPWorld`, `RTPPlayer`, plus shared SDK value types from `net.leaf.schematics.*`, `net.leaf.tags.*`, and `io.github.dailystruggle.anvil.*` exposed through `RTPWorld`, `RTPChunk`, `SchematicPaster`, and `RTPAPI.columnProbeCoalescer()`) shall be platform-agnostic to ensure compatibility across Bukkit, Paper, Folia, Fabric, NeoForge, and potential future server implementations.
 
 ### 1.3 Unified Command Framework
 - **REQ-API-F-005 — Unified Command-Tree Contract:** The command framework shall be the single source of truth for the command tree across all supported platforms. Platform adapters shall not duplicate command-tree structure.

@@ -197,6 +197,26 @@ class RtpBStatsTest {
         }
     }
 
+    @Test
+    @DisplayName("readDistributionFromManifest returns null for null/blank values and trims valid values")
+    void readDistributionFromManifest_handlesNullBlankAndPaddedValues() {
+        assertNull(RtpBStats.readDistributionFromManifest(null));
+        assertNull(RtpBStats.readDistributionFromManifest(manifestWithDistribution(null)));
+        assertNull(RtpBStats.readDistributionFromManifest(manifestWithDistribution("")));
+        assertNull(RtpBStats.readDistributionFromManifest(manifestWithDistribution("   \t  ")));
+        assertNull(RtpBStats.readDistributionFromManifest(manifestWithDistribution("\u0001")));
+        assertEquals("free", RtpBStats.readDistributionFromManifest(manifestWithDistribution("  free  ")));
+    }
+
+    private static java.util.jar.Manifest manifestWithDistribution(String distribution) {
+        java.util.jar.Manifest mf = new java.util.jar.Manifest();
+        mf.getMainAttributes().put(java.util.jar.Attributes.Name.MANIFEST_VERSION, "1.0");
+        if (distribution != null) {
+            mf.getMainAttributes().putValue(RtpBStats.MANIFEST_DISTRIBUTION_ATTR, distribution);
+        }
+        return mf;
+    }
+
     private File writeJarWithManifestDistribution(String distribution, String classEntry, byte[] classBytes)
             throws Exception {
         pluginDir.mkdirs();

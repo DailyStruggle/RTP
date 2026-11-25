@@ -34,7 +34,7 @@ RTP provides multiple ways to view and update settings (starting with the visual
 | `definitions/regions/*.yml` | Per-region teleport area, shape, queue settings | [REGIONS.md](REGIONS.md) |
 | `definitions/worlds/*.yml` | Per-world default region and permission settings | [WORLDS.md](WORLDS.md) |
 | `definitions/effects/*.yml` | Per-event teleport effects (sounds, particles, potions) | [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md) |
-| `advanced/performance.yml` | Background task timing, cache behaviour, TPS thresholds | [PERFORMANCE.md](PERFORMANCE.md) |
+| `advanced/performance.yml` | Background task timing, cache behaviour, TPS thresholds, Folia `maxRegionalInflight` concurrency | [PERFORMANCE.md](PERFORMANCE.md) |
 | `advanced/messages/*.yml` | All player-facing message strings (split by concern) | [MESSAGES.md](MESSAGES.md) |
 | `advanced/logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `advanced/metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
@@ -255,7 +255,7 @@ Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../
 
 ## Tips
 
-- **Run `/rtp reload` after every edit**; no restart needed.
+- **Run `/rtp reload` after every edit**; no restart needed (except startup-only Folia `maxRegionalInflight` in `advanced/performance.yml`).
 - **Never change `version:` fields**, as they are used internally for config migration.
 - **Use `[0]`, `[1]`, `[2]`** as world placeholders instead of hardcoded names if your world names may change.
 - **Set `cacheCap` to match your player count** — a server with 50 concurrent players benefits from a larger cache than a server with 5.

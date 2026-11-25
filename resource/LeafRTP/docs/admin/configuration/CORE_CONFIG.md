@@ -91,6 +91,7 @@ Nested under the `defaults:` block. Holds starter fallback templates and values 
 ---
 
 ## Related Files
+- Performance, tick budgets, and Folia regional concurrency (`maxRegionalInflight` / `-Drtp.folia.maxRegionalInflight`): [`advanced/performance.yml`](PERFORMANCE.md).
 - Database persistence settings: [`advanced/database.yml`](CONFIGURATION.md#database-persistence-advanceddatabaseyml).
 - Multi-server network settings: [`advanced/network.yml`](../proxies/CONFIGURATION.md).
 

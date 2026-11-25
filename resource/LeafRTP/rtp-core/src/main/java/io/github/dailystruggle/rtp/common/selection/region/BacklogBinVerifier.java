@@ -13,8 +13,13 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -44,6 +49,10 @@ final class BacklogBinVerifier {
   private static final int DEFAULT_DEPTH = 2;
   private static final int MAX_DEPTH = 8;
 
+  private static final int STATE_PENDING = 0;
+  private static final int STATE_RUNNING = 1;
+  private static final int STATE_CANCELLED = 2;
+
   /** Abandon a batch, and expire a world-wide bin claim, after this long. */
   static final long TIMEOUT_NANOS =
       Math.max(1L, Long.getLong("rtp.backlog.batchTimeoutMillis", 10_000L)) * 1_000_000L;
@@ -55,15 +64,15 @@ final class BacklogBinVerifier {
 
   private final Executor executor;
   private final ArrayDeque<Batch> inFlight = new ArrayDeque<>();
-  private final Object drainLock = new Object();
-  private int activeBatches;
+  private final Set<CountDownLatch> activeBatches = ConcurrentHashMap.newKeySet();
 
   private record Batch(
       RegionFileCoord key,
       WorldBacklogBinIndex index,
       List<BacklogLocationBuffer.BacklogEntry> entries,
       CompletableFuture<Map<ChunkCoord, Decision>> future,
-      java.util.concurrent.atomic.AtomicBoolean cancelled,
+      AtomicInteger state,
+      CountDownLatch done,
       long submittedNanos) {}
 
   BacklogBinVerifier() {
@@ -120,38 +129,39 @@ final class BacklogBinVerifier {
       if (!index.tryClaim(key, now, TIMEOUT_NANOS)) return;
       List<BacklogLocationBuffer.BacklogEntry> entries = binEntries(index, oldest);
       List<ChunkCoord> chunks = chunksOf(entries);
-      java.util.concurrent.atomic.AtomicBoolean batchCancelled =
-          new java.util.concurrent.atomic.AtomicBoolean();
+      AtomicInteger batchState = new AtomicInteger(STATE_PENDING);
+      CountDownLatch batchDone = new CountDownLatch(1);
       CompletableFuture<Map<ChunkCoord, Decision>> future;
       try {
         Executor exec = (executor != null) ? executor : RTPRuntime.blockingIoExecutor();
         future =
             CompletableFuture.supplyAsync(
                 () -> {
-                  synchronized (drainLock) {
-                    if (batchCancelled.get()) {
+                  activeBatches.add(batchDone);
+                  try {
+                    if (!batchState.compareAndSet(STATE_PENDING, STATE_RUNNING)) {
                       return Collections.emptyMap();
                     }
-                    activeBatches++;
-                  }
-                  try {
                     return classify(provider, world, chunks);
                   } finally {
-                    synchronized (drainLock) {
-                      activeBatches--;
-                      if (activeBatches == 0) {
-                        drainLock.notifyAll();
-                      }
-                    }
+                    batchDone.countDown();
+                    activeBatches.remove(batchDone);
                   }
                 },
                 exec);
       } catch (RuntimeException e) {
-        // Rejected submit: the bin goes UNKNOWN (cold fill checks) rather than stay stuck.
+        // Rejected submit: log and fall back to UNKNOWN so the cold fill checks live (S-004).
+        RTPRuntime.log(
+            Level.WARNING,
+            "[RTP] Backlog batch submit rejected for region file " + key
+                + "; leaving candidate(s) to the cold fill's chunk-load check",
+            e);
+        batchState.set(STATE_CANCELLED);
+        batchDone.countDown();
         future = CompletableFuture.completedFuture(Collections.emptyMap());
       }
       SUBMITTED.incrementAndGet();
-      inFlight.addLast(new Batch(key, index, entries, future, batchCancelled, now));
+      inFlight.addLast(new Batch(key, index, entries, future, batchState, batchDone, now));
     }
   }
 
@@ -166,6 +176,7 @@ final class BacklogBinVerifier {
             ? Collections.emptyMap() : b.future().getNow(Collections.emptyMap());
         APPLIED.incrementAndGet();
       } else if (now - b.submittedNanos() > TIMEOUT_NANOS) {
+        b.state().compareAndSet(STATE_PENDING, STATE_CANCELLED);
         b.future().cancel(false);
         TIMED_OUT.incrementAndGet();
         RTPRuntime.log(Level.WARNING, "[RTP] Backlog batch for region file " + b.key() + " exceeded "
@@ -186,27 +197,28 @@ final class BacklogBinVerifier {
    * finish before world/region teardown (S-002), and releases all bin claims.
    */
   synchronized void close() {
-    synchronized (drainLock) {
-      for (Batch b : inFlight) {
-        b.cancelled().set(true);
+    Set<CountDownLatch> toAwait = new LinkedHashSet<>();
+    for (Batch b : inFlight) {
+      boolean cancelledBeforeStart = b.state().compareAndSet(STATE_PENDING, STATE_CANCELLED);
+      b.future().cancel(false);
+      if (!cancelledBeforeStart) {
+        toAwait.add(b.done());
       }
     }
-    for (Batch b : inFlight) {
-      b.future().cancel(false);
-    }
-    long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
-    synchronized (drainLock) {
-      while (activeBatches > 0) {
-        long remainingNanos = deadlineNanos - System.nanoTime();
-        if (remainingNanos <= 0L) {
+    toAwait.addAll(activeBatches);
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    for (CountDownLatch latch : toAwait) {
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      if (remainingNanos <= 0L) {
+        break;
+      }
+      try {
+        if (!latch.await(remainingNanos, TimeUnit.NANOSECONDS)) {
           break;
         }
-        try {
-          drainLock.wait(remainingNanos / 1_000_000L, (int) (remainingNanos % 1_000_000L));
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-          break;
-        }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        break;
       }
     }
     for (Batch b : inFlight) {

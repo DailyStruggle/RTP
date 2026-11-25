@@ -2594,4 +2594,83 @@ class LcaRegionFileStorageTest {
             assertEquals("minecraft:bedrock", ((Map<?, ?>) p0.items.get(1)).get("Name"));
         }
     }
+
+    @Test
+    @DisplayName("Region locks remain fixed-bounded via lock striping across many regions and eviction churn")
+    void regionLocksRemainBoundedAndStripeSafelyUnderChurn(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region-lock-stripes");
+        Files.createDirectories(regionDir);
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(
+                regionDir,
+                LcaRegionReader.STORAGE_KIND_REGION_VOXEL,
+                -4,
+                24,
+                4671,
+                0,
+                false,
+                false,
+                4,
+                LcaRegionFileStorage.DEFAULT_COMPACT_FRAGMENTATION_THRESHOLD)) {
+            java.lang.reflect.Method regionLockMethod =
+                    LcaRegionFileStorage.class.getDeclaredMethod("regionLock", long.class);
+            regionLockMethod.setAccessible(true);
+
+            java.util.Set<Object> distinctLocks =
+                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            for (int rx = -16; rx < 16; rx++) {
+                for (int rz = -16; rz < 16; rz++) {
+                    long key = LcaRegionFileStorage.packRegionKey(rx, rz);
+                    Object lockA = regionLockMethod.invoke(storage, key);
+                    Object lockB = regionLockMethod.invoke(storage, key);
+                    assertNotNull(lockA);
+                    assertSame(lockA, lockB, "regionLock must deterministically map a key to the same monitor");
+                    distinctLocks.add(lockA);
+                }
+            }
+            assertTrue(
+                    distinctLocks.size() <= 256,
+                    "Region lock monitors must remain bounded at <= 256 stripes, found: " + distinctLocks.size());
+            assertTrue(
+                    distinctLocks.size() >= 128,
+                    "Region lock stripes should distribute 1024 region keys across >= 128 stripes, found: "
+                            + distinctLocks.size());
+
+            // Exercise concurrent writes and eviction across 24 regions with maxOpenRegions=4
+            ExecutorService pool = Executors.newFixedThreadPool(4);
+            try {
+                List<Future<?>> futures = new ArrayList<>();
+                for (int i = 0; i < 24; i++) {
+                    final int regionIdx = i;
+                    futures.add(pool.submit(() -> {
+                        int chunkX = regionIdx * 32 + 1;
+                        int chunkZ = (regionIdx % 5) * 32 + 2;
+                        storage.writeChunkCompound(
+                                chunkX,
+                                chunkZ,
+                                buildChunkNbt(chunkX, chunkZ, "minecraft:stone"));
+                        return null;
+                    }));
+                }
+                for (Future<?> f : futures) {
+                    f.get(30, TimeUnit.SECONDS);
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+            assertTrue(storage.openRegionCount() <= 4, "Open regions must stay bounded by maxOpenRegions");
+            storage.flush();
+        }
+
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(regionDir, false)) {
+            for (int i = 0; i < 24; i++) {
+                int chunkX = i * 32 + 1;
+                int chunkZ = (i % 5) * 32 + 2;
+                assertTrue(
+                        reopened.doesChunkExist(chunkX, chunkZ),
+                        "Chunk must persist across lock-striped concurrent writes and eviction: ("
+                                + chunkX + "," + chunkZ + ")");
+            }
+        }
+    }
 }

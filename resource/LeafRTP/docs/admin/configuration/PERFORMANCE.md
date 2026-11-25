@@ -35,7 +35,25 @@ Keys marked **Integer / Duration** below accept a plain number or a duration wit
 | `period` | Integer / Duration | `20` | Ticks between refills of the same region (`20` ticks = 1 second; supports duration units such as `2s`, `24h`, `1d`). When `autoTune: true`, acts as the demand credit horizon and idle cadence (`8 * period` ticks when a region has no demand) while regions with demand refill on every pulse within the per-tick ceilings. When `autoTune: false`, regions take turns at this fixed interval so each region gets one refill every `period` ticks. | **MEDIUM** — Lower values refill faster but use more CPU. |
 | `syncAllottedTime` | Integer / Duration | `5` | Max milliseconds per tick for RTP's main-thread work (queued commands, scripted actions, sync task queue; supports duration units). When `autoTune: true`, acts as the per-tick ceiling for background sync work (scaled down as MSPT approaches the soft target), while player-facing work keeps the full configured value. On Folia it also applies as a per-region-thread ceiling: RTP adds at most this much to any region's tick, however many players' work lands there, and the rest waits behind other regions. Values above 25 are treated as 25, so at least half of each tick stays free for the server and other plugins. Range: 1–25. | **MEDIUM** — Higher values allow faster processing at the risk of tick time. |
 | `asyncAllottedTime` | Integer / Duration | `25` | Max milliseconds per pulse for RTP's background work (supports duration units). When `autoTune: true`, acts as the per-pulse ceiling for background refill and scales with demand and CPU headroom, while waiting players keep the full configured value; when `autoTune: false`, acts as a fixed per-pulse budget. Values above 25 are treated as 25. Range: 1–25. | **MEDIUM** |
-| `maxRegionalInflight` | Integer | `max(1, availableProcessors / 2)` | Folia only (optional; also overridable via `-Drtp.folia.maxRegionalInflight=<n>`). Maximum number of concurrent in-flight regional scheduler tasks. Positive integers set the exact cap; `0` or negative values disable the cap (`Integer.MAX_VALUE`). Omitting the key uses `max(1, availableProcessors / 2)`. | **MEDIUM** — Raising or uncapping increases concurrent Folia region load. |
+| `maxRegionalInflight` | Integer | `max(1, availableProcessors / 2)` | Folia only (optional; startup-only, requires a server restart). Maximum number of concurrent in-flight regional scheduler tasks. Positive integers set the exact cap; `0` or negative values disable the cap (`Integer.MAX_VALUE`). Overridden by JVM property `-Drtp.folia.maxRegionalInflight=<n>`. See *Folia Regional Concurrency* below. | **MEDIUM** — Raising or uncapping increases concurrent Folia region load. |
+
+### Folia Regional Concurrency (`maxRegionalInflight`)
+
+On Folia servers, RTP limits how many regional scheduler slices may be in flight concurrently to protect region threads during background refills and bursts. The limit is resolved once when the Folia scheduler starts (changes require a **server restart**, not `/rtp reload`), in this order of precedence:
+
+1. **JVM system property:** `-Drtp.folia.maxRegionalInflight=<n>` (takes precedence over `advanced/performance.yml`).
+2. **Config file (`advanced/performance.yml`):** uncomment and set `maxRegionalInflight`.
+3. **Default (omitted):** `max(1, Runtime.getRuntime().availableProcessors() / 2)`.
+
+**Value semantics:**
+- **Positive integer (`> 0`):** exact maximum number of concurrent in-flight regional tasks.
+- **`0` or negative (`<= 0`):** disables the cap (`Integer.MAX_VALUE`, uncapped).
+- **Invalid / non-integer value:** logs a `WARNING` and falls through to the next source (or the default).
+
+```yaml
+# advanced/performance.yml (Folia only; restart required after changing)
+maxRegionalInflight: 0
+```
 
 ## World Loading & View Distance
 
@@ -54,6 +72,7 @@ Keys marked **Integer / Duration** below accept a plain number or a duration wit
 | `postTeleportQueueing` | Boolean | `false` | Immediately try to refill the cache after a teleport occurs. | **MEDIUM** |
 | `checkOnChunkLoads` | Boolean | `true` | Learn biomes from chunks already loaded without doing extra work. | **LOW** |
 | `backlogRefillThreshold` | Double | `0.5` | Refill the L3 backlog buffer when it drops to this fraction (e.g. `0.5` = 50%). Range: 0.0–1.0. | **LOW** |
+| `backlogGenerationStrategy` | String | `"FLAT_STRIDE"` | Backlog candidate generation strategy. Allowed values: `"FLAT_STRIDE"` (1D Hilbert dyadic-stride Feistel permutation matching live selection) or `"BINNED_AMORTIZED"` (region-file binned PRP with amortized batch quotas and within-bin dyadic stride). | **LOW** |
 | `pregeneratedPreference` | Double | `0.0` | Bias toward pregenerated chunks over generating new terrain. Range: 0.0–1.0 (0 = no preference, 1 = avoid ungenerated). | **LOW** |
 | `loginCacheEnabled` | Boolean | `false` | Maintain a dedicated reserve of safe spots for players joining the server (`rtp.onevent.join`/`firstjoin`). | **LOW** |
 | `loginCacheCap` | Integer | `0` | Max size of the login reserve cache. `0` = auto (server max players). | **LOW** |

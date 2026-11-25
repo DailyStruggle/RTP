@@ -236,4 +236,136 @@ class BacklogBinVerifierTest {
     assertEquals(0, backlog.validatedSize());
     assertTrue(io.queue.isEmpty(), "no pool hand-off without a provider");
   }
+
+  @Test
+  @DisplayName("S-002: close prevents queued unstarted batches from invoking classifyBatch even if executed later")
+  void close_preventsQueuedBatchFromRunningClassify() {
+    System.setProperty(BacklogBinVerifier.DEPTH_PROPERTY, "1");
+    List<BacklogLocationBuffer.BacklogEntry> a = stage(0, 0, 2);
+    ManualExecutor io = new ManualExecutor();
+    RecordingProvider provider = new RecordingProvider();
+    BacklogBinVerifier v = new BacklogBinVerifier(io);
+
+    v.pulse(null, backlog, index, provider, e -> { });
+    assertEquals(1, v.inFlight());
+    assertEquals(1, io.queue.size());
+
+    v.close();
+    assertEquals(0, v.inFlight());
+    assertFalse(index.isClaimed(RegionFileCoord.of(a.get(0).location().coords()), System.nanoTime(),
+        BacklogBinVerifier.TIMEOUT_NANOS), "close releases the bin claim");
+
+    // Simulate a worker picking up the previously queued task after close().
+    io.runAll();
+    assertTrue(provider.batches.isEmpty(), "cancelled queued batch must never invoke classifyBatch");
+  }
+
+  @Test
+  @DisplayName("S-002: close awaits an actively executing batch until disk classification finishes")
+  void close_awaitsActiveBatchCompletion() throws Exception {
+    System.setProperty(BacklogBinVerifier.DEPTH_PROPERTY, "1");
+    List<BacklogLocationBuffer.BacklogEntry> a = stage(0, 0, 2);
+    java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean();
+    Provider blockingProvider = new Provider() {
+      @Override
+      public Decision classify(RTPWorld world, int cx, int cz) {
+        throw new AssertionError("single-chunk classify must not be used");
+      }
+
+      @Override
+      public Map<ChunkCoord, Decision> classifyBatch(RTPWorld world, List<ChunkCoord> chunks) {
+        entered.countDown();
+        try {
+          assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+        finished.set(true);
+        return java.util.Collections.emptyMap();
+      }
+    };
+
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+    java.util.concurrent.ExecutorService closer = java.util.concurrent.Executors.newSingleThreadExecutor();
+    try {
+      BacklogBinVerifier v = new BacklogBinVerifier(pool);
+      v.pulse(null, backlog, index, blockingProvider, e -> { });
+      assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS), "worker entered classifyBatch");
+
+      java.util.concurrent.CountDownLatch closeDone = new java.util.concurrent.CountDownLatch(1);
+      closer.execute(() -> {
+        v.close();
+        closeDone.countDown();
+      });
+
+      assertFalse(closeDone.await(50, java.util.concurrent.TimeUnit.MILLISECONDS),
+          "close must wait while classifyBatch is still running");
+      release.countDown();
+      assertTrue(closeDone.await(5, java.util.concurrent.TimeUnit.SECONDS),
+          "close returns once active classifyBatch finishes");
+      assertTrue(finished.get(), "active classifyBatch completed before close returned");
+      assertEquals(0, v.inFlight());
+      assertFalse(index.isClaimed(RegionFileCoord.of(a.get(0).location().coords()), System.nanoTime(),
+          BacklogBinVerifier.TIMEOUT_NANOS));
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+      closer.shutdownNow();
+    }
+  }
+
+  @Test
+  @DisplayName("S-002: close restores interrupt status and still releases bin claims if interrupted while draining")
+  void close_interruptedDuringDrain_restoresInterruptAndReleasesClaim() throws Exception {
+    System.setProperty(BacklogBinVerifier.DEPTH_PROPERTY, "1");
+    List<BacklogLocationBuffer.BacklogEntry> a = stage(0, 0, 2);
+    java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    Provider blockingProvider = new Provider() {
+      @Override
+      public Decision classify(RTPWorld world, int cx, int cz) {
+        throw new AssertionError("single-chunk classify must not be used");
+      }
+
+      @Override
+      public Map<ChunkCoord, Decision> classifyBatch(RTPWorld world, List<ChunkCoord> chunks) {
+        entered.countDown();
+        try {
+          release.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+        return java.util.Collections.emptyMap();
+      }
+    };
+
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+    try {
+      BacklogBinVerifier v = new BacklogBinVerifier(pool);
+      v.pulse(null, backlog, index, blockingProvider, e -> { });
+      assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+
+      java.util.concurrent.atomic.AtomicBoolean interruptedAfterClose =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      java.util.concurrent.CountDownLatch closeFinished = new java.util.concurrent.CountDownLatch(1);
+      Thread closerThread = new Thread(() -> {
+        Thread.currentThread().interrupt();
+        v.close();
+        interruptedAfterClose.set(Thread.currentThread().isInterrupted());
+        closeFinished.countDown();
+      }, "backlog-close-interrupt-test");
+      closerThread.start();
+
+      assertTrue(closeFinished.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertTrue(interruptedAfterClose.get(), "close must preserve caller interrupt flag");
+      assertEquals(0, v.inFlight());
+      assertFalse(index.isClaimed(RegionFileCoord.of(a.get(0).location().coords()), System.nanoTime(),
+          BacklogBinVerifier.TIMEOUT_NANOS), "bin claim must be released even on interrupt");
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
 }
