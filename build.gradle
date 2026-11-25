@@ -676,16 +676,24 @@ apiModulesForBinaryCheck.each { modulePath ->
             ignoreMissingClasses = true
             // Platform/internal adapter implementation packages are not public API.
             // effectsapi.fabric moved to rtp-fabric-common (effects-api-ADR-003
-            // amendment 2026-10-15) and effectsapi.bukkit / EffectsAPI moved to
-            // rtp-bukkit-common (ADR-116 Decision 4); kept excluded so the baseline diff stays quiet.
+            // amendment 2026-10-15), effectsapi.bukkit / EffectsAPI moved to
+            // rtp-bukkit-common (ADR-116 Decision 4), and commandsapi.bukkit moved
+            // to rtp-bukkit-common (ADR-115/ADR-126 pure SDK boundary); kept excluded
+            // so the baseline diff stays quiet.
             packageExcludes = [
                     'io.github.dailystruggle.effectsapi.fabric',
-                    'io.github.dailystruggle.effectsapi.bukkit'
+                    'io.github.dailystruggle.effectsapi.bukkit',
+                    'io.github.dailystruggle.commandsapi.bukkit',
+                    'io.github.dailystruggle.commandsapi.bukkit.localCommands',
+                    'io.github.dailystruggle.commandsapi.bukkit.LocalParameters'
             ]
             classExcludes = [
                     'io.github.dailystruggle.effectsapi.fabric.*',
                     'io.github.dailystruggle.effectsapi.bukkit.*',
-                    'io.github.dailystruggle.effectsapi.EffectsAPI'
+                    'io.github.dailystruggle.effectsapi.EffectsAPI',
+                    'io.github.dailystruggle.commandsapi.bukkit.*',
+                    'io.github.dailystruggle.commandsapi.bukkit.localCommands.*',
+                    'io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*'
             ]
             txtOutputFile = txtReportFile.get().asFile
             richReport {

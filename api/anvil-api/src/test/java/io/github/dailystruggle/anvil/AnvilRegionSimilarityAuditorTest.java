@@ -710,9 +710,9 @@ class AnvilRegionSimilarityAuditorTest {
                 mutateSingleSectionBlock(interiorOnly, 0, (4 << 8) | (5 << 4) | 5, "minecraft:granite");
                 interiorDriftChunks.put(key, interiorOnly);
 
-                // Candidate B: on chunk (1,0) shift surface +4 blocks (creating a 4-block migration cliff
-                // against Vanilla neighbors (0,0) and (1,1)), change biome to desert, and flood border cave.
-                boolean perturbed = (cx == 1 && cz == 0);
+                // Candidate B: on chunk (0,0) shift surface +4 blocks (creating a 4-block excess cliff
+                // against Vanilla neighbors (1,0) and (0,1)), change biome to desert, and flood border cave.
+                boolean perturbed = (cx == 0 && cz == 0);
                 LinkedHashMap<String, Object> cliffRoot = buildSyntheticOverworldChunk(
                         perturbed ? 4 : 0,
                         perturbed,
@@ -761,11 +761,12 @@ class AnvilRegionSimilarityAuditorTest {
         assertEquals(75.0, cliffSeam.borderSurfaceExactPct(), 1e-6);
         assertEquals(75.0, cliffSeam.borderSurfaceWithin1BlockPct(), 1e-6);
         assertEquals(4, cliffSeam.seamMaxInducedCliffBlocks());
-        assertTrue(cliffSeam.seamInducedCliffEdges() >= 32L,
-                "Expected >= 32 synthetic cliff edges across the 2 shared borders of chunk (1,0)");
+        // 16 E-W edges ((0,0)->(1,0)) + 15 N-S edges ((0,0)->(0,1), lx=1..15);
+        // at lx=0, (0,1) has a 3-block oak tree canopy at (0,0) so dRef=3 and dC2V=1.
+        assertEquals(31L, cliffSeam.seamInducedCliffEdges());
         assertEquals(75.0, cliffSeam.borderExactBiomePct(), 1e-6);
         assertTrue(cliffSeam.borderSubterraneanFluidLeakVoxels() >= 16L,
-                "Flooding upper cave along z=0 border of chunk (1,0) must report >= 16 fluid-to-air seam leaks");
+                "Flooding upper cave along z=0 border of chunk (0,0) must report >= 16 fluid-to-air seam leaks");
 
         String json = RegionSimilarityAuditor.toJson(cliffSc);
         assertTrue(json.contains("\"migration_seam\""));
@@ -780,22 +781,25 @@ class AnvilRegionSimilarityAuditorTest {
     @SuppressWarnings("unchecked")
     private static void mutateSingleSectionBlock(
             LinkedHashMap<String, Object> root, int targetSectionY, int voxelIndex, String newBlockId) {
-        List<LinkedHashMap<String, Object>> sections =
-                (List<LinkedHashMap<String, Object>>) root.get("sections");
-        for (LinkedHashMap<String, Object> sec : sections) {
+        Object rawSections = root.get("sections");
+        List<?> sections = (rawSections instanceof Nbt.NbtList nbtList)
+                ? nbtList.items
+                : (List<?>) rawSections;
+        for (Object item : sections) {
+            LinkedHashMap<String, Object> sec = (LinkedHashMap<String, Object>) item;
             if (((Number) sec.get("Y")).intValue() == targetSectionY) {
                 int[] indices = new int[4096];
                 Arrays.fill(indices, 0);
                 indices[voxelIndex] = 1;
                 List<String> pal = List.of("minecraft:stone", newBlockId);
                 LinkedHashMap<String, Object> blockStates = new LinkedHashMap<>();
-                List<LinkedHashMap<String, Object>> palEntries = new ArrayList<>();
+                List<Object> palEntries = new ArrayList<>();
                 for (String name : pal) {
                     LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
                     entry.put("Name", name);
                     palEntries.add(entry);
                 }
-                blockStates.put("palette", palEntries);
+                blockStates.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, palEntries));
                 blockStates.put("data", AnvilTestFixtures.packIndices(4, indices));
                 sec.put("block_states", blockStates);
                 return;
