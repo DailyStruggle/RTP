@@ -64,22 +64,23 @@ class EditorParserFuzzTest {
         try {
             boolean structuredGzip = data.consumeBoolean();
             if (structuredGzip) {
-                ByteArrayOutputStream raw = new ByteArrayOutputStream();
-                try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(raw))) {
-                    out.writeInt(data.consumeBoolean() ? 0x52545042 : data.consumeInt());
-                    out.writeInt(data.consumeBoolean() ? 1 : data.consumeInt());
-                    out.writeUTF(data.consumeBoolean() ? "world" : data.consumeString(16));
-                    int palSize = data.consumeInt(0, 8);
-                    out.writeInt(palSize);
-                    for (int i = 0; i < palSize; i++) {
-                        out.writeUTF(data.consumeString(16));
+                try (ByteArrayOutputStream raw = new ByteArrayOutputStream()) {
+                    try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(raw))) {
+                        out.writeInt(data.consumeBoolean() ? 0x52545042 : data.consumeInt());
+                        out.writeInt(data.consumeBoolean() ? 1 : data.consumeInt());
+                        out.writeUTF(data.consumeBoolean() ? "world" : data.consumeString(16));
+                        int palSize = data.consumeInt(0, 8);
+                        out.writeInt(palSize);
+                        for (int i = 0; i < palSize; i++) {
+                            out.writeUTF(data.consumeString(16));
+                        }
+                        int count = data.consumeInt(0, 4);
+                        out.writeInt(count);
+                        byte[] rest = data.consumeRemainingAsBytes();
+                        out.write(rest);
                     }
-                    int count = data.consumeInt(0, 4);
-                    out.writeInt(count);
-                    byte[] rest = data.consumeRemainingAsBytes();
-                    out.write(rest);
+                    Files.write(tempFile, raw.toByteArray());
                 }
-                Files.write(tempFile, raw.toByteArray());
             } else {
                 Files.write(tempFile, data.consumeRemainingAsBytes());
             }

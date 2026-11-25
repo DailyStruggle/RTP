@@ -39,6 +39,11 @@ public final class LcaModeABlockSection {
 
     private static final ThreadLocal<ReadCache> READ_CACHE = ThreadLocal.withInitial(ReadCache::new);
 
+    /** Releases the current thread's L1 Mode A read cache (including strong section refs). */
+    public static void clearThreadLocalScratch() {
+        READ_CACHE.remove();
+    }
+
     /**
      * Fixed 4-slot per-thread L1 ordinal cache for immutable {@code DELTA_ROARING} sections
      * ({@code 16 KiB} of reusable {@code byte[4096]} buffers per worker thread, zero per-chunk
@@ -127,6 +132,9 @@ public final class LcaModeABlockSection {
         this.flatBits = (byte) flatBits;
         this.octreeMask64 = octreeMask64;
         this.paletteRuntimeIds = Objects.requireNonNull(paletteRuntimeIds, "paletteRuntimeIds");
+        if (paletteRuntimeIds.length == 0) {
+            throw new IllegalArgumentException("paletteRuntimeIds must not be empty");
+        }
         this.blockPayload = Objects.requireNonNull(blockPayload, "blockPayload");
         this.containerOffsets = containerOffsets;
         int slabMask = 0;
@@ -683,8 +691,12 @@ public final class LcaModeABlockSection {
     }
 
     public int queryVoxelRuntimeId(int yzx) {
+        int len = this.paletteRuntimeIds.length;
+        if (len == 0) {
+            throw new IllegalStateException("paletteRuntimeIds must not be empty");
+        }
         int ord = queryVoxelOrdinal(yzx);
-        return this.paletteRuntimeIds[ord < this.paletteRuntimeIds.length ? ord : 0];
+        return this.paletteRuntimeIds[ord >= 0 && ord < len ? ord : 0];
     }
 
     /**

@@ -206,6 +206,28 @@ public record RawChunkFrameSnapshot(
             int bitsPerVoxel,
             byte[] flatBytes
     ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof FlatBitPackSection other)) return false;
+            return bitsPerVoxel == other.bitsPerVoxel
+                    && Arrays.equals(paletteRuntimeIds, other.paletteRuntimeIds)
+                    && Arrays.equals(flatBytes, other.flatBytes);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Integer.hashCode(bitsPerVoxel);
+            result = 31 * result + Arrays.hashCode(paletteRuntimeIds);
+            return 31 * result + Arrays.hashCode(flatBytes);
+        }
+
+        @Override
+        public String toString() {
+            return "FlatBitPackSection[paletteRuntimeIds=" + Arrays.toString(paletteRuntimeIds)
+                    + ", bitsPerVoxel=" + bitsPerVoxel
+                    + ", flatBytes=" + Arrays.toString(flatBytes) + "]";
+        }
     }
 
     /**

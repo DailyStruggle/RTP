@@ -1,5 +1,6 @@
 package io.github.dailystruggle.anvil;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -69,6 +70,61 @@ public record LcaDecodedChunkMeta(
         return residualNbtBytes != null && residualNbtBytes.length > 0;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof LcaDecodedChunkMeta other)) return false;
+        return dataVersion == other.dataVersion
+                && chunkX == other.chunkX
+                && chunkZ == other.chunkZ
+                && minSectionY == other.minSectionY
+                && Objects.equals(statusName, other.statusName)
+                && lastUpdateTick == other.lastUpdateTick
+                && inhabitedTimeTicks == other.inhabitedTimeTicks
+                && bpFlags == other.bpFlags
+                && postProcessingCount == other.postProcessingCount
+                && starlightLightVersion == other.starlightLightVersion
+                && Objects.equals(biomeKeys, other.biomeKeys)
+                && Arrays.equals(heightmapCodes, other.heightmapCodes)
+                && Arrays.equals(customHeightmapNames, other.customHeightmapNames)
+                && Arrays.deepEquals(heightmapLongs, other.heightmapLongs)
+                && Arrays.equals(sections, other.sections)
+                && Arrays.equals(residualNbtBytes, other.residualNbtBytes);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(
+                dataVersion, chunkX, chunkZ, minSectionY, statusName,
+                lastUpdateTick, inhabitedTimeTicks, bpFlags, postProcessingCount,
+                starlightLightVersion, biomeKeys);
+        result = 31 * result + Arrays.hashCode(heightmapCodes);
+        result = 31 * result + Arrays.hashCode(customHeightmapNames);
+        result = 31 * result + Arrays.deepHashCode(heightmapLongs);
+        result = 31 * result + Arrays.hashCode(sections);
+        return 31 * result + Arrays.hashCode(residualNbtBytes);
+    }
+
+    @Override
+    public String toString() {
+        return "LcaDecodedChunkMeta[dataVersion=" + dataVersion
+                + ", chunkX=" + chunkX
+                + ", chunkZ=" + chunkZ
+                + ", minSectionY=" + minSectionY
+                + ", statusName=" + statusName
+                + ", lastUpdateTick=" + lastUpdateTick
+                + ", inhabitedTimeTicks=" + inhabitedTimeTicks
+                + ", bpFlags=" + bpFlags
+                + ", postProcessingCount=" + postProcessingCount
+                + ", starlightLightVersion=" + starlightLightVersion
+                + ", biomeKeys=" + biomeKeys
+                + ", heightmapCodes=" + Arrays.toString(heightmapCodes)
+                + ", customHeightmapNames=" + Arrays.toString(customHeightmapNames)
+                + ", heightmapLongs=" + Arrays.deepToString(heightmapLongs)
+                + ", sections=" + Arrays.toString(sections)
+                + ", residualNbtBytes=" + Arrays.toString(residualNbtBytes) + "]";
+    }
+
     /**
      * Direct decoded metadata for a single chunk section (including low/high Starlight boundary
      * sections where {@code biomeGlobalDictIds} is {@code null}).
@@ -84,5 +140,42 @@ public record LcaDecodedChunkMeta(
             byte[] blockLightBytes,
             int blockLightStarlightState
     ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof DecodedSectionMeta other)) return false;
+            return sectionY == other.sectionY
+                    && Arrays.equals(biomeGlobalDictIds, other.biomeGlobalDictIds)
+                    && Arrays.equals(biomePackedLongs, other.biomePackedLongs)
+                    && skyLightKind == other.skyLightKind
+                    && Arrays.equals(skyLightBytes, other.skyLightBytes)
+                    && skyLightStarlightState == other.skyLightStarlightState
+                    && blockLightKind == other.blockLightKind
+                    && Arrays.equals(blockLightBytes, other.blockLightBytes)
+                    && blockLightStarlightState == other.blockLightStarlightState;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(
+                    sectionY, skyLightKind, skyLightStarlightState, blockLightKind, blockLightStarlightState);
+            result = 31 * result + Arrays.hashCode(biomeGlobalDictIds);
+            result = 31 * result + Arrays.hashCode(biomePackedLongs);
+            result = 31 * result + Arrays.hashCode(skyLightBytes);
+            return 31 * result + Arrays.hashCode(blockLightBytes);
+        }
+
+        @Override
+        public String toString() {
+            return "DecodedSectionMeta[sectionY=" + sectionY
+                    + ", biomeGlobalDictIds=" + Arrays.toString(biomeGlobalDictIds)
+                    + ", biomePackedLongs=" + Arrays.toString(biomePackedLongs)
+                    + ", skyLightKind=" + skyLightKind
+                    + ", skyLightBytes=" + Arrays.toString(skyLightBytes)
+                    + ", skyLightStarlightState=" + skyLightStarlightState
+                    + ", blockLightKind=" + blockLightKind
+                    + ", blockLightBytes=" + Arrays.toString(blockLightBytes)
+                    + ", blockLightStarlightState=" + blockLightStarlightState + "]";
+        }
     }
 }

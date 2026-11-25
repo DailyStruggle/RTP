@@ -117,9 +117,10 @@ class AnvilRegionInspectorCliTest {
         assertTrue(filteredOut.get(0).sampleChunks().isEmpty());
 
         PrintStream origOut = System.out;
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        try {
-            System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
+        String json;
+        try (ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                PrintStream capture = new PrintStream(buf, true, StandardCharsets.UTF_8)) {
+            System.setOut(capture);
             AnvilRegionInspectorCli.main(new String[] {
                 mcaFile.toString(),
                 "--block-filter",
@@ -129,10 +130,11 @@ class AnvilRegionInspectorCliTest {
                 "--max-samples",
                 "4"
             });
+            capture.flush();
+            json = buf.toString(StandardCharsets.UTF_8);
         } finally {
             System.setOut(origOut);
         }
-        String json = buf.toString(StandardCharsets.UTF_8);
         assertTrue(json.contains("\"region_count\": 1"));
         assertTrue(json.contains("\"minecraft:oak_log\": 10"));
         assertTrue(json.contains("\"minecraft:oak_leaves\": 25"));

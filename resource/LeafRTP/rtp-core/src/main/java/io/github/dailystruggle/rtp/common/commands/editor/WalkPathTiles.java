@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Full-resolution walk path of one region, produced as spatial tiles over time (ADR-104 §4.6).
@@ -52,7 +53,7 @@ public final class WalkPathTiles {
     private final Deque<int[]> pending;
     private final int tilesTotal;
     private final boolean truncated;
-    private volatile int tilesDone;
+    private final AtomicInteger tilesDone = new AtomicInteger();
 
     WalkPathTiles(String region, MemoryShape<?> shape, int maxTiles) {
         this.region = Objects.requireNonNull(region, "region");
@@ -95,7 +96,7 @@ public final class WalkPathTiles {
     }
 
     public int tilesDone() {
-        return tilesDone;
+        return tilesDone.get();
     }
 
     public int tilesTotal() {
@@ -124,11 +125,11 @@ public final class WalkPathTiles {
         while (!pending.isEmpty() && scanned < Math.max(1, maxTiles)) {
             int[] t = pending.poll();
             scanned++;
-            tilesDone++;
+            tilesDone.incrementAndGet();
             Tile tile = computeTile(shape, range, t[0], t[1]);
             if (tile != null) tiles.add(tile);
         }
-        return new Batch(region, tiles, tilesDone, tilesTotal, isDone());
+        return new Batch(region, tiles, tilesDone.get(), tilesTotal, isDone());
     }
 
     /**

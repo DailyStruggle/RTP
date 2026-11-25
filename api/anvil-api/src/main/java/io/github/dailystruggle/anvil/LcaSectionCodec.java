@@ -224,6 +224,8 @@ final class LcaSectionCodec {
     static void clearThreadLocalScratch() {
         SCRATCH.remove();
         LcaV3Codec.clearThreadLocalScratch();
+        LcaModeABlockSection.clearThreadLocalScratch();
+        LcaSectionBacking.clearThreadLocalScratch();
     }
 
     /**
@@ -9296,6 +9298,24 @@ final class LcaSectionCodec {
     }
 
     private record DirectBiomeData(int[] globalDictIds, long[] packedLongs) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof DirectBiomeData other)) return false;
+            return Arrays.equals(globalDictIds, other.globalDictIds)
+                    && Arrays.equals(packedLongs, other.packedLongs);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(globalDictIds) + Arrays.hashCode(packedLongs);
+        }
+
+        @Override
+        public String toString() {
+            return "DirectBiomeData[globalDictIds=" + Arrays.toString(globalDictIds)
+                    + ", packedLongs=" + Arrays.toString(packedLongs) + "]";
+        }
     }
 
     private record DirectMicroPalette(
@@ -9304,6 +9324,31 @@ final class LcaSectionCodec {
             DirectBiomeData[] biomeTemplates,
             byte[] stateLightV1
     ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof DirectMicroPalette other)) return false;
+            return Arrays.equals(localToGlobalStateId, other.localToGlobalStateId)
+                    && Arrays.equals(localToGlobalBiomeId, other.localToGlobalBiomeId)
+                    && Arrays.equals(biomeTemplates, other.biomeTemplates)
+                    && Arrays.equals(stateLightV1, other.stateLightV1);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Arrays.hashCode(localToGlobalStateId);
+            result = 31 * result + Arrays.hashCode(localToGlobalBiomeId);
+            result = 31 * result + Arrays.hashCode(biomeTemplates);
+            return 31 * result + Arrays.hashCode(stateLightV1);
+        }
+
+        @Override
+        public String toString() {
+            return "DirectMicroPalette[localToGlobalStateId=" + Arrays.toString(localToGlobalStateId)
+                    + ", localToGlobalBiomeId=" + Arrays.toString(localToGlobalBiomeId)
+                    + ", biomeTemplates=" + Arrays.toString(biomeTemplates)
+                    + ", stateLightV1=" + Arrays.toString(stateLightV1) + "]";
+        }
     }
 
     private static DirectMicroPalette decodePureIdMicroPaletteDirect(

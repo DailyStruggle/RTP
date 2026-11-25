@@ -63,6 +63,14 @@ public final class LcaSectionBacking {
     private static final ThreadLocal<SoftReference<CompactEncodeScratch>> THREAD_ENCODE_SCRATCH =
             new ThreadLocal<>();
 
+    /** Releases all per-thread scratch buffers owned by {@link LcaSectionBacking}. */
+    public static void clearThreadLocalScratch() {
+        THREAD_LOCAL_EPHEMERAL_VOXELS.remove();
+        THREAD_LOCAL_WORD_MASKS_64.remove();
+        THREAD_DECODE_YZX_4096.remove();
+        THREAD_ENCODE_SCRATCH.remove();
+    }
+
     private static int[] decodeYzx4096Scratch() {
         SoftReference<int[]> ref = THREAD_DECODE_YZX_4096.get();
         int[] buf = ref != null ? ref.get() : null;
@@ -1429,7 +1437,7 @@ public final class LcaSectionBacking {
     }
 
     /**
-     * Applies an array of packed 32-bit `dirtyOverlay` entries (`((pos12 + 1) << 19) | stateId19`)
+     * Applies an array of packed 32-bit `dirtyOverlay` entries ({@code ((pos12 + 1) << 19) | stateId19})
      * from an inter-server or wire section delta directly into this section's `activeOverlay`.
      */
     public synchronized int applyPackedOverlayEntries(int[] packedOverlayEntries, long currentTick) {

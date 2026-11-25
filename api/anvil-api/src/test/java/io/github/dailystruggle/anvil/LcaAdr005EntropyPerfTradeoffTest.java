@@ -1106,7 +1106,10 @@ class LcaAdr005EntropyPerfTradeoffTest {
             try (FileChannel ch = FileChannel.open(regPath, StandardOpenOption.READ)) {
                 int chunksInReg = 0;
                 for (int rz = 0; rz < 32 && chunksInReg < 24; rz += 5) {
-                    for (int rx = 0; rx < 32 && chunksInReg < 24; rx += 5) {
+                    for (int rx = 0; rx < 32; rx += 5) {
+                        if (chunksInReg >= 24) {
+                            break;
+                        }
                         if (!LcaRegionReader.INSTANCE.isChunkGenerated(regBytes, rx, rz)) continue;
                         AnvilReader.ChunkEntry entry = LcaRegionReader.INSTANCE.readChunk(regBytes, rx, rz);
                         if (entry == null || entry.root == null) continue;
@@ -1881,21 +1884,30 @@ class LcaAdr005EntropyPerfTradeoffTest {
         };
 
         byte[][] archives = new byte[variantNames.length][];
-        LcaRegionWriter.LcaLiveArchive[] liveArchs = new LcaRegionWriter.LcaLiveArchive[variantNames.length];
+        double[] encUs = new double[variantNames.length];
+        double[] nbtRdUs = new double[variantNames.length];
+        double[] viewRdUs = new double[variantNames.length];
         for (int v = 0; v < variantNames.length; v++) {
-            LcaV3Codec.setThreadFeatureMask(featMasks[v]);
-            try {
-                LcaRegionWriter.LcaLiveArchive arch = new LcaRegionWriter.LcaLiveArchive(
-                        0, 0, -4, 24, dataVersion, lcd2Levels[v],
-                        LcaRegionReader.STORAGE_KIND_REGION_VOXEL,
-                        LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES,
-                        versions[v]);
+            final int fv = v;
+            LcaV3Codec.setThreadFeatureMask(featMasks[fv]);
+            try (LcaRegionWriter.LcaLiveArchive arch = new LcaRegionWriter.LcaLiveArchive(
+                    0, 0, -4, 24, dataVersion, lcd2Levels[fv],
+                    LcaRegionReader.STORAGE_KIND_REGION_VOXEL,
+                    LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES,
+                    versions[fv])) {
                 for (int i = 0; i < n; i++) {
                     int[] c = coords.get(i);
                     arch.saveChunkInitial(c[0], c[1], roots.get(i));
                 }
-                liveArchs[v] = arch;
-                archives[v] = arch.toByteArray();
+                archives[fv] = arch.toByteArray();
+                encUs[fv] = benchUs(1, 2, n, () -> {
+                    long acc = 0;
+                    for (int i = 0; i < n; i++) {
+                        int[] c = coords.get(i);
+                        acc += arch.saveChunkCoW(c[0], c[1], roots.get(i));
+                    }
+                    return acc;
+                });
             } finally {
                 LcaV3Codec.resetThreadFeatureMask();
             }
@@ -1903,34 +1915,13 @@ class LcaAdr005EntropyPerfTradeoffTest {
             for (int i = 0; i < n; i++) {
                 int[] c = coords.get(i);
                 AnvilChunkView exp = AnvilReader.toView(roots.get(i));
-                AnvilChunkView act = LcaRegionReader.readChunkView(archives[v], c[0], c[1]);
+                AnvilChunkView act = LcaRegionReader.readChunkView(archives[fv], c[0], c[1]);
                 assertNotNull(act);
                 for (int y = -64; y < 320; y += 37) {
                     assertEquals(exp.blockIdAt(5, y, 7), act.blockIdAt(5, y, 7));
                 }
-                byte[] nbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(archives[v], c[0], c[1]);
+                byte[] nbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(archives[fv], c[0], c[1]);
                 assertNotNull(nbt);
-            }
-        }
-
-        // Warmup + measure encode (saveChunkCoW), direct NBT decode, and readChunkView latencies
-        double[] encUs = new double[variantNames.length];
-        double[] nbtRdUs = new double[variantNames.length];
-        double[] viewRdUs = new double[variantNames.length];
-        for (int v = 0; v < variantNames.length; v++) {
-            final int fv = v;
-            LcaV3Codec.setThreadFeatureMask(featMasks[fv]);
-            try {
-                encUs[fv] = benchUs(1, 2, n, () -> {
-                    long acc = 0;
-                    for (int i = 0; i < n; i++) {
-                        int[] c = coords.get(i);
-                        acc += liveArchs[fv].saveChunkCoW(c[0], c[1], roots.get(i));
-                    }
-                    return acc;
-                });
-            } finally {
-                LcaV3Codec.resetThreadFeatureMask();
             }
             nbtRdUs[fv] = benchUs(1, 3, n, () -> {
                 long acc = 0;

@@ -588,10 +588,9 @@ class LcaGoldenFixtureTest {
             byte[] rawNbt = Nbt.writeNamedRoot("", roots.get(i));
             Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION);
             byte[] compressed;
-            try {
+            try (ByteArrayOutputStream bos = new ByteArrayOutputStream(rawNbt.length)) {
                 deflater.setInput(rawNbt);
                 deflater.finish();
-                ByteArrayOutputStream bos = new ByteArrayOutputStream(rawNbt.length);
                 byte[] buf = new byte[4096];
                 while (!deflater.finished()) {
                     int n = deflater.deflate(buf);

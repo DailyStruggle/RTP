@@ -83,7 +83,7 @@ public final class LcaRemoteStreamCodec {
 
     /**
      * Packs a 12-bit voxel position (`0..4095`) and 19-bit block-state ID into a non-zero
-     * 32-bit `dirtyOverlay` entry (`((pos12 + 1) << 19) | (stateId19 & 0x7FFFF)`).
+     * 32-bit `dirtyOverlay` entry ({@code ((pos12 + 1) << 19) | (stateId19 & 0x7FFFF)}).
      */
     public static int packDirtyOverlayEntry(int pos12, int stateId19) {
         if (pos12 < 0 || pos12 > 0xFFF) {

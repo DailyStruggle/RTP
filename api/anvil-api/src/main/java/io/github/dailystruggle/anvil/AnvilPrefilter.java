@@ -152,7 +152,7 @@ public final class AnvilPrefilter {
   /**
    * Synchronous detailed-probe entry point. Returns both the verdict and, on ACCEPT,
    * the decoded {@link AnvilChunkView}. Exposed for tests and for
-   * {@link #probeDetailed(Path, String, int, int, Set, UnaryOperator)}.
+   * {@link #probeDetailed(Path, String, int, int, Set, UnaryOperator, Executor)}.
    *
    * <p>This three-arg overload uses the {@link #DEFAULT_RECONCILER}; platform adapters
    * that need a registry-aware reconciler (e.g. {@code Material.matchMaterial} on

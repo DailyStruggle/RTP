@@ -1,6 +1,5 @@
 package io.github.dailystruggle.anvil;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -11,8 +10,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 
 /**
  * Single-pass streaming binary Mojang NBT chunk visitor and `.lca` `ChunkFrame` slab encoder
@@ -300,107 +297,17 @@ public final class LcaStreamingNbtEncoder {
             }
         }
 
-        int[] localStateGlobalIdArr = null;
-        if (useSlabLocalPalette && localStateGlobalIds != null) {
-            localStateGlobalIdArr = new int[localStateGlobalIds.size()];
-            for (int k = 0; k < localStateGlobalIdArr.length; k++) {
-                localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
-            }
-        }
-        byte[] slabLocalPaletteBytes;
-        if (!useSlabLocalPalette) {
-            slabLocalPaletteBytes = new byte[0];
-        } else if (factoredV3) {
-            int[] localBiomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
-            for (int k = 0; k < localBiomeGlobalIdArr.length; k++) {
-                localBiomeGlobalIdArr[k] = localBiomeGlobalIds.get(k);
-            }
-            slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
-                    localStateGlobalIdArr, localStateGlobalIdArr.length,
-                    localBiomeGlobalIdArr, localBiomeGlobalIdArr.length,
-                    sortedBiomeTemplates);
-        } else {
-            slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
-                    localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates);
-        }
-        totalSectionPayloadBytes += slabLocalPaletteBytes.length;
-
-        boolean scale4B = totalSectionPayloadBytes > 0x7FFF;
-        int unitShift = scale4B ? 2 : 0;
-        int unitAlign = 1 << unitShift;
-
-        ByteArrayOutputStream sectionsBody = new ByteArrayOutputStream(totalSectionPayloadBytes + 16);
-        if (useSlabLocalPalette) {
-            sectionsBody.writeBytes(slabLocalPaletteBytes);
-        }
-        int[] sectionOffsetEntries = new int[sectionCount];
-
-        for (int i = 0; i < sectionCount; i++) {
-            LcaSectionCodec.EncodedSection enc = encodedSections[i];
-            if (enc == null) {
-                sectionOffsetEntries[i] = 0x0000;
-            } else if (enc.inlineEntry16 != 0) {
-                sectionOffsetEntries[i] = enc.inlineEntry16;
-            } else {
-                while ((sectionsBody.size() & (unitAlign - 1)) != 0) {
-                    sectionsBody.write(0);
-                }
-                int startRel = sectionsBody.size();
-                int entry16 = (startRel >>> unitShift) + 1;
-                if (entry16 > 0x7FFF) {
-                    throw new IOException("Section offset exceeded 15-bit range even with scale4B=" + scale4B);
-                }
-                sectionOffsetEntries[i] = entry16;
-                sectionsBody.writeBytes(enc.frameBytes);
-            }
-        }
-
-        if (scale4B) {
-            while ((sectionsBody.size() & 3) != 0) {
-                sectionsBody.write(0);
-            }
-        }
-        int residualNbtRelOffset = sectionsBody.size() >>> unitShift;
-        if (residualNbtRelOffset > 0xFFFF) {
-            throw new IOException("Residual offset exceeded 16-bit range: " + residualNbtRelOffset);
-        }
-
         boolean effectiveModeB = archive.isWriteModeBLcd2();
         byte[] residualNbtBytes = buildCompactResidualTail(
                 chunk, archive.minSectionY(), sectionCount, !effectiveModeB, arena,
                 (archive.regionX() << 5) + rx, (archive.regionZ() << 5) + rz, formatVersion);
-        boolean hasResidualNbt = residualNbtBytes.length > 0;
 
-        int defaultBiomeCode = (chunkDefaultBiomeDictId >= 0 && chunkDefaultBiomeDictId < 30)
-                ? (chunkDefaultBiomeDictId + 1)
-                : 0;
-        int chunkFlags = (hasResidualNbt ? 1 : 0)
-                | (useSlabLocalPalette ? 2 : 0)
-                | (scale4B ? 4 : 0)
-                | ((defaultBiomeCode & 0x1F) << 3);
-
-        int chunkIdx = (rx & 31) | ((rz & 31) << 5);
         int headerLen = 24 + (sectionCount << 1);
-        byte[] secBytes = sectionsBody.toByteArray();
-        byte[] chunkFrame = new byte[headerLen + secBytes.length + residualNbtBytes.length];
-        ByteBuffer bb = ByteBuffer.wrap(chunkFrame);
-        int selfDescribingDvWord = LcaRegionReader.CHUNK_FRAME_SELF_TAG_MAGIC
-                | ((chunkIdx & 0x03FF) << 16)
-                | (chunk.chunkDataVersion & 0xFFFF);
-        bb.putInt(0, selfDescribingDvWord);
-        bb.putLong(4, chunk.lastUpdate);
-        bb.putLong(12, chunk.inhabitedTime);
-        chunkFrame[20] = (byte) chunk.statusOrdinal;
-        chunkFrame[21] = (byte) chunkFlags;
-        bb.putShort(22, (short) residualNbtRelOffset);
-        for (int i = 0; i < sectionCount; i++) {
-            bb.putShort(24 + (i << 1), (short) sectionOffsetEntries[i]);
-        }
-        System.arraycopy(secBytes, 0, chunkFrame, headerLen, secBytes.length);
-        if (hasResidualNbt) {
-            System.arraycopy(
-                    residualNbtBytes, 0, chunkFrame, headerLen + secBytes.length, residualNbtBytes.length);
-        }
+        byte[] chunkFrame = LcaRegionWriter.LcaLiveArchive.assembleChunkFrame(
+                rx, rz, sectionCount, chunk.chunkDataVersion, chunk.lastUpdate, chunk.inhabitedTime,
+                chunk.statusOrdinal, chunkDefaultBiomeDictId, useSlabLocalPalette, factoredV3,
+                localStateList, localStateGlobalIds, localBiomeList, localBiomeGlobalIds,
+                sortedBiomeTemplates, encodedSections, totalSectionPayloadBytes, residualNbtBytes);
 
         if (effectiveModeB) {
             return archive.encodeModeBWithAtomicDictForStreaming(chunkFrame, headerLen);
@@ -673,95 +580,21 @@ public final class LcaStreamingNbtEncoder {
             nbtBytes = Arrays.copyOf(rawNbtScratch, rawOutPos);
         }
 
-        if (allowDeflateResidual && nbtBytes.length >= 256) {
-            ByteArrayOutputStream defOut = new ByteArrayOutputStream(Math.max(128, nbtBytes.length >>> 2));
-            Deflater deflater = new Deflater(Deflater.BEST_SPEED);
-            try (DeflaterOutputStream dos = new DeflaterOutputStream(defOut, deflater)) {
-                dos.write(nbtBytes);
-            } finally {
-                deflater.end();
-            }
-            byte[] compressedNbt = defOut.toByteArray();
-            if (compressedNbt.length < nbtBytes.length) {
-                nbtBytes = compressedNbt;
-                bpFlags |= 4096;
-            }
-        }
-        if (extFlags != 0) {
-            bpFlags |= LcaV3Codec.BP_FLAG_HAS_EXTENDED_FLAGS;
-        }
-        if (nbtBytes.length > 0) {
-            bpFlags |= 1024;
-        }
-        int mbnlLen = mbnlPrefix == null ? 0 : mbnlPrefix.length;
-        if (mbnlLen > 0) {
-            bpFlags |= 8192;
-        }
-        if (bpFlags == 0) {
-            return new byte[0];
-        }
-
-        ByteArrayOutputStream tailOut = new ByteArrayOutputStream(64 + mbnlLen + nbtBytes.length);
-        tailOut.write((bpFlags >>> 8) & 0xFF);
-        tailOut.write(bpFlags & 0xFF);
-        if ((bpFlags & 8192) != 0) {
-            byte[] vBuf = new byte[5];
-            int mLen = LcaSectionCodec.writeVarIntToBuf(vBuf, 0, mbnlLen);
-            tailOut.write(vBuf, 0, mLen);
-            tailOut.write(mbnlPrefix, 0, mbnlLen);
-        }
-        if ((bpFlags & 32) != 0) {
-            tailOut.write(ppEmptyCount & 0xFF);
-        }
-        if ((bpFlags & 64) != 0) {
-            byte[] vBuf = new byte[5];
-            int vLen = LcaSectionCodec.writeVarIntToBuf(vBuf, 0, starlightVer);
-            tailOut.write(vBuf, 0, vLen);
-        }
-        if ((bpFlags & 128) != 0) {
-            tailOut.write(lowBoundaryFlags & 0xFF);
-        }
-        if ((bpFlags & 256) != 0) {
-            tailOut.write(highBoundaryFlags & 0xFF);
-        }
-        if ((bpFlags & 512) != 0) {
-            tailOut.write(secHmKeys.size() & 0xFF);
-            byte[] vBuf = new byte[5];
-            for (int h = 0; h < secHmKeys.size(); h++) {
-                String hmKey = secHmKeys.get(h);
-                byte[] pay = secHmPayloads.get(h);
-                int code = LcaSectionCodec.encodeStandardHeightmapCode(hmKey);
-                tailOut.write(code & 0xFF);
-                if (code == 0xFF) {
-                    byte[] kUtf = hmKey.getBytes(StandardCharsets.UTF_8);
-                    int kLen = LcaSectionCodec.writeVarIntToBuf(vBuf, 0, kUtf.length);
-                    tailOut.write(vBuf, 0, kLen);
-                    tailOut.writeBytes(kUtf);
-                }
-                int pLen = LcaSectionCodec.writeVarIntToBuf(vBuf, 0, pay.length);
-                tailOut.write(vBuf, 0, pLen);
-                tailOut.writeBytes(pay);
-            }
-        }
-        if (extFlags != 0) {
-            LcaV3Codec.writeVarInt(tailOut, extFlags);
-            if (extBlockTicks != null) {
-                LcaV3Codec.writeVarInt(tailOut, extBlockTicks.length);
-                tailOut.writeBytes(extBlockTicks);
-            }
-            if (extFluidTicks != null) {
-                LcaV3Codec.writeVarInt(tailOut, extFluidTicks.length);
-                tailOut.writeBytes(extFluidTicks);
-            }
-            if (extBlockEntities != null) {
-                LcaV3Codec.writeVarInt(tailOut, extBlockEntities.length);
-                tailOut.writeBytes(extBlockEntities);
-            }
-        }
-        if (nbtBytes.length > 0) {
-            tailOut.writeBytes(nbtBytes);
-        }
-        return tailOut.toByteArray();
+        return LcaRegionWriter.LcaLiveArchive.assembleResidualTailBytes(
+                nbtBytes,
+                allowDeflateResidual,
+                bpFlags,
+                extFlags,
+                mbnlPrefix,
+                ppEmptyCount,
+                starlightVer,
+                lowBoundaryFlags,
+                highBoundaryFlags,
+                secHmKeys,
+                secHmPayloads,
+                extBlockTicks,
+                extFluidTicks,
+                extBlockEntities);
     }
 
     private static byte[] appendRawSlice(
