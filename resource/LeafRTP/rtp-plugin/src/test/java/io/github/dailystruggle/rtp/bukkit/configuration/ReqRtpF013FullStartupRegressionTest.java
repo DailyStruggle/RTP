@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import net.leaf.yaml.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;

@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.api.safety.SafetyToken;
-import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
+import net.leaf.yaml.configuration.ConfigParser;
+import net.leaf.tags.safety.SafetyToken;
+import net.leaf.tags.safety.SafetyTokenParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;

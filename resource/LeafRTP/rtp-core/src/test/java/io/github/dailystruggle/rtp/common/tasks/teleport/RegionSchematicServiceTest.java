@@ -8,12 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster;
-import io.github.dailystruggle.rtp.api.schematic.BlockPlacement;
-import io.github.dailystruggle.rtp.api.schematic.LoadedSchematic;
-import io.github.dailystruggle.rtp.api.schematic.PasteOptions;
-import io.github.dailystruggle.rtp.api.schematic.PasteResult;
-import io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner;
-import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
+import net.leaf.schematics.schematic.BlockPlacement;
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.PasteResult;
+import net.leaf.schematics.schematic.SchematicPlacementPlanner;
+import net.leaf.schematics.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabSchematicInstaller;
 import io.github.dailystruggle.rtp.common.commands.prefab.Skyblock;

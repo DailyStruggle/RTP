@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import net.leaf.yaml.configuration.ConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -34,7 +36,7 @@ public class DynamicWorldConfigTest {
         configs = new Configs(tempDir.toFile());
         ActiveConfigs.set(configs);
         mockMulti = mock(MultiConfigParser.class);
-        mockMulti.configParserFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        mockMulti.configParserFactory = new net.leaf.yaml.factory.Factory<>();
         configs.multiConfigParserMap.put(WorldKeys.class, mockMulti);
 
         mockWorldParser = mock(ConfigParser.class);

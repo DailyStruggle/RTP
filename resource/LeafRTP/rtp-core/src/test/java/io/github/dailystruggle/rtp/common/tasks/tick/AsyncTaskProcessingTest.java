@@ -216,8 +216,8 @@ class AsyncTaskProcessingTest {
     @DisplayName("performance.yml period: autoTune false refills once per `period` pulses; autoTune true refills every pulse with credit")
     void period_singleRegion_runsOncePerPeriod() {
         @SuppressWarnings("unchecked")
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.autoTune, false);

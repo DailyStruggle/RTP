@@ -332,8 +332,8 @@ public class TimeBoundTaskPipeCharacterizationTest {
 
             Field pickField = Region.class.getDeclaredField("backlogPacer");
             pickField.setAccessible(true);
-            io.github.dailystruggle.rtp.common.predict.BudgetPacer pacer =
-                    (io.github.dailystruggle.rtp.common.predict.BudgetPacer) pickField.get(region);
+            net.leaf.predict.BudgetPacer pacer =
+                    (net.leaf.predict.BudgetPacer) pickField.get(region);
             assertEquals(0L, pacer.predictedCostNanos(), "Initial backlog predicted cost must be 0");
 
             Method processBacklogMethod = Region.class.getDeclaredMethod("processBacklog", long.class, long.class);

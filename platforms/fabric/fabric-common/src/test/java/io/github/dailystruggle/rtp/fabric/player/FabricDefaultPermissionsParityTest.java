@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * MULTI_PLATFORM_PLAN Step F sub-item 5 - Permission node parity test vs. the
  * Bukkit adapter.
  *
- * <p><b>Why this exists.</b> {@link FabricDefaultPermissions} is the Fabric-side
+ * <p>{@link FabricDefaultPermissions} is the Fabric-side
  * substitute for the {@code plugin.yml} {@code permissions:} default table that
  * Bukkit / Paper / Folia / Spigot consume automatically. On Bukkit
  * {@code BukkitRTPPlayer#hasPermission} simply delegates to

@@ -258,7 +258,7 @@ public final class NetworkBindings {
      * Redis host does not break the proxy boot.
      *
      * <p>The returned waitlist is owned by the caller; closing the
-     * Redis-backed waitlist releases its {@link io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool}.
+     * Redis-backed waitlist releases its {@link net.leaf.database.resp.RespPool}.
      * The in-memory waitlist does not implement {@link AutoCloseable} and
      * needs no teardown.</p>
      *

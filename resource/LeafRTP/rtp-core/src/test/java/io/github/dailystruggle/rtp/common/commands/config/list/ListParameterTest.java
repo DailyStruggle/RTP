@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 import java.nio.file.Path;
 

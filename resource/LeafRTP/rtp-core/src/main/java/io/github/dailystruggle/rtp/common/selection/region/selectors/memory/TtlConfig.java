@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.TtlKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -113,9 +113,9 @@ public final class TtlConfig {
     if (s.isEmpty() || s.equals("-1") || s.equals("infinite") || s.equals("permanent")) {
       return INFINITE;
     }
-    io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.ParsedDuration parsed =
-        io.github.dailystruggle.rtp.common.selection.region.util.DurationParser.parse(
-            s, io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit.SECOND);
+    net.leaf.units.DurationParser.ParsedDuration parsed =
+        net.leaf.units.DurationParser.parse(
+            s, net.leaf.units.TemporalUnit.SECOND);
     if (parsed == null) return INFINITE;
     long seconds = (long) Math.round(parsed.toSeconds());
     return seconds <= 0 ? INFINITE : seconds;

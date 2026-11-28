@@ -124,7 +124,7 @@ A new `MetricInput.KEPT_REGION` extracts `1 - min(1, regionKeptCounts[r] / 64)`.
 
 In typical deployments each backend hosts one region (often named after the server). The pair-wise sum collapses to "per-backend score plus a constant", and the `(serverId asc, regionKey asc)` tiebreak preserves the determinism of the legacy backend-only path. Multi-region backends are handled the same way: each `(b, r)` is scored independently, so a backend with two regions does not unfairly outweigh a peer with one.
 
-### Why Not Fork Lobby And Proxy
+### Shared Selector Between Lobby and Proxy
 
 Operators tune curves and weights in `network.yml` once. The lobby and proxy disagree only when they observe different snapshots (different Redis read instants), which self-corrects on the next heartbeat tick. Forking would mean two config blocks, two tuning passes, and inevitable divergence.
 

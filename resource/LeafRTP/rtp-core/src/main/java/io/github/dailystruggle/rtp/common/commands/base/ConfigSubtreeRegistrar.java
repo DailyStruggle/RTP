@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.base;
 
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 
 /**
  * Capability contract for command nodes that can register child configuration parsers.

@@ -180,7 +180,7 @@ public class MockRTPWorld extends RTPWorld<String> {
      * Test hook (ADR-060): blocks captured by the most recent successful
      * {@link #restoreBlocks(java.util.List)} call.
      */
-    public final java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> restoredBlocks =
+    public final java.util.List<net.leaf.schematics.platform.BlockDelta> restoredBlocks =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /** Test hook (ADR-060): when {@code true}, {@link #restoreBlocks} returns {@code false} (failure path). */
@@ -188,7 +188,7 @@ public class MockRTPWorld extends RTPWorld<String> {
 
     @Override
     public boolean restoreBlocks(
-            java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+            java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
         if (restoreShouldFail) return false;
         restoredBlocks.addAll(blocks);
         return true;

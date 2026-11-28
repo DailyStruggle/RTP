@@ -13,7 +13,7 @@ import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 
 import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
@@ -273,8 +273,8 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
             }
         }
         assertTrue(regionsParser != null);
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> defaultParser =
-                new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> defaultParser =
+                new net.leaf.yaml.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
                         "default",
                         "1.0",
@@ -319,7 +319,7 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
             }
         }
         assertNotNull(regionsParser);
-        regionsParser.addParser(new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        regionsParser.addParser(new net.leaf.yaml.configuration.ConfigParser<>(
                 io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
                 "default", "1.0", regionsParser.myDirectory, regionsParser.fileDatabase));
         MultiConfigParser<?> parser = regionsParser;
@@ -541,8 +541,8 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         assertTrue(mDescend.invoke(null, sq, "nonexistent") == null);
 
         // RtpYamlSection descent
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection mockSection =
-                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection.class);
+        net.leaf.yaml.RtpYamlSection mockSection =
+                org.mockito.Mockito.mock(net.leaf.yaml.RtpYamlSection.class);
         org.mockito.Mockito.when(mockSection.get("shape.radius")).thenReturn(500L);
         org.mockito.Mockito.when(mockSection.get("throwing")).thenThrow(new RuntimeException("err"));
         assertEquals(500L, mDescend.invoke(null, mockSection, "shape.radius"));

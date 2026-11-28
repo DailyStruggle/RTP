@@ -4,7 +4,7 @@ package io.github.dailystruggle.rtp.countdownaddon;
  * Configuration keys for the countdown addon.
  *
  * <p>Enum constants are matched against YAML keys in {@code countdown.yml} by RTP's
- * {@link io.github.dailystruggle.rtp.common.configuration.ConfigParser}. Add a new constant here to
+ * {@link net.leaf.yaml.configuration.ConfigParser}. Add a new constant here to
  * expose a new option; no reflection glue is needed.
  */
 public enum CountdownKeys {

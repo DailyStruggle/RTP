@@ -18,7 +18,7 @@ import java.util.logging.Level;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 public class ListCmd extends BaseRTPCmdImpl {
   private final String name;

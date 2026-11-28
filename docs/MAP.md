@@ -35,6 +35,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — pointer to the Linear `LeafRTP` team, where forward-looking work is tracked.
 - [`dev/POTENTIAL_BUGS.md`](dev/POTENTIAL_BUGS.md) — triage log for potential issues found during development.
 - [`dev/PUBLISHING.md`](dev/PUBLISHING.md) — publishing `rtp-api`/`rtp-core` for out-of-repo addons (JitPack active; Maven Central how-to).
+- [`dev/MARKETPLACE_CONVERSION_RESEARCH.md`](dev/MARKETPLACE_CONVERSION_RESEARCH.md) — cross-resource storefront conversion baselines, sample-size power, review cold-start, AI disclosure, and hosting buyer segments.
 - [`dev/PULL_REQUEST_PROCESS.md`](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, local verification gates, and CI pipeline reference.
 - [`dev/SEMVER.md`](dev/SEMVER.md) — semantic versioning policy and guarantees.
 - [`dev/STAKEHOLDERS.md`](../resource/LeafRTP/docs/dev/STAKEHOLDERS.md) — roles.

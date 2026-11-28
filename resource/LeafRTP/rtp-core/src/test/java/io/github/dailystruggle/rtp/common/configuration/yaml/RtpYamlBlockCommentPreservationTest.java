@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration.yaml;
 
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlReader;
+import net.leaf.yaml.RtpYamlWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

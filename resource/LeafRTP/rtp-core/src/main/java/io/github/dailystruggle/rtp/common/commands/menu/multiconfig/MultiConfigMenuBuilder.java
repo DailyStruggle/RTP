@@ -5,8 +5,8 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 
 import java.util.ArrayList;
 import java.util.EnumMap;

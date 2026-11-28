@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.world;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import net.leaf.yaml.search.FuzzySearchEngine;
 import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

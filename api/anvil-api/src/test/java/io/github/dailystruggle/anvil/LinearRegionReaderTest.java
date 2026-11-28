@@ -342,7 +342,7 @@ class LinearRegionReaderTest {
         // 5. Exercise LcaRegionWriter and LcaRegionFileStorage zstdLevel (0, 1, 6) overloads
         byte[] lcaZ0 = LcaRegionWriter.transcodeFromReader(reader, blV3Bytes, 0, 0, 0);
         byte[] lcaZ1 = LcaRegionWriter.transcodeFromReader(reader, blV3Bytes, 0, 0, 1);
-        byte[] lcaZ6 = LcaRegionWriter.convertModeAToModeB(lcaZ0, 6);
+        byte[] lcaZ6 = LcaRegionWriter.transcodeFromReader(reader, blV3Bytes, 0, 0, 6);
         assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ0, rx, rz));
         assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ1, rx, rz));
         assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ6, rx, rz));

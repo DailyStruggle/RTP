@@ -7,7 +7,7 @@ import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;

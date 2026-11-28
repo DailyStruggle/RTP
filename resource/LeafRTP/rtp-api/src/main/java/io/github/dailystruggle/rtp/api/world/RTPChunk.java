@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.api.world;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
+import net.leaf.tags.safety.CompiledUnsafeSet;
 import java.util.Objects;
 import java.util.Set;
 

@@ -5,7 +5,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -72,7 +72,7 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
     void connect_withExistingYamlFile_loadsIt() throws Exception {
         File RtpYamlConfig = tempDir.resolve("player.yml").toFile();
         RtpYamlConfig.createNewFile();
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
+        net.leaf.yaml.RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.set("health", 20);
         yf.save();
 

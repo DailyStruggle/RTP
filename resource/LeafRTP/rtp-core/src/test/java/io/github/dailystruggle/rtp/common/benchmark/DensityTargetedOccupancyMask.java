@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 /**
  * Adjusts a {@link TiledOccupancyMask} to a target usable share while keeping its clustering.
  *
- * <p>Why this exists: the real save tiled outward is usable on about a quarter of its chunks, which
+ * <p>The real save tiled outward is usable on about a quarter of its chunks, which
  * is a harsher world than most servers run. A comparison of two curves at a stated usable share
  * needs that share as an input, not as whatever the source save happens to be, because run counts
  * depend on the boundary length between usable and unusable ground and that boundary is a function

@@ -1,6 +1,11 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.PasteResult;
+import net.leaf.schematics.schematic.PlacedBlockEntity;
+import net.leaf.schematics.schematic.SchematicPlacementPlanner;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.List;

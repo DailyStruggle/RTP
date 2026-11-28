@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.governor;
 
-import io.github.dailystruggle.rtp.common.predict.ProbedShareAllocator;
+import net.leaf.predict.ProbedShareAllocator;
 
 import java.util.AbstractMap;
 import java.util.AbstractSet;

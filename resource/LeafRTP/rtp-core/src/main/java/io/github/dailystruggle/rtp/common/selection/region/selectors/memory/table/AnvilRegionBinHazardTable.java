@@ -35,7 +35,7 @@ public final class AnvilRegionBinHazardTable {
   private final int binCount;
   private final BinContainer[] bins;
   private final long[] binGoodPrefixSums;
-  private long totalGoodCount;
+  private volatile long totalGoodCount;
 
   public sealed interface BinContainer
       permits UnallocatedBin, FullDiscardedBin, BitmaskBin, RunBin {

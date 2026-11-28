@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  *       {@code AnvilPrefilter.probeSyncDetailed} applies.
  * </ul>
  *
- * <p><b>Why the centre column and not all 256.</b> {@code probeSync} rejects a chunk when
+ * <p><b>Centre-column granularity.</b> {@code probeSync} rejects a chunk when
  * <i>any</i> of its 256 columns is unsafe, which is the right posture for an advisory pre-filter but
  * the wrong granularity for a per-chunk mask: at that rule almost every generated chunk on a real
  * save carries one waterlogged block somewhere and the usable share collapses towards zero. The

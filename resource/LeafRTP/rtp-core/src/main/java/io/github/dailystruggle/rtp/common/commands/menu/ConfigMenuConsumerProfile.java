@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.YamlCommentLookup;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 
 import java.util.Deque;
 import java.util.Objects;

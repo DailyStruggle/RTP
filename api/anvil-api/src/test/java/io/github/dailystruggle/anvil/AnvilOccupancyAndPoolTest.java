@@ -2,14 +2,11 @@ package io.github.dailystruggle.anvil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -100,21 +97,52 @@ class AnvilOccupancyAndPoolTest {
   }
 
   @Test
-  @DisplayName("AnvilIoPool executor service lifecycle and memory budget")
-  void testAnvilIoPool() throws ExecutionException, InterruptedException {
-    assertNotNull(AnvilIoPool.get());
-    Future<String> f = AnvilIoPool.get().submit(() -> Thread.currentThread().getName());
-    String threadName = f.get();
-    assertTrue(threadName.startsWith("RTP-Anvil-IO-"));
-
-    long defaultBudget = AnvilIoPool.getMemoryBudgetBytes();
+  @DisplayName("AnvilRegionByteCache memory budget and ColumnProbeCoalescer shutdown drain")
+  void testAnvilRegionByteCacheBudgetAndCoalescerDrain(@TempDir Path tmp) throws Exception {
+    long defaultBudget = AnvilRegionByteCache.getMemoryBudgetBytes();
     assertTrue(defaultBudget > 0);
+    try {
+      AnvilRegionByteCache.setMemoryBudgetBytes(128L * 1024L * 1024L);
+      assertEquals(128L * 1024L * 1024L, AnvilRegionByteCache.getMemoryBudgetBytes());
+    } finally {
+      AnvilRegionByteCache.setMemoryBudgetBytes(defaultBudget);
+    }
 
-    AnvilIoPool.setMemoryBudgetBytes(128L * 1024L * 1024L);
-    assertEquals(128L * 1024L * 1024L, AnvilIoPool.getMemoryBudgetBytes());
+    java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+    try (ColumnProbeCoalescer coalescer = AnvilPrefilter.createColumnProbeCoalescer(cmd -> pool.execute(() -> {
+      started.countDown();
+      try {
+        release.await(2, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      cmd.run();
+    }))) {
+      java.util.concurrent.CompletableFuture<ColumnProbe> inFlight =
+          AnvilPrefilter.probeColumnAsync(coalescer, tmp, "", 0, 0, 0, 15);
+      assertTrue(started.await(2, java.util.concurrent.TimeUnit.SECONDS));
 
-    // Restore
-    AnvilIoPool.setMemoryBudgetBytes(defaultBudget);
+      Thread releaser = new Thread(() -> {
+        try {
+          Thread.sleep(40L);
+        } catch (InterruptedException ignored) {
+          Thread.currentThread().interrupt();
+        }
+        release.countDown();
+      });
+      releaser.start();
+
+      assertTrue(coalescer.awaitDrain(2, java.util.concurrent.TimeUnit.SECONDS));
+      assertTrue(coalescer.isClosed());
+      assertTrue(inFlight.isDone());
+      java.util.concurrent.CompletableFuture<ColumnProbe> rejected =
+          AnvilPrefilter.probeColumnAsync(coalescer, tmp, "", 0, 0, 0, 15);
+      assertTrue(rejected.isCompletedExceptionally());
+    } finally {
+      pool.shutdownNow();
+    }
   }
 
   @Test

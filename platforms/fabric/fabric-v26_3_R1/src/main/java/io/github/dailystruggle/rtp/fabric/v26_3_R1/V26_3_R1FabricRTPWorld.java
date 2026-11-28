@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -180,7 +180,8 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                         .probeAndPublish(worldFolder, dim, cx, cz, k, rawUnsafe,
                                 s -> (RTPRuntime.serverAccessor() != null)
                                         ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                                        : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                                        : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s),
+                                RTPRuntime.blockingIoExecutor())
                         .thenCompose(result -> {
                             io.github.dailystruggle.anvil.AnvilChunkView view = result.view();
                             if (view != null) {
@@ -342,14 +343,27 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         return null;
     }
 
+    public CompletableFuture<Long> loadLiveChunk(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+        long k = key(cx, cz);
+        if (getLiveCachedChunk(k) != null) {
+            return CompletableFuture.completedFuture(k);
+        }
+        return loadLiveChunk(level, server, cx, cz, k);
+    }
+
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
-        return getChunkAt(cx, cz).thenApply(k -> {
+        return loadLiveChunk(cx, cz).thenApply(k -> {
+            if (k == null) return null;
             CompletableFuture<Boolean> done = new CompletableFuture<>();
             ChunkSet set = new ChunkSet(this, cx, cz,
                     Collections.singletonList(CompletableFuture.completedFuture(k)),
                     done);
-            done.complete(k != null);
+            done.complete(true);
             return set;
         });
     }
@@ -488,8 +502,9 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        // Coalesced on the server's blocking-I/O executor: pending probes for one r.X.Z.mca share one open (S-005).
         return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+                RTPRuntime.columnProbeCoalescer(),
                 worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
                 if (err != null) throw err;
@@ -760,7 +775,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     @Override
-    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    public int setBlocks(java.util.List<net.leaf.schematics.platform.BlockDelta> blocks) {
         ServerLevel level = world;
         if (level == null || blocks == null || blocks.isEmpty()) return 0;
         net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
@@ -774,7 +789,7 @@ public final class V26_3_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         }
         int placed = 0;
         String firstFailedToken = null;
-        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+        for (net.leaf.schematics.platform.BlockDelta delta : blocks) {
             try {
                 net.minecraft.world.level.block.state.BlockState state =
                         net.minecraft.commands.arguments.blocks.BlockStateParser

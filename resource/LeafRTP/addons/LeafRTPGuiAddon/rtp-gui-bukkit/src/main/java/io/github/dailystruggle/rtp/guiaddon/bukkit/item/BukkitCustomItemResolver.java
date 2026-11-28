@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.guiaddon.bukkit.item;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
-import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import net.leaf.yaml.search.FuzzySearchEngine;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;

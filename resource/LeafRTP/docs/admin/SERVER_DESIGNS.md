@@ -161,7 +161,7 @@ vert:
 
 On custom generator maps where 80–95% of chunks are ocean and safe land islands are small:
 
-- **Why naive setups struggle:** If `WATER` is blocked in `safety.yml` (`unsafeBlocks`) and 90% of the map is ocean, uncached random picks will reject 9 out of 10 chunks.
+- **Failure mode of uncached picks:** If `WATER` is blocked in `safety.yml` (`unsafeBlocks`) and 90% of the map is ocean, uncached random picks will reject 9 out of 10 chunks.
 - **Three solutions (pick one or combine):**
   1. **Off-Tick Spatial Pre-Scan (`/rtp scan start region=default`):** Walks the region's Archimedean spiral using the fast `.mca` / `.linear` region-file reader (`anvil-api`) and records ocean chunks in spatial memory (`mode: ACCUMULATE`), so future selections jump directly to real islands in $O(1)$.
   2. **Arrival Platform Schematic (`advanced/schematics/`):** Configure a small boat, raft, or lilypad/dock schematic in the region so players landing on water receive a safe floating platform (`PlatformRestoreSqlStore` automatically cleans temporary platforms up after expiration).

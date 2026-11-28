@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import java.util.List;
@@ -49,8 +48,6 @@ public class ScanPauseCmd extends ScanSubCmd {
       }
 
       scanTask.pause();
-      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
 
       if (ActiveConfigs.get() == null) continue;
       String msg = String.valueOf(ActiveConfigs.get().getConfigValue(CommandMessages.scanPause, ""));

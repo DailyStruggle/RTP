@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
+import net.leaf.database.resp.RespEndpoint;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

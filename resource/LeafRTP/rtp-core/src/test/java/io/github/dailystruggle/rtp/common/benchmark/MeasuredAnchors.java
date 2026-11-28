@@ -10,7 +10,7 @@ import java.util.Map;
  * Measured ground truth from the real stress harness, transcribed once so the queueing model has a
  * single calibration and validation surface (ADR-080).
  *
- * <p><b>Why these live in code.</b> A model that is checked against numbers a reader cannot see is
+ * <p>A model that is checked against numbers a reader cannot see is
  * not falsifiable. Every field here is a direct measurement from a named run, and the model's own
  * output is reported beside it as a signed residual, so a reader can see where the model is wrong
  * and in which direction.

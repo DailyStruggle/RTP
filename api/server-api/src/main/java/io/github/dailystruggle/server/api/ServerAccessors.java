@@ -1,6 +1,8 @@
 package io.github.dailystruggle.server.api;
 
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -77,6 +79,31 @@ public final class ServerAccessors {
     }
     ServerAccessor current = accessor;
     return current == null ? Optional.empty() : current.scheduler();
+  }
+
+  /**
+   * Returns the lifecycle-managed blocking-I/O {@link Executor} from the installed
+   * {@link ServerAccessor}, or falls back to the explicit {@link TaskScheduler} override if set.
+   *
+   * @return optional blocking I/O executor; never {@code null}
+   */
+  public static Optional<Executor> blockingIoExecutor() {
+    ServerAccessor current = accessor;
+    if (current != null) {
+      try {
+        Executor exec = current.blockingIoExecutor();
+        if (exec != null) {
+          return Optional.of(exec);
+        }
+      } catch (IllegalStateException ex) {
+        log(Level.FINE, "ServerAccessor has no blockingIoExecutor; checking scheduler override", ex);
+      }
+    }
+    TaskScheduler explicit = schedulerOverride;
+    if (explicit != null) {
+      return Optional.of(task -> explicit.runAsync(Objects.requireNonNull(task, "task")));
+    }
+    return Optional.empty();
   }
 
   /**

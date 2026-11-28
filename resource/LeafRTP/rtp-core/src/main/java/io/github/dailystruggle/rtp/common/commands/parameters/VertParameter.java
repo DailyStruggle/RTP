@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;

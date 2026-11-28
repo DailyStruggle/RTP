@@ -6,7 +6,7 @@ import java.util.Arrays;
  * A sorted run table over 1D keys, with two coalescing rules: the shipped fixed gap, and a
  * <b>dynamic</b> gap derived from the lengths of the runs being joined.
  *
- * <p>Why a test-scope table rather than the shipped one: {@code MemoryShape} exposes run start keys
+ * <p><b>Test-scope table:</b> {@code MemoryShape} exposes run start keys
  * but not run widths, and the dynamic rule needs widths on both sides of every gap. Rather than
  * widen shipped API for a measurement, the fixed rule here is a transcription of
  * {@code MemoryShape#coalesceRuns} - merge when {@code nextKey <= curEnd + gap} - and

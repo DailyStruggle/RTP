@@ -10,8 +10,9 @@
 // the root subprojects { } block. No shadow, no Loom, no platform deps.
 plugins {
     id 'java-library'
-    alias(libs.plugins.pitest) apply false
 }
+
+version = '1.0.0'
 
 base {
     archivesName = 'rtp-proxy-common'

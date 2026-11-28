@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis.resp;
 
+import net.leaf.database.resp.RespException;
+import net.leaf.database.resp.RespProtocol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

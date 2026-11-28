@@ -20,13 +20,18 @@ public final class OnPlayerJoin implements Listener {
     UUID uuid = player.getUniqueId();
 
     if (RTP.getInstance().fileBinStore != null && !TeleportSessions.current().latestTeleportData.containsKey(uuid)) {
-      TeleportData restored = RTP.getInstance().fileBinStore.load(uuid);
-      if (restored != null) {
-        TeleportSessions.current().latestTeleportData.put(uuid, restored);
-        if (restored.targetRegionName != null) {
-          RTP.setLastRegionTeleportTime(uuid, restored.targetRegionName, restored.time);
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+        if (RTP.getInstance().fileBinStore == null || TeleportSessions.current().latestTeleportData.containsKey(uuid)) {
+          return;
         }
-      }
+        TeleportData restored = RTP.getInstance().fileBinStore.load(uuid);
+        if (restored != null) {
+          TeleportSessions.current().latestTeleportData.putIfAbsent(uuid, restored);
+          if (restored.targetRegionName != null) {
+            RTP.setLastRegionTeleportTime(uuid, restored.targetRegionName, restored.time);
+          }
+        }
+      });
     }
 
     if (player.hasPermission("rtp.personalqueue")) {

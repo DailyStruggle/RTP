@@ -26,10 +26,6 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 // 1.20.1 ChunkStatus lives at .chunk.ChunkStatus (the package move to
 // .chunk.status happened in 1.21.3 - see V1_21_R1FabricVersionAdapter Javadoc).
 import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;

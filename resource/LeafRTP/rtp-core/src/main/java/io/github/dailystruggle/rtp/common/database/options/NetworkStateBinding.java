@@ -25,7 +25,13 @@ public interface NetworkStateBinding {
         NetworkTransport t = transport();
         if (t == null) return 0L;
         try {
-            return t.getLastTeleportTime(playerId).get(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+            java.util.concurrent.CompletableFuture<Long> future = t.getLastTeleportTime(playerId);
+            if (future == null) return 0L;
+            if (future.isDone()) {
+                Long nowVal = future.getNow(0L);
+                return nowVal != null ? nowVal : 0L;
+            }
+            return future.get(200, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return 0L;

@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.database.pool;
 
+import net.leaf.database.pool.MiniConnectionPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

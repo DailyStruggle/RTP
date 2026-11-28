@@ -15,14 +15,14 @@ import io.github.dailystruggle.rtp.common.commands.parameters.*;
 import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import net.leaf.yaml.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -34,9 +34,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistrar {
 

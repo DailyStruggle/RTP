@@ -129,5 +129,6 @@ Every product `FRONT_PAGE.md` follows a fixed 3-Zone progression where every fun
 - `scripts/tests/test_build_front_pages.py`
 - `corpus-atlas/build_doc_index.py` (`split_markdown_sections`, `extract_doc_snippet`)
 - [`docs/dev/RULES.md`](../dev/RULES.md) (`Rule D-006`, `Rule D-010`)
+- [`docs/dev/MARKETPLACE_CONVERSION_RESEARCH.md`](../dev/MARKETPLACE_CONVERSION_RESEARCH.md)
 - [corpus-atlas-ADR-001](../../corpus-atlas/docs/adr/corpus-atlas-ADR-001-scope-preserving-ast-synthesis-and-zero-open-cards.md), [corpus-atlas-ADR-002](../../corpus-atlas/docs/adr/corpus-atlas-ADR-002-method-scoped-ast-macro-comprehension-and-shorthand-ir.md)
 - Google Heading-Vector & Passage Indexing References: `US9959315B1` (*Generating a heading vector for a document*), `US20160078102A1` (*Document scoring based on document content update*), and Google Content Warehouse API (`CompositeDoc`, `PerDocData.bodyWordsToTokensRatioBegin`, `Goldmine`, `SalientTermsSet`).

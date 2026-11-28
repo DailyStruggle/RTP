@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.effects;
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;

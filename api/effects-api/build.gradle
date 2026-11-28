@@ -7,6 +7,8 @@
 //   - NeoForge : :rtp-neoforge:rtp-neoforge-common (rtp.neoforge.effects.local)
 // No Loom or platform jars here, so effects-api builds as a plain Java 17 library (ADR-113, ADR-116).
 
+version = '1.0.0'
+
 dependencies {
     // --- neutral server accessor seam (ADR-116) ---
     api project(':server-api')

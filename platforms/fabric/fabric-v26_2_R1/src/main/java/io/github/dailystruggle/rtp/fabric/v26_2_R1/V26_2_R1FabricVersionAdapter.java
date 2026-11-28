@@ -442,7 +442,16 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
                                             .get(io.github.dailystruggle.rtp.common.factory.FactoryNames.shape)
                                             .get("SQUARE");
                     if (shape instanceof io.github.dailystruggle.rtp.common.selection
-                            .region.selectors.memory.shapes.Square square) {
+                            .region.selectors.memory.shapes.MemoryShape<?> ms
+                            && ms.myClass == io.github.dailystruggle.rtp.common.selection.region
+                                    .selectors.memory.shapes.enums.GenericMemoryShapeParams.class) {
+                        @SuppressWarnings("unchecked")
+                        io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<
+                                io.github.dailystruggle.rtp.common.selection.region
+                                        .selectors.memory.shapes.enums.GenericMemoryShapeParams> square =
+                                (io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<
+                                        io.github.dailystruggle.rtp.common.selection.region
+                                                .selectors.memory.shapes.enums.GenericMemoryShapeParams>) shape;
                         square.set(io.github.dailystruggle.rtp.common.selection.region
                                         .selectors.memory.shapes.enums.GenericMemoryShapeParams.radius,
                                 (long) (mcBorder.getSize() / 32.0));

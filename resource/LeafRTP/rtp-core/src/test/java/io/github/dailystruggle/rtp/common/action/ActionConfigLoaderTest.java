@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -155,7 +155,7 @@ class ActionConfigLoaderTest {
   @Test
   @DisplayName("ActionConfigLoader handles nulls, empty files, and invalid formats safely")
   void testParseInvalidAndDefaults() {
-    assertNotNull(ActionConfigLoader.parseDefinition("empty", (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) null));
+    assertNotNull(ActionConfigLoader.parseDefinition("empty", (net.leaf.yaml.RtpYamlSection) null));
 
     RtpYamlConfig emptyYaml = RtpYamlConfig.parse("");
     ActionDefinition emptyDef = ActionConfigLoader.parseDefinition("empty", emptyYaml);
@@ -175,7 +175,7 @@ class ActionConfigLoaderTest {
     MultiConfigParser<ActionKeys> actions =
         new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
 
-    io.github.dailystruggle.rtp.common.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
+    net.leaf.yaml.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
     assertNotNull(parser);
 
     parser.set(ActionKeys.gate, java.util.List.of(java.util.Map.of("players", ">= 2")));
@@ -342,7 +342,7 @@ class ActionConfigLoaderTest {
     MultiConfigParser<ActionKeys> actions =
         new MultiConfigParser<>(ActionKeys.class, "actions", "1.0", tempDir.toFile(), "definitions/actions", "en");
 
-    io.github.dailystruggle.rtp.common.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
+    net.leaf.yaml.configuration.ConfigParser<ActionKeys> parser = actions.getParser("default");
     assertNotNull(parser);
 
     parser.set(ActionKeys.alias, "direct_action");

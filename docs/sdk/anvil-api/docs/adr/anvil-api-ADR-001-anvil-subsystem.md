@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Formerly:** ADR-016
-**Extended by:** [leafrtp-ADR-084](../../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-084-measured-cost-probe-first-gate.md) (measured-cost gate on whether the center-column probe runs); [leafrtp-ADR-085](../../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-085-purpose-gated-live-loads.md) (speculative fill resolves through the region-file view first; live fallback pinned when a kept slot is free, else unpinned without the success ring)
+**Extended by:** [leafrtp-ADR-084](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-084-measured-cost-probe-first-gate.md) (measured-cost gate on whether the center-column probe runs); [leafrtp-ADR-085](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-085-purpose-gated-live-loads.md) (speculative fill resolves through the region-file view first; live fallback pinned when a kept slot is free, else unpinned without the success ring)
 
 ## Context
 

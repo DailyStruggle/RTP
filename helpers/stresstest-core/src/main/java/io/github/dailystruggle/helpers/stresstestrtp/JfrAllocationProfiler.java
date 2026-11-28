@@ -19,7 +19,7 @@ import java.util.logging.Logger;
 /**
  * Per-phase, per-plugin allocation profiler built on Flight Recorder.
  *
- * <p>Why this exists: the heap-used series and {@link GcSampler} answer "how
+ * <p>The heap-used series and {@link GcSampler} answer "how
  * much did the JVM churn" and "how often did GC run", but on a shared server
  * JVM neither can say <em>which plugin's</em> allocation forced those
  * collections - and a GC pause is a global stop-the-world event that interrupts
@@ -289,7 +289,7 @@ public final class JfrAllocationProfiler {
     /**
      * Drops each thread's first sample in a recording.
      *
-     * <p>Why: the JVM computes a sample's weight as the thread's allocated bytes
+     * <p>The JVM computes a sample's weight as the thread's allocated bytes
      * since that thread's previous sample, and that per-thread mark survives
      * across recordings. The first sample of a long-lived thread in a new
      * recording therefore carries everything it allocated while no recording

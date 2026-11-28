@@ -54,11 +54,11 @@ All multi-byte integers in header and directory structures are big-endian (`BE`)
 | Byte Offset | Type | Field Name | Description / Invariant |
 | ---: | :--- | :--- | :--- |
 | `0x00..0x07` | `uint64` | `magic` | `0x4C43415F56303031L` (`"LCA_V001"` ASCII) |
-| `0x08..0x09` | `uint16` | `formatVersion` | `0x0001` (Major `1`, Minor `0`) |
+| `0x08..0x09` | `uint16` | `formatVersion` | `0x0002` (Major `2`, Minor `0`; `0x0001` supported for read & auto-upgrade) |
 | `0x0A` | `uint8` | `storageKind` | `0 = REGION_VOXEL`, `1 = ENTITIES`, `2 = POI`, `3 = MAP_TILE` |
-| `0x0B` | `uint8` | `flags` | Bit `0`: `HAS_SHARED_DICT`; Bit `1`: `HAS_LOD_HEADER`; Bit `2`: `HAS_TAIL_DELTA_RING`; Bit `3`: `DEFAULT_ZSTD1`; Bit `4`: `HAS_SECDED_PARITY` |
-| `0x0C..0x0F` | `int32` | `regionX` | Region $X$ coordinate ($\lfloor \text{chunkX} / 32 \rfloor$) |
-| `0x10..0x13` | `int32` | `regionZ` | Region $Z$ coordinate ($\lfloor \text{chunkZ} / 32 \rfloor$) |
+| `0x0B` | `uint8` | `flags` | Bit `0`: `HAS_SHARED_DICT`; Bit `1`: `HAS_LOD_HEADER`; Bit `2`: `HAS_TAIL_DELTA_RING`; Bit `3`: `DEFAULT_MODE_B`; Bit `4`: `HAS_SECDED_PARITY` |
+| `0x0C..0x0F` | `int32` | `regionX` | Signed region $X$ coordinate |
+| `0x10..0x13` | `int32` | `regionZ` | Signed region $Z$ coordinate |
 | `0x14..0x17` | `int32` | `minSectionY` | World minimum section $Y$ (e.g. `-4` for $Y = -64$) |
 | `0x18..0x19` | `uint16` | `sectionCount` | Vertical sections per chunk (e.g. `24` for $Y = -64..319$) |
 | `0x1A..0x1B` | `uint16` | `slabShift` | Sub-slab alignment shift: `8` ($2^8 = 256\text{ bytes}$) |
@@ -75,7 +75,7 @@ Indexed by `chunkIdx = (rx & 31) | ((rz & 31) << 5)`. Each 64-bit word is read a
 $$\underbrace{\mathtt{slabOffset35}}_{\text{bits } 63..29} \;\big|\; \underbrace{\mathtt{codec1}}_{\text{bit } 28} \;\big|\; \underbrace{\mathtt{exactByteLen20}}_{\text{bits } 27..8} \;\big|\; \underbrace{\mathtt{generation8}}_{\text{bits } 7..0}$$
 
 - **`slabOffset35` (bits `63..29`, 35 bits):** Starting file offset in `256-byte` sub-slabs (`actualByteOffset = slabOffset35 << 8`), addressing up to $8\text{ TiB}$ per region file. `0` indicates an ungenerated/absent chunk.
-- **`codec1` (bit `28`, 1 bit):** `0 = Mode A (Uncompressed Section Payload)`, `1 = Mode B (Uncompressed ChunkFrame Header + SEC-DED Parity + Zstd-1 Body)`.
+- **`codec1` (bit `28`, 1 bit):** `0 = Mode A (Uncompressed Section Payload)`, `1 = Mode B (Uncompressed ChunkFrame Header + SEC-DED Parity + Continuous Atomic Region Dictionary LCD2 0x4C44 Body)`.
 - **`exactByteLen20` (bits `27..8`, 20 bits):** Exact payload byte length ($1\text{ B} .. 1,048,575\text{ B}$). Allocated slab capacity is `allocatedSlabs = (exactByteLen20 + 255) >>> 8`. Uncompressed chunk materialization is bounded by `MAX_CHUNK_UNCOMPRESSED_BYTES = 16 MiB` (`CBIT T4`).
 - **`generation8` (bits `7..0`, 8 bits):** Monotonically incrementing wrapping save counter (`0..255`). Serves as an ABA concurrency guard for lock-free readers and an $O(1)$ cache-invalidation token for `LeafRTP` and map readers.
 
@@ -100,14 +100,16 @@ BiomeEntry[segmentBiomeCount]:
   VarInt  utf8ByteLen
   byte[]  biomeIdString            // e.g. "minecraft:lush_caves"
   uint32  foliageAndWaterTint      // Biome tint colors for map rendering
-byte[]  slackPadding               // Zero-filled slack up to (segmentCapacityBytes - 8)
+byte[]  patternArenaSlice          // Optional forward-indexed 384B Canonical Huffman + cross-chunk LZ arena
+byte[]  slackPadding               // Zero-filled slack between active payload and downward-growing SEC-DED
+uint8   secDedSyndromes[W]         // Downward-growing (72, 64) SEC-DED syndromes at (cap - 8 - 1 - w)
 uint64  nextSegmentLinkTrailer     // ALWAYS at the last 8 bytes of the segment (offset + segmentCapacityBytes - 8)
 ```
 - **Pre-Allocated Slack and Tail Relative Continuation Pointer (`nextSegmentLinkTrailer`):**
   - The root dictionary at `0x2040` is pre-allocated with `256B`-aligned slack capacity (default `1,024 B` = 4 sub-slabs of `256 B`, configurable up to `4,096 B+`) so newly encountered `BlockState` or `Biome` strings append into `slackPadding` in $O(1)$ without shifting `lodHeaderOffset` or `slabPoolBaseOffset`.
   - The final 8 bytes (`uint64`) of every dictionary segment store a relative continuation link trailer:
     $$\underbrace{\mathtt{nextSegmentRelSlabs32}}_{\text{bits } 63..32\text{ (int32)}} \;\big|\; \underbrace{\mathtt{nextSegmentCapacitySlabs24}}_{\text{bits } 31..8\text{ (uint24)}} \;\big|\; \underbrace{\mathtt{segmentFlags8}}_{\text{bits } 7..0}$$
-    where `nextSegmentRelSlabs32` is a relative offset in `256-byte` sub-slabs from the start of the current segment to the next dictionary segment (`0` = terminal segment), and `nextSegmentCapacitySlabs24` is the capacity of that next segment in `256B` sub-slabs.
+    where `nextSegmentRelSlabs32` is a relative offset in `256-byte` sub-slabs from the start of the current segment to the next dictionary segment (`0` = terminal segment), `nextSegmentCapacitySlabs24` is the capacity of that next segment in `256B` sub-slabs, `segmentFlags8` bit `0` (`0x01`) marks an active continuation link, and `segmentFlags8` bit `1` (`0x02`) enables downward-growing Extended Hamming `(72, 64)` `SEC-DED` dictionary syndromes (`segCap - 8 - 1 - w`) and the forward-addressed Mode B `dictPatternArena` (`384 B` packed 4-bit `lit`/`cmd`/`off` Canonical Huffman lengths + up to `16 KiB` of cross-chunk LZ byte patterns; normative bit layout in [`LCA-ICD-1.0` Sections 5.3-5.4](../ICD.md#53-mode-b-pattern-arena-dictpatternarena--384-byte-canonical-huffman-tables)).
   - When a segment's slack is exhausted (`usedPayloadBytes + newEntryBytes > segmentCapacityBytes - 8`), the writer allocates a free slab range from the `TreeMap` (e.g., `256 B .. 4 KiB`), formats it as a continuation segment (with `nextSegmentLinkTrailer = 0`), and atomically writes the relative pointer into the current segment's trailer. This allows the shared dictionary to grow across chained segments while preserving monotonic global dictionary IDs (`0 .. totalStateCount - 1`); offline compaction can flatten chained segments into a single contiguous root arena.
 - **Material Metadata (`materialPacked`):** Embedding the 32-bit `materialPacked` word (`RGBA8` albedo + translucency/emissive/water flags) in the region dictionary once per state allows map renderers to shade voxel or octree LOD cells in $O(1)$ from the `VarInt` state ID without parsing blockstate JSONs or textures during LOD streaming.
 
@@ -138,7 +140,7 @@ At `byteOffset = slabOffset35 << 8`:
 +-----------------------------------------------------------------------+
 | [If codec1 == 1 (Mode B): uint8 headerSecDed[headerWords] (9 bytes)]  |
 |   Extended Hamming (72, 64) SEC-DED syndromes over the uncompressed   |
-|   ChunkFrame header words; body below is Zstd-1 frame-compressed      |
+|   ChunkFrame header words; body below is pure-Java LCD2 (0x4C44)      |
 +-----------------------------------------------------------------------+
 | Slab-Local Chunk Micro-Palette (Part A: 1-byte Static Core Tokens +   |
 | Base Block/Biome Names; Part B: Sparse '[...]' Property Suffixes)     |
@@ -204,10 +206,16 @@ byte[]  residualNbtPayload         // Optional Mojang TAG_Compound up to residua
   - `Bit 9` (`0x0200`): Secondary heightmaps (`uint8 count` + `(code8, VarInt payLen, payload)` entries using `0xFE, refIdx` for exact duplicate of an earlier heightmap or `0xFD, refIdx, numLongs` for best-reference cross-heightmap zero-run RLE)
   - `Bit 10` (`0x0400`): Trailing residual `Nbt` `TAG_Compound` slice present (`[pos .. residualRelEnd)`)
   - `Bit 11` (`0x0800`): Non-voxel root marker (`entities/` or `poi/` chunk payload)
-  - `Bit 12` (`0x1000`): Residual `Nbt` slice is `DEFLATE`-compressed (applied only in uncompressed `Mode A` when `nbtBytes >= 256 B`; skipped in `Mode B` so `Zstd-1` compresses the entire `ChunkFrame` body in a single pass without nested compression)
+  - `Bit 12` (`0x1000`): Residual `Nbt` slice is `DEFLATE`-compressed (applied only in uncompressed `Mode A` when `nbtBytes >= 256 B`; skipped in `Mode B` so the `LCD2` (`0x4C44`) frame compresses the entire `ChunkFrame` body in a single pass without nested compression)
   - `Bit 13` (`0x2000`): `MOTION_BLOCKING_NO_LEAVES` binary heightmap stream present (`VarInt mbnlByteLen` + `byte[mbnlByteLen] mbnlDeltaStream`).
   - `Bit 14` (`0x4000`, `HAS_CHUNK_PATCH_TAIL`): Length-prefixed `ChunkPatchTail` (`VarInt patchTailByteLen` + `byte[patchTailByteLen]`) placed immediately before `Bit 10` (`residualNbtPayload`), containing appended Slab-Local Micro-Palette entries (`Part A` + `Part B` for `localIdx >= K`), per-section voxel delta lists (`(uint16 yzx12, VarInt dictId)`), optional replacement section offset overrides, optional `SkyLight`/`BlockLight` section patches, and a 1-byte Extended Hamming `(72, 64)` `patchParity8` syndrome trailer.
 - Decoded in `LcaSectionCodec.unpackResidualSectionAndNbt` and `LcaSectionCodec.locateAndDecodeChunkPatchTail` without injecting synthetic marker keys into the returned NBT map.
+
+#### 4.4 Mode B (`codec1 = 1`): Inline Header `SEC-DED` & Continuous Atomic Region Dictionary (`LCD2` `0x4C44`)
+While **Mode A (`codec1 = 0`)** writes the post-header chunk body uncompressed (`0-LZ`) for sub-microsecond section slicing, **Mode B (`codec1 = 1`, default when `lcd2-level >= 1`)** achieves whole-region dictionary compression ratios without `.linear`'s whole-region read/write amplification or native JNI dependencies (`LcaSectionCodec.encodeModeBChunkFrameWithAtomicDict` / `decodeAtomicDictBody`):
+1. **Uncompressed Header + Inline `(72, 64)` `SEC-DED` Syndromes (`CBIT T3c`):** Bytes `[0 .. headerLen)` remain uncompressed so `selfTagAndDataVersion`, timestamps, `chunkStatusOrdinal`, and `uint16[sectionCount]` `sectionOffsets` can be inspected or probed without decompressing the body (`0`-body uniform chunks omit the `LCD2` frame altogether when `exactByteLen20 == headerLen + headerWords`). Immediately following the header, `headerWords = (headerLen + 7) >>> 3` bytes store Extended Hamming `(72, 64)` syndromes over each big-endian 64-bit header word (right-padded with `0x00` on trailing partial words).
+2. **`LCD2` (`0x4C44` `"LD"`) 3-Stream Body Frame (`CBIT T8`):** Non-empty chunk bodies (`[headerLen .. chunkFrame.length)`) are encoded behind a `9-byte` header (`uint16 magic = 0x4C44`, `uint8 frameFlags8`, `uint24BE compFrameLen` inclusive of the `9 B` header, `uint24BE uncompBodyLen`). Incompressible payloads set `RAW_PASSTHROUGH` (`0x04`); otherwise the payload splits into `litStream`, `cmdStream`, and `offStream`, each independently entropy-coded with MSB-first 12-bit length-limited Canonical Huffman tables (`frameFlags8` bits `0`, `1`, `3`) stored once per region at `dictPatternArena[0 .. 383]`.
+3. **4-Mode Intra-Chunk & Forward Region-Arena Matching:** Each `1-byte` command token `(litCode3 << 5) | (matchMode2 << 3) | lenCode3` places any `litCode3 == 7` or `lenCode3 == 7` overflow `VarInt`s into `offStream` ahead of the match offset and selects among `0: SHORT_INTRA` (`1 B` offset `1 .. 256`, `minMatch = 3`), `1: FAR_INTRA` (`2 B` offset `257 .. 65,792`, `minMatch = 4`), `2: DICT_ARENA` (`2 B` forward offset into immutable `dictPatternArena[384 .. 65,919]`, `minMatch = 4`), and `3: REPEAT_OFFSET` (`0 B`, `minMatch = 3`). Because `dictPatternArena` grows monotonically across chained Layer 2 segments, `CoW` single-chunk saves remain $O(1)$ (`~554 us`) without invalidating previously written Mode B slabs. Complete byte tables and reference Java decoder pseudocode are specified in [`LCA-ICD-1.0` (`ICD.md` Section 6.2)](../ICD.md#62-mode-b-codec1--1-header-sec-ded-syndromes--continuous-atomic-region-dictionary-lcd2-body-decompression).
 
 ### 5. Layer 4: $16 \times 16 \times 16$ Section Frame Layout (`BlockStates`, `Biomes`, `Light`)
 
@@ -259,15 +267,15 @@ Before encoding a section, the encoder samples $4 \times 8 \times 8 = 256$ point
 - Else: selects `01:H_3` (isotropic 3D Hilbert octree curve).
 
 #### 5.2 Per-State Delta-Roaring Containers (`p = 1 .. |P|-1`)
-`palette[0]` is implicit (`90.8%` of voxels on `r.0.0.mca`) and omitted from the container stream. For each minority palette index $p \in [1, |P|-1]$, a 2-bit container tag + 14-bit count/length header selects the smallest representation over the 12-bit traversal index $h \in [0, 4095]$ (with `adjGap = (r == 0) ? gap : (gap - 1)` since consecutive runs of the same state are separated by at least 1 voxel):
-1. **`00 = TAG_SINGLETON` (`2 bytes` total):** Header word `0x0000 | h12` when state $p$ appears once in the section.
-2. **`01 = TAG_DELTA_RUN` (`Adaptive 4|4 or 6|2 Packed Gap|Len Stream`):**
-   - Bit `13` of the 16-bit container header selects `0 = 4|4 split` (`gap4 | len4`, for runs up to `16` voxels with `adjGap < 15`) or `1 = 6|2 split` (`gap6 | len2`, for short runs of `1..3` voxels separated by gaps up to `62` without escape bytes).
-   - Escape values (`gap4 == 15` or `gap6 == 63`) use a bounded `240` encoding (`1 byte` for `< 240`, `2 bytes` `0xF0 | hi4, lo8` for `240..4,095`).
+`palette[0]` is implicit (`90.8%` of voxels on `r.0.0.mca`) and omitted from the container stream. When `blockEncodingMode == 01` (`octreeOccupancyMask64 != -1L`), the cursor domain $c \in [0, N_{\text{active}} - 1]$ is rank-compacted over `octreeOccupancyMask64` (`64 K` active voxels across non-empty $4^3$ octants for `01:H_3`; `1024 S` active voxels across non-empty $16 \times 4 \times 16$ slabs for `00:YZX` and `10:Y+H_2`). For each minority palette index $p \in [1, |P|-1]$, a 2-bit container tag + 14-bit metadata header selects the smallest representation:
+1. **`00 = TAG_SINGLETON` (`2..5 bytes` total):** `subTag` (`bits 13..12`) encodes a single voxel at `idx12` (`00`, `2 B`), a single contiguous run of length `2..257` (`01`, `3 B`) or `258..4096` (`10`, `4 B`), or two contiguous runs of length `1..16` each (`11`, `4..5 B`).
+2. **`01 = TAG_DELTA_RUN` (`Adaptive 4|4, 5|3, 6|2, or 7|1 Packed Gap|Len Stream`):**
+   - Bits `13..12` of the 16-bit container header select `subMode in 0..3` (`lBits = 4 - subMode`, `gMax = (1 << (4 + subMode)) - 1`, `lMax = (1 << lBits) - 1`), matching `4|4` (`gMax=15, lMax=15`), `5|3` (`gMax=31, lMax=7`), `6|2` (`gMax=63, lMax=3`), or `7|1` (`gMax=127, lMax=1`).
+   - Escape values (`adjGap == gMax`) use a bounded `240` encoding (`1 byte` for `< 240`, `2 bytes` `0xF0 | hi4, lo8` for `240..4,095`).
 3. **`10 = TAG_DELTA_ARRAY` (`Bounded 240 Delta Gaps`):**
    - When all occurrences of state $p$ are isolated single voxels (`totalVoxels == runCount`), stores `adjGap` via the bounded `240` encoding (`1 B` for `< 240`, `2 B` for $\ge 240$) without length bits.
-4. **`11 = TAG_BITMAP` (`512 bytes`, `long[64]`):**
-   - Direct $4,096$-bit occupancy mask when a minority state's run stream would exceed `514 bytes`.
+4. **`11 = TAG_BITMAP` (`Compacted or Word-Masked 64-Bit Bitmap`):**
+   - Stores either a contiguous bitmap over `N_active` (`512 B` or `0x1000 | byteLen`) or a Word-Masked bitmap (`8 B` `wordMask64` + `8 * popcnt(wordMask64)` bytes for only the non-zero 64-voxel words).
 
 #### 5.3 `leafrtp-ADR-072` Flat Bit-Packed Ceiling (`blockEncodingMode = 10`)
 Let $b = \max(1, \lceil \log_2 |P| \rceil)$ and `flatBytes = (4096 * b + 7) >>> 3`. If the sum of container bytes for $p = 1 .. |P|-1$ exceeds `flatBytes` (`0.085%` of natural sections, or high-entropy player builds), the encoder sets `blockEncodingMode = 10` and writes the `flatBytes` bit-packed array in `YZX` order, bounding worst-case section size to the bit-packed representation.
@@ -308,20 +316,20 @@ Let $b = \max(1, \lceil \log_2 |P| \rceil)$ and `flatBytes = (4096 * b + 7) >>> 
 Following `anvil-api-ADR-002`, `LcaRegionReader` implements `BuiltInTestable`:
 - **`PBIT` (Power-On Built-In Test):** On initialization, encodes and decodes a static 2-section micro-canary (1 uniform inline section + 1 non-uniform `H_3` Delta-Roaring section with `Y+H_2` Gray `SkyLight`) in `< 2 ms`, verifying bit-exact voxel/light parity and `octreeOccupancyMask64` equivalence.
 - **`CBIT` (Continuous Built-In Test - $O(1)$ Read Tripwires `T1..T8`):**
-  - `T1`: Verify `magic == 0x4C43415F56303031L` (`"LCA_V001"`) at `0x0000` and footer canary `0x4C4341315F454E44L` (`"LCA1_END"`) at `fileLength - 8`.
+  - `T1`: Verify `magic == 0x4C43415F56303031L` (`"LCA_V001"`) at `0x0000`, `formatVersion` in `{0x0001, 0x0002}`, and footer canary `0x4C4341315F454E44L` (`"LCA1_END"`) at `fileLength - 8`.
   - `T2`: Verify `headerChecksum` over superblock bytes `0x00..0x37`.
-  - `T3`, `T3b` & `T3c`: Verify chunk pointer bounds `(slabOffset35 << 8) + exactByteLen20 <= fileLength - 8`, verify the self-describing ChunkFrame header canary `(rawDvWord & 0xFC00_0000) == 0x5800_0000` with embedded `((rawDvWord >>> 16) & 0x03FF) == chunkIdx` to detect pointer offset variation in $O(1)$ (`T3b`), and in `Mode B` (`codec1 = 1`) verify and heal every 64-bit word of the uncompressed `ChunkFrame` header (`headerLen = 24 + 2 * sectionCount` bytes) via its `headerWords = (headerLen + 7) >>> 3` Extended Hamming `(72, 64)` SEC-DED syndromes before inspecting `sectionOffsets[]` or decompressing the Zstd body (`T3c`).
+  - `T3`, `T3b` & `T3c`: Verify chunk pointer bounds `(slabOffset35 << 8) + exactByteLen20 <= fileLength - 8`, verify the self-describing ChunkFrame header canary `(rawDvWord & 0xFC00_0000) == 0x5800_0000` with embedded `((rawDvWord >>> 16) & 0x03FF) == chunkIdx` to detect pointer offset variation in $O(1)$ (`T3b`), and in `Mode B` (`codec1 = 1`) verify and heal every 64-bit word of the uncompressed `ChunkFrame` header (`headerLen = 24 + 2 * sectionCount` bytes) via its `headerWords = (headerLen + 7) >>> 3` Extended Hamming `(72, 64)` SEC-DED syndromes before inspecting `sectionOffsets[]` or decoding the `LCD2` (`0x4C44`) body (`T3c`).
   - `T4`: Enforce per-chunk uncompressed allocation ceiling (`<= 16 MiB`).
-  - `T5`: Verify `sectionOffsets[i]` (scaled by `1B` or `4B` per `chunkFlags` bit `2`) stays strictly within `[sectionDirEnd .. exactByteLen20)` with no duplicate non-uniform section offsets, and verify chained dictionary continuation pointers (`nextSegmentRelSlabs32`) are acyclic (`<= 64` segments) and bounded within `fileLength - 8`.
+  - `T5`: Verify `sectionOffsets[i]` (scaled by `1B` or `4B` per `chunkFlags` bit `2`) stays strictly within `[sectionDirEnd .. exactByteLen20)` with no duplicate non-uniform section offsets, verify Mode B body magic `0x4C44` (`"LD"`), and verify chained dictionary continuation pointers (`nextSegmentRelSlabs32`) are acyclic (`<= 64` segments) and bounded within `fileLength - 8`.
   - `T6` & `T6b`: Verify Delta-Roaring run cursor $h$ never exceeds $4,096$ (`T6`), and verify that the 64-bit `decodedOctreeMask64` accumulated from minority voxel octants matches the stored `octreeOccupancyMask64` header word (`T6b` spatial syndrome check, detecting corrupted interior run bytes even when $h \le 4,096$).
   - `T7`: Verify `VarInt` palette indices stay strictly `< stateCount`.
   - `T8`: On lock-free concurrent `FileChannel` / `mmap` reads, pin the target `slabOffset35` in `PINNED_SLAB_STARTS`, read `ptrBefore = getVolatile(chunkIdx)`, decode/copy the target slab, issue `VarHandle.loadLoadFence()`, and re-read `ptrAfter = getVolatile(chunkIdx)`. Because live writers use Copy-on-Write (`CoW`) slab allocation with hazard-pointer retirement (`Section 2.3`), `ptrBefore == ptrAfter` guarantees a tear-free snapshot across 256-save `generation8` wraps.
 
 #### 7.2 4-Tier Bit-Rot & Offset-Variation Recovery (`healRegionBitRot` & `readChunkViewWithRecovery`)
 `.lca` defines four recovery tiers for pointer and payload corruption:
-1. **Tier 1 - Extended Hamming `(72, 64)` SEC-DED Pointer Healing (`< 10 ns`):**
-   - Stores a `1,024-byte` SEC-DED syndrome table (`1 byte` per 64-bit chunk pointer) at `secDedTableOffset` (`superblock.flags` bit `4`). Each data bit $b \in [0, 63]$ of `ptr64` is mapped to a unique 7-bit mask `SECDED_DATA_MASKS[b]` with popcount $\ge 2$, plus bit `7` as overall parity.
-   - `LcaSectionCodec.healSingleBitFlip64` repairs single-bit flips in `slabOffset35`, `codec1`, `exactByteLen20`, or `generation8` in $O(1)$ (`ptr64 ^ (1L << corruptedBit)`) and detects double-bit errors (`DED`, returning `Long.MIN_VALUE` to trigger Tier 2).
+1. **Tier 1 - Extended Hamming `(72, 64)` SEC-DED Pointer, Dictionary & Mode B Header Healing (`< 10 ns`):**
+   - Stores a `1,024-byte` SEC-DED syndrome table (`1 byte` per 64-bit chunk pointer) at `secDedTableOffset` (`superblock.flags` bit `4`), plus downward-growing `(72, 64)` SEC-DED syndromes at the tail of each Layer 2 dictionary segment (`segmentFlags8` bit `1` = `0x02`). Each data bit $b \in [0, 63]$ of `ptr64` is mapped to a unique 7-bit mask `SECDED_DATA_MASKS[b]` with popcount $\ge 2$, plus bit `7` as overall parity.
+   - `LcaSectionCodec.healSingleBitFlip64` repairs single-bit flips in `slabOffset35`, `codec1`, `exactByteLen20`, `generation8`, or Layer 2 dictionary words in $O(1)$ (`word64 ^ (1L << corruptedBit)`) and detects double-bit errors (`DED`, returning `Long.MIN_VALUE` to trigger Tier 2).
 2. **Tier 2 - Self-Describing `256B` Slab Reverse-Scan (`healRegionBitRot`):**
    - Every `ChunkFrame` begins with a self-describing 32-bit word `0x5800_0000 | (chunkIdx << 16) | chunkDataVersion`.
    - If a pointer in `0x0040..0x203F` suffers multi-bit corruption (`DED`), zeroing, or offset variation (`CBIT T3b` pointing to another chunk's slab), `LcaRegionReader.healRegionBitRot` scans the `256B`-aligned sub-slab pool from `slabPoolBaseOffset` to `fileLength - 8`, matches `0x5800_0000 | (chunkIdx << 16)`, measures the frame length, and reconstructs the 64-bit pointer and SEC-DED syndrome byte.
@@ -330,21 +338,49 @@ Following `anvil-api-ADR-002`, `LcaRegionReader` implements `BuiltInTestable`:
 4. **Tier 4 - Copy-on-Write (`CoW`) Prior-Generation Pointer Rollback (`rollbackCorruptChunkToPriorCoW`):**
    - Because live saves rotate to fresh `256B` CoW slabs before swapping the directory pointer, `LcaLiveArchive` retains `prevChunkPointers[1024]`, allowing $O(1)$ rollback to the previous verified generation if an interrupted write is detected.
 
-## Benchmarks (`overworld_mountain_r.0.0.mca` & `r.0.0.mca`, `LcaRegionCodecTest`)
+#### 7.3 Minecraft `26.4+` `16×16×16` Per-Block Biomes & Lowercase `status` Inside `LCA_FORMAT_VERSION_V3` (`0x0003`)
+Minecraft `26.4` (`DataVersion = 5131`) increases per-section biome granularity from `4×4×4` (`64` cells) to `16×16×16` (`4,096` cells) and renames the root NBT chunk status key from `"Status"` to `"status"`. Because `LCA_FORMAT_VERSION_V3` (`0x0003`) remained pre-release, both changes are encoded natively inside `V3` without introducing a `V4` superblock version:
 
-Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and light round-trip parity across `.mca` fixtures (`1.20.4`, `1.21.4`, `26.1`, `26.3`) and random/sequential whole-region sweeps on `overworld_mountain_r.0.0.mca` (`64` chunks):
+- **Dual-Resolution `BiomePaletteSection` (`4` or `16` cells per axis):**
+  - Preserves the 3-component record signature `(int sectionY, List<String> palette, long[] data)`.
+  - Single-entry palettes (`palette.size() == 1`, `data == null`) are resolution-invariant and require zero wire change (`bLen == 0` chunk-default elision or `bLen == 1` + `dictId`).
+  - For `palette.size() >= 2`, Mojang's non-spanning packed `long[]` lengths for `64` cells (`1..7` longs) and `4,096` cells (`64..820` longs) are strictly disjoint; `BiomePaletteSection.isPerBlockGrid(paletteSize, data)` dispatches unambiguously, and `hasMalformedData()` / `biomeIdAt()` fail closed (`null`) on lengths strictly between the `64`-cell and `4,096`-cell requirements (`S-004`).
+- **Inline `4,096`-Biome Wire Framing (`BIOME_4096_MARKER = 65`):**
+  - Legacy `4×4×4` inline biome blocks encode `bLen ∈ [0..64]`, while chunk biome template references occupy `0x80..0xBF` (bit `7 == 1`). Escaping multi-biome `16×16×16` sections with `varInt(65)` (`0x41`, `> 64` and bit `7 == 0`) has zero wire collision with `4×4×4` sections or template references and fails closed (`CBIT T7`) on legacy decoders.
+  - Payload layout: `varInt(65)` + `varInt(actualBLen)` (`2..4096`) + `actualBLen × varInt(dictId)` + `modeByte`:
+    - `modeByte = 0x00` (`BIOME_4096_MODE_RLE`): `CURVE_XZY` extended RLE (`varInt(runCount)`). When `actualBLen <= 8`, each run is encoded in 1 byte `(pIdx << 5) | lenCode` where `lenCode < 31` yields `len = lenCode + 1` and `lenCode == 31` yields `len = 32 + varInt(ext)`. When `actualBLen > 8`, each run is `varInt(pIdx) + varInt(len - 1)`.
+    - `modeByte = 0x01` (`BIOME_4096_MODE_RAW_PACKED`): Raw big-endian Mojang-packed `long[requiredLongs(actualBLen, 4096)]`, automatically selected whenever `rleTotalBytes >= rawTotalBytes` so adversarial high-entropy biome patterns never expand past the vanilla packed ceiling.
+  - Vertical `BiomeTemplate` deduplication (`0x80 | tmplIdx`) remains unchanged and caches `4,096`-cell templates seamlessly.
+  - **Memory Hygiene & `CBIT` Bounds:** `ScratchArena` allocates `biomeCells4096` lazily via `ensureBiome4096Cells()` so `64`-biome worlds incur zero extra heap overhead. Decoders enforce `actualBLen ∈ [2..4096]` (`T7`), `dictId < dictBiomes.size()` (`T7`), `modeByte ∈ {0x00, 0x01}` (`T5`), exact RLE cursor completion `== 4,096` (`T6`), and raw packed palette index `< actualBLen` (`T7`).
+- **Verbatim Lowercase `"status"` Preservation:**
+  - When a chunk root carries lowercase `"status"` (and no `"Status"`), `"minecraft:full"` / `"full"` records `statusOrdinal = 0xFE` (`STATUS_ORDINAL_ABSENT`) while retaining `"status"` verbatim in the residual NBT tail; non-full proto-chunk statuses (`"minecraft:terrain"`, `"minecraft:noise_biomes"`, `"minecraft:structure_starts"`, etc.) record `statusOrdinal = 0xFD` (`STATUS_ORDINAL_RESIDUAL`) while retaining `"status"` verbatim in the residual NBT tail.
+  - Direct view/probe paths (`readChunkView`, `readColumnProbe`, `readTerrainProbe`) continue returning `null` for `0xFD` proto-chunks and decoding `0xFE` full chunks, while `readChunk`, `readChunkNbtBytes`, and `transcodeToMca` preserve exact `"Status"` vs `"status"` key casing without synthesizing duplicate keys.
 
-| Workload / Metric (`overworld_mountain_r.0.0.mca`, `64` Chunks) | Vanilla `.mca` (`4K` `Zlib`) | `.linear` (`Zstd-1` Whole-Region) | `.lca` Mode A: `0-LZ` (Slab-Local Palette) | `.lca` Mode B: `+ Zstd-1` (Slab-Local Palette) |
+## Benchmarks (`1_21_R1` & `overworld_mountain_r.0.0.mca`, `LcaRegionCodecTest`)
+
+Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and light round-trip parity across `.mca` fixtures (`1.20.4`, `1.21.4`, `26.1`, `26.3`, `26.4`) and random/sequential whole-region sweeps on the 64-chunk `1_21_R1` (`532,480 B` `.mca`) and `overworld_mountain_r.0.0.mca` (`495,616 B` `.mca`) benchmarks:
+
+### 1. `1_21_R1` 64-Chunk Benchmark (`532,480 B` Vanilla `.mca`, `299,918 B` `.linear`)
+
+| Workload / Metric (`1_21_R1`, `64` Chunks) | Vanilla `.mca` (`4K` `Zlib`) | `.linear` (`Zstd-1` Whole-Region) | `.lca` `v2` Mode A: `0-LZ` (Slab-Local Palette) | `.lca` `v2` Mode B: `LCD2` (`0x4C44` Atomic Dict) |
 | :--- | ---: | ---: | ---: | ---: |
-| Region Storage Size (`64` Chunks) | `495,616 B` (`100.0%`) | `318,806 B` (`64.3%`) | `293,384 B` (`59.2%` of `.mca`, `-8.0%` vs `.linear`) | `250,376 B` (`50.5%` of `.mca`, `-21.5%` vs `.linear`) |
-| Cold Random 1-Chunk Read (`Store -> AnvilChunkView`) | `163.93 us` | `2,519.12 us` (`2.52 ms`) | `64.68 us` (`2.53x` vs `.mca`, `39.0x` vs cold `.linear`) | `87.27 us` (`1.88x` vs `.mca`, `28.9x` vs cold `.linear`) |
-| Warm Random 1-Chunk Read (`Cached -> AnvilChunkView`) | `163.93 us` | `64.26 us` | `64.08 us` (`1.00x` vs warm `.linear`, `2.56x` vs `.mca`) | `69.92 us` (`2.34x` vs `.mca`) |
+| Region Storage Size (`64` Chunks) | `532,480 B` (`100.0%`) | `299,918 B` (`56.3%`, `1.78x`) | `272,648 B` (`51.2%` of `.mca`, `1.95x`, `-9.1%` vs `.linear`) | `207,368 B` (`38.9%` of `.mca`, `2.57x`, `-30.9%` vs `.linear`) |
+| Cold Random 1-Chunk Read (`Store -> AnvilChunkView`) | `90.26 us` | `1,303.75 us` (`1.30 ms`) | `25.28 us` (`3.57x` vs `.mca`, `51.6x` vs cold `.linear`) | `70.60 us` (`1.28x` vs `.mca`, `18.5x` vs cold `.linear`) |
+| Warm Random 1-Chunk Read (`Cached -> AnvilChunkView`) | `90.26 us` | `32.79 us` | `24.80 us` (`1.32x` vs warm `.linear`, `3.64x` vs `.mca`) | `48.75 us` (`1.85x` vs `.mca`) |
+
+### 2. `overworld_mountain_r.0.0.mca` (`495,616 B` Vanilla `.mca`, `318,806 B` `.linear`)
+
+| Workload / Metric (`overworld_mountain_r.0.0.mca`, `64` Chunks) | Vanilla `.mca` (`4K` `Zlib`) | `.linear` (`Zstd-1` Whole-Region) | `.lca` `v2` Mode A: `0-LZ` (Slab-Local Palette) | `.lca` `v2` Mode B: `LCD2` (`0x4C44` Atomic Dict) |
+| :--- | ---: | ---: | ---: | ---: |
+| Region Storage Size (`64` Chunks) | `495,616 B` (`100.0%`) | `318,806 B` (`64.3%`, `1.55x`) | `290,056 B` (`58.5%` of `.mca`, `1.71x`, `-9.0%` vs `.linear`) | `233,224 B` (`47.1%` of `.mca`, `2.13x`, `-26.8%` vs `.linear`) |
+| Cold Random 1-Chunk Read (`Store -> AnvilChunkView`) | `163.93 us` | `2,519.12 us` (`2.52 ms`) | `54.10 us` (`3.03x` vs `.mca`, `46.6x` vs cold `.linear`) | `88.20 us` (`1.86x` vs `.mca`, `28.6x` vs cold `.linear`) |
+| Warm Random 1-Chunk Read (`Cached -> AnvilChunkView`) | `163.93 us` | `64.26 us` | `52.67 us` (`1.22x` vs warm `.linear`, `3.11x` vs `.mca`) | `68.10 us` (`2.41x` vs `.mca`) |
 | Cold Whole-Region Sequential Sweep (`All 64 Chunks`) | `7.75 ms` (`121.14 us/ch`) | `6.14 ms` (`95.92 us/ch`) | `3.67 ms` (`57.27 us/ch` - `1.67x` vs `.linear`, `2.12x` vs `.mca`) | `4.46 ms` (`69.67 us/ch` - `1.38x` vs `.linear`, `1.74x` vs `.mca`) |
 | Warm Whole-Region Sequential Sweep (`All 64 Chunks`) | `7.75 ms` (`121.14 us/ch`) | `4.14 ms` (`64.61 us/ch`) | `3.58 ms` (`55.87 us/ch` - `1.16x` vs warm `.linear`, `2.17x` vs `.mca`) | `4.46 ms` (`69.67 us/ch`) |
 | Cold Whole-Region Terrain Probe Sweep (`Y=[48..112]`) | `7.89 ms` (`123.33 us/ch`) | `5.84 ms` (`91.32 us/ch`) | `0.48 ms` (`7.47 us/ch` - `12.23x` vs `.linear`, `16.51x` vs `.mca`) | `~1.05 ms` |
 | Random RTP Terrain Window Probe (`Y=[48..112]`) | `109.72 us` | `64.26 us` (warm) | `8.55 us` (`12.84x` vs `.mca`) | `~11.5 us` |
-| Partial 1-Section Read (`16^3` `H_3` / Inline Uniform) | `109.72 us` | `64.26 us` (warm) | `1.31 us` (`0.93 us` uniform - `118.6x` vs `.mca`) | `~3.8 us` |
-| Dirty Chunk Save (CPU Latency) | `444.83 us` | `48,991--205,789 us` | `395.94 us` (`1.12x` vs `.mca`, `>120x` vs `.linear`) | `~470.0 us` (per-chunk `Zstd-1`) |
+| Partial 1-Section Read (`16^3` `H_3` / Inline Uniform) | `109.72 us` | `64.26 us` (warm) | `1.39 us` (`0.93 us` uniform - `78.9x` to `118.6x` vs `.mca`) | `~3.40 us` |
+| Dirty Chunk Save (CPU Latency) | `444.83 us` | `48,991--205,789 us` | `390.00 us` (`1.14x` vs `.mca`, `>120x` vs `.linear`) | `~554.0 us` (`LCD2` continuous atomic dict) |
 | 10,000 Concurrent CoW Saves Slab Reuse & Torn Reads | `4.20 -> 18.69 MB` (`82.3%`) | Rewrites `43.4 GB` total | `100.00%` (`10,000 / 10,000`) reuse, `0 B` growth, `0` torn reads | `100.00%` reuse, `0` torn reads |
 
 ## Alternatives Considered
@@ -362,8 +398,8 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 ## Consequences
 
 - **Positive:**
-  - **Storage Footprint:** Uncompressed Mode A (`299,784 B` on the 64-chunk mountain fixture, `60.5%` of `.mca`; `3.82 MB` on `r.0.0.mca`) is `-6.0%` smaller than `.linear Zstd-1` (`318,806 B` / `4.34 MB`) without LZ compression overhead; Mode B (`+ Zstd-1`, `251,400 B` / `2.35 MB`) reduces size by `49.3%--62.3%` vs. `.mca` and `21.1%--45.9%` vs. `.linear`.
-  - **Read, Save, and LOD Latency:** Supports `66.92 us` cold 1-chunk reads (`46.7 us` on `r.0.0.mca`), `0.93--1.36 us` single-section reads, `231.1--369.8 us` single dirty chunk saves, and `18.6 us` / `11.5 us` `LOD-2` / `LOD-3` extraction.
+  - **Storage Footprint:** Uncompressed `.lca` `v2` Mode A (`272,648 B` on `1_21_R1`, `51.2%` of `.mca`; `290,056 B` on `overworld_mountain_r.0.0.mca`, `58.5%` of `.mca`) is `-9.0%` to `-9.1%` smaller than whole-region `.linear Zstd-1` (`299,918 B` / `318,806 B`) without any LZ compression overhead; Mode B (`LCD2` `0x4C44` Continuous Atomic Layer 2 Region Dictionary, `207,368 B` / `233,224 B`) is pure Java with zero Zstd dependency and reduces size by `52.9%--61.1%` vs. `.mca` (`2.13x--2.57x`) and `26.8%--30.9%` vs. `.linear`.
+  - **Read, Save, and LOD Latency:** Supports `25.28--54.10 us` cold 1-chunk reads (`24.80--52.67 us` warm), `0.93--1.39 us` single-section reads, `390.0 us` single dirty chunk saves (`~554.0 us` in Mode B `LCD2`), and `18.6 us` / `11.5 us` `LOD-2` / `LOD-3` extraction.
   - **Direct Map Streaming:** Streams multi-span Hilbert columns, `octreeOccupancyMask64` octants, and `165 B` single-section deltas directly from `.lca` without separate `.prbm` mesh files.
   - **In-File Slab Reuse:** The `uint64[1024]` atomic `256B` slab pointer directory and `uint16[24]` per-chunk section directory enable lock-free reader visibility and `95.0%--100.0%` slab reuse across $10,000$ saves.
 - **Negative / Trade-offs:**
@@ -371,9 +407,11 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 
 ## References
 
+- [`LCA-ICD-1.0` (`api/anvil-api/docs/ICD.md`)](../ICD.md) - Normative `.lca` Binary Format Interface Control Document
 - [anvil-api-ADR-001](anvil-api-ADR-001-anvil-subsystem.md) - Anvil Read-Only Subsystem
 - [anvil-api-ADR-002](anvil-api-ADR-002-multi-format-region-support.md) - Multi-Format Region Support (`.mca` & `.linear`)
 - [leafrtp-ADR-065](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-065-layered-spiral-hilbert-rle-index.md) - Layered Spiral-Hilbert RLE Index
 - [leafrtp-ADR-072](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-072-hybrid-bit-packed-and-16-bit-run-container-hazard-table.md) - Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
 - [leafconfig-ADR-001](../../../../resource/LeafConfig/docs/adr/leafconfig-ADR-001-universal-server-config-atlas-and-web-ide.md) - Universal Server Config Atlas & 3D World Map Workspace
-- `io.github.dailystruggle.anvil.LcaRegionReader`, `io.github.dailystruggle.anvil.LcaRegionWriter`, `io.github.dailystruggle.anvil.LcaSectionCodec`, and `io.github.dailystruggle.anvil.LcaRegionCodecTest` (`api/anvil-api`)
+- `io.github.dailystruggle.anvil.LcaRegionReader`, `io.github.dailystruggle.anvil.LcaRegionWriter`, `io.github.dailystruggle.anvil.LcaSectionCodec`, `io.github.dailystruggle.anvil.LcaRegionCodecTest`, and `io.github.dailystruggle.anvil.Mc264BiomeLcaParityTest` (`api/anvil-api`)
+

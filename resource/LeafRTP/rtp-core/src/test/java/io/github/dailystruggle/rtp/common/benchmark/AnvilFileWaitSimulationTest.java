@@ -44,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p><b>Opt-in.</b> Tagged {@code simulation}; run with {@code ./gradlew :rtp-core:simulationBenchmark
  * --tests "*AnvilFileWaitSimulationTest*"}.
  *
- * <p><b>Why wall and CPU are both reported.</b> A thread inside a synchronous {@code FileChannel}
+ * <p><b>Wall and CPU reporting.</b> A thread inside a synchronous {@code FileChannel}
  * call is unavailable to its pool either way. Thread CPU time (user + kernel, which includes
  * filesystem filter drivers running in the caller's context) says whether that occupancy also
  * burns a core. {@code cpu share of wall} near 1 means the open is kernel work on our thread;

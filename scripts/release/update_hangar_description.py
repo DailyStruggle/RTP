@@ -3,8 +3,8 @@
 Updates the Hangar project main page (description) using the generated
 scripts/release/generated/FRONT_PAGE_HANGAR.md.
 
-Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the Lite assembly variant
-only (ADR-024). Pro is never published to nor advertised on Hangar: the Hangar
+Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the free default LeafRTP
+download only. Pro is never published to nor advertised on Hangar: the Hangar
 page is built from docs/publishing/FRONT_PAGE.md by
 scripts/release/build_front_pages.py, which drops promo/purchase blocks and fails
 on any leftover promo term.

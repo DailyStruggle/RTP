@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
 import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;

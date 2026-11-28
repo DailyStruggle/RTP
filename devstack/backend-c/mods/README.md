@@ -48,7 +48,7 @@ the RTP jar is a build output staged by the harness, and Fabric API /
 FabricProxy-Lite are third-party downloads. The directory itself exists so
 the bind mount has a target.
 
-## Why backend-c exists
+## Role of backend-c
 
 `rtp-fabric` is the project's least-stable platform adapter. The point
 of `backend-c` is to drive that adapter under the same Velocity + Redis

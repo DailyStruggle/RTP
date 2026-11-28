@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
-import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
-import io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit;
+import net.leaf.units.DistanceParser;
+import net.leaf.units.SpatialUnit;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +15,8 @@ import java.util.UUID;
 /**
  * Ephemeral session state for an admin navigating the Setup Wizard.
  * Tracks user selections across each stage before compiling into a prefab recipe.
+ *
+ * @governedBy leafrtp-ADR-024, ADR-038
  */
 public final class SetupSession {
 

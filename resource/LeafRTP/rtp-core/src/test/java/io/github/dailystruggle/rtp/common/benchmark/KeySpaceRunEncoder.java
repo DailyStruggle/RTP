@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 /**
  * Counts the run table a shape's curve would hold, without building it.
  *
- * <p>Why this exists: a 100 km border is a 6250-chunk radius, i.e. about 156 million addressed
+ * <p>A 100 km border is a 6250-chunk radius, i.e. about 156 million addressed
  * chunks, of which more than half are unusable. Marking those through {@code addBadLocation} and
  * rebuilding is not a measurement that fits in a test JVM - the mark set alone exceeds the heap
  * before a single run is coalesced - so the footprint at border scale cannot be obtained the way

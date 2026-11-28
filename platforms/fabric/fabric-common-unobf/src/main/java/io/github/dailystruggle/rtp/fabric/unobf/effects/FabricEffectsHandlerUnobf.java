@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import net.leaf.yaml.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;

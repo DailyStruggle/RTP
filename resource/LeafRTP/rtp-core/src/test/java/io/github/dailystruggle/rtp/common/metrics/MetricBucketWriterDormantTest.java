@@ -86,8 +86,8 @@ class MetricBucketWriterDormantTest {
   @Test
   @DisplayName("REQ-RTP-METTS-007: NetworkTimeSeriesConfig parses metrics.networkTimeSeries.* from network.yml")
   void networkYmlSectionParsesNetworkTimeSeriesConfig() {
-    io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
-        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+    net.leaf.yaml.RtpYamlConfig yaml =
+        net.leaf.yaml.RtpYamlConfig.parse(
             """
             network:
               enabled: true

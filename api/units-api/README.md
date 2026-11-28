@@ -4,14 +4,14 @@ Dependency-free temporal, spatial, and data-size unit parsers and cache memory f
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:units-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:units-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:units-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:units-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:units-api:3.3.1'
+    implementation 'io.github.leafcraftdev:units-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:units-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:units-api:1.0.0'
 }
 ```
 

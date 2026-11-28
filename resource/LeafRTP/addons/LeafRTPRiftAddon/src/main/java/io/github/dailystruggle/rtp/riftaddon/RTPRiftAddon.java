@@ -5,7 +5,7 @@ import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.InputStream;

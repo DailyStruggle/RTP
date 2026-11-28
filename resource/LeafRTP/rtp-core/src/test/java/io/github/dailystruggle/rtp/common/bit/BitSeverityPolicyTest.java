@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.action.ActionDefinitionValidator;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BitKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;

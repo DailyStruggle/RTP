@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentMap;
  * Fully-reflective registry / resource-id resolver for the NeoForge effect
  * layer.
  *
- * <p><b>Why fully reflective.</b> The resource-identifier class
+ * <p>The resource-identifier class
  * {@code net.minecraft.resources.ResourceLocation} was renamed to
  * {@code Identifier} in the MC 1.21.11 mappings (see
  * {@code NeoForgeResourceIds}). Any bytecode that names {@code ResourceLocation}

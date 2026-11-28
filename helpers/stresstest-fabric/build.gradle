@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-group = 'io.github.dailystruggle'
+group = 'io.github.leafcraftdev'
 version = '1.0-SNAPSHOT'
 
 java {

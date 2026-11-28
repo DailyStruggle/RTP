@@ -83,7 +83,7 @@ public final class RTPNeoForgeMod {
    * {@code RTPRuntime.scheduler()}; {@code null} until then so any API entry before
    * core load fails loud per S-006 rather than silently no-opping.
    */
-  private NeoForgeServerAccessor accessor;
+  private volatile NeoForgeServerAccessor accessor;
 
   /**
    * Network mode bootstrap (ADR-049 / REQ-RTP-NET-002). Manages heartbeat
@@ -314,7 +314,10 @@ public final class RTPNeoForgeMod {
     try {
       io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
           io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("neoforge"),
-          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveServiceId(
+              RTPNeoForgeMod.class),
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveAssemblyVariant(
+              RTPNeoForgeMod.class),
           acc.getPluginDirectory());
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP][NeoForge] bStats setup skipped or failed: " + t.getMessage());
@@ -326,24 +329,25 @@ public final class RTPNeoForgeMod {
     // reference material (architecture diagrams, requirements, ADRs) ships
     // alongside the config tree on NeoForge. Idempotent + fail-soft - see
     // NeoForgeJarUtils Javadoc.
-    try {
-      String modVersion = net.neoforged.fml.ModList.get()
-          .getModContainerById(MOD_ID)
-          .map(c -> c.getModInfo().getVersion().toString())
-          .orElse("unknown");
-      io.github.dailystruggle.rtp.neoforge.utils.NeoForgeJarUtils
-          .extractDocs(acc.getPluginDirectory(), modVersion);
-    } catch (Throwable t) {
-      RTP.log(Level.WARNING,
-          "[RTP][NeoForge] NeoForgeJarUtils.extractDocs dispatch failed: "
-              + t.getClass().getSimpleName() + ": " + t.getMessage());
-    }
-    io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
-        .rebuildFromDataFolder(acc.getPluginDirectory());
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+      try {
+        String modVersion = net.neoforged.fml.ModList.get()
+            .getModContainerById(MOD_ID)
+            .map(c -> c.getModInfo().getVersion().toString())
+            .orElse("unknown");
+        io.github.dailystruggle.rtp.neoforge.utils.NeoForgeJarUtils
+            .extractDocs(acc.getPluginDirectory(), modVersion);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[RTP][NeoForge] NeoForgeJarUtils.extractDocs dispatch failed: "
+                + t.getClass().getSimpleName() + ": " + t.getMessage());
+      }
+      io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
+          .rebuildFromDataFolder(acc.getPluginDirectory());
+    });
 
     // N2.3 - register the game-bus event bridge (player join/quit, world
     // load/unload). Created here (not in the constructor) because it needs the
-    // accessor, which only exists once the server has started.
     NeoForgeEventBridge bridge = new NeoForgeEventBridge(acc);
     bridge.register();
 

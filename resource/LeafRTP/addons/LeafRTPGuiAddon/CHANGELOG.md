@@ -7,7 +7,9 @@ are documented here. This file covers **only** the addon under
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-### [1.0.1] - unreleased
+## [Unreleased]
+
+## [1.0.1] - Unreleased
 
 ### Fixed
 

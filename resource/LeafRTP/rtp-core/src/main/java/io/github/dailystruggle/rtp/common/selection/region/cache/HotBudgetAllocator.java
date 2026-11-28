@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.cache;
 
-import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
-import io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator;
+import net.leaf.predict.EwmaEstimator;
+import net.leaf.predict.WaterFillingAllocator;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

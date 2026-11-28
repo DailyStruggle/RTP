@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -91,8 +91,8 @@ public class RTPCmdPvPGateTest {
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
             Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
-            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
-                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
+            if (fv instanceof net.leaf.yaml.configuration.ConfigParser) {
+                ((net.leaf.yaml.configuration.ConfigParser) fv).set((Enum) k, v);
             }
         });
   }

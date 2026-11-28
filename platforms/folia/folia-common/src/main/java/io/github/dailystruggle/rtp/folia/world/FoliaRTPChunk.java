@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.folia.world;
 
 import io.github.dailystruggle.anvil.AnvilChunkView;
-import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
+import net.leaf.tags.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;

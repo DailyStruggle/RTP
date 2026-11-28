@@ -88,6 +88,30 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [Unreleased]
 
+## [3.3.3] - Unreleased
+
+> **Addon developer upgrade note.** Standalone SDK modules extracted from `rtp-core` and `rtp-api` now live under `net.leaf.*` (`yaml-api`, `units-api`, `tags-api`, `schematics-api`, `predict-api`, `config-bit-api`, and `database-api` Redis RESP2 classes) and `io.github.dailystruggle.anvil.*` (`anvil-api`). Server configurations are fully backward-compatible; addons compiling against `RTPWorld.restoreBlocks`/`setBlocks`, `RTPChunk`, `RTPLocation`, `SchematicPaster`, or `PendingPlatformRestore` must update imports and recompile against `3.3.3`.
+
+### Added
+
+- **Configurable Folia regional task concurrency cap (`maxRegionalInflight` in `advanced/performance.yml`, `-Drtp.folia.maxRegionalInflight=<n>`).** Folia operators can now set a fixed cap on concurrent in-flight regional scheduler tasks or disable the cap with `0` or a negative value; when omitted, the cap defaults to `max(1, availableProcessors / 2)`. The JVM property takes precedence over `advanced/performance.yml`, and changes take effect on server restart.
+
+- **`.lca` v3 chunk archive codec support (`anvil-api`, [anvil-api-ADR-003](https://github.com/DailyStruggle/RTP/tree/V3/api/anvil-api/docs/adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md)).** Off-tick region inspection and prefiltering now support `.lca` v3 chunk archives alongside `.lca` v2, `.mca`, `.linear`, and `.b_linear` region files, including streaming NBT decoding and parity verification.
+
+### Changed
+
+- **For addon developers.** Shared SDK packages relocated from `io.github.dailystruggle.rtp.*` to `net.leaf.yaml.*` (`yaml-api`), `net.leaf.units.*` (`units-api`), `net.leaf.tags.*` (`tags-api`), `net.leaf.schematics.*` (`schematics-api`), `net.leaf.predict.*` (`predict-api`), `net.leaf.bit.config.*` (`config-bit-api`), `net.leaf.database.resp.*` (`database-api`, including `RespPool`), and `io.github.dailystruggle.anvil.*` (`anvil-api`). `RTPAPI` also adds `columnProbeCoalescer()`, `setColumnProbeCoalescer(...)`, and `closeColumnProbeCoalescer()` for shared off-tick column probe lifecycle management.
+
+### Fixed
+
+- **Regions with an explicit block radius such as `radius: 16384b` could be shrunk to a 64-chunk ring and warn that they exceeded a 256-chunk world border.** The `SQUARE` world-border lookup left the border shape at its 256-chunk (`4,096`-block) default instead of reading the world's `WorldBorder` size, and `spatialResolution: auto` converted `radius: 16384b` to a plain chunk count (`1024`) before the unit check ran, causing `1024` chunks to be re-interpreted as `1,024` blocks (`64` chunks). Native world-border shapes on Paper, Folia, Spigot, Fabric, and NeoForge now read the world's actual `WorldBorder` size and center, and unit checks run before `spatialResolution: auto` caches the converted chunk count.
+
+- **`.lca` region files could be treated as ungenerated chunks during random teleports, and evicting open `.lca` regions on large world borders could stall chunk reads.** Chunk-existence checks read the first `4 KiB` of `.lca` files as a legacy `.mca` header, and opening a clean 1,024-chunk `.lca` region read every chunk header individually and ran unpromoted FIFO cache eviction. `.lca` existence checks now read the `.lca` pointer directory, clean region opens verify the header parity table without per-chunk reads, and region caches use Second-Chance Clock promotion with coalesced compaction before cache removal.
+
+- **On-demand random teleports (`rtp.unqueued` or empty cache queues) could decode candidate chunks twice when `anvilPrefilterEnabled` was active.** When the on-demand load governor selected a direct chunk load (or after an offline region prefilter check passed), the live chunk loader re-entered the offline region-file prefilter before loading the chunk on the server. Direct and post-prefilter chunk loads now load the live server chunk once without re-reading the region file.
+
+- **Chunk-load listeners on Fabric could stall the server thread when reading neighboring chunks, and Paper `26.x+` time-skip events and subcommand tab completion could miss lookups.** Fabric `CHUNK_LOAD` callbacks now run on the next server tick instead of inside `ServerChunkCache` chunk promotion, Bukkit `TimeSkipEvent` skip-reason lookups resolve across Paper's relocated `SkipReason` enum without throwing `IncompatibleClassChangeError`, and Bukkit tab completion checks both subcommand maps when suggesting `parameter=value` arguments.
+
 ## [3.3.2] - 2026-10-30
 
 ### Added

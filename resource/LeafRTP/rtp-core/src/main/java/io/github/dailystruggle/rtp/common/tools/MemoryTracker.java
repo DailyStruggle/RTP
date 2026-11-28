@@ -56,8 +56,8 @@ public class MemoryTracker {
 
   private static boolean isSystemLoggingEnabled() {
     if (ActiveConfigs.get() != null) {
-      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
-          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
+      net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
+          (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
               ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging != null) {
         Object o = logging.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_memory_tracker, true);

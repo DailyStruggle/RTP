@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.governor;
 
-import io.github.dailystruggle.rtp.common.predict.AimdLimiter;
-import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
-import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
-import io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator;
+import net.leaf.predict.AimdLimiter;
+import net.leaf.predict.EwmaEstimator;
+import net.leaf.predict.EwmaLinearFit;
+import net.leaf.predict.WaterFillingAllocator;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 
 import java.util.ArrayList;

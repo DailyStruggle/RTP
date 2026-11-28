@@ -2,7 +2,7 @@
 
 General-purpose, MIT-licensed, Java 17+ multi-platform Minecraft plugin and mod SDK. Every module under `api/` is usable standalone on Spigot, Paper, Folia, Fabric, NeoForge, and Velocity without depending on `rtp-core` or `rtp-api`.
 
-All 14 modules uphold four shared architectural guarantees:
+Every module in the catalog upholds four shared architectural guarantees:
 - **Java 17 bytecode baseline** ([ADR-113](../docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)) so artifacts load on every modern server runtime from Minecraft 1.18+ through 26.x+.
 - **Zero `rtp-core` or `rtp-api` dependency**, enforced at bytecode level by ArchUnit package-boundary tests.
 - **Zero raw thread creation** (`new Thread` / `Executors.new*ThreadPool`); asynchronous and regional work routes through caller-supplied executors or `TaskScheduler`.
@@ -23,6 +23,7 @@ All 14 modules uphold four shared architectural guarantees:
 - [`units-api`](units-api/README.md) - Dependency-free human-friendly temporal (`20t`, `1d12h`), spatial (`256c`, `4r`, `2km`), and data-size (`256MB`, `1GiB`) parsers with context-aware auto-interpretation (`DurationParser`, `DistanceParser`, `DataSizeParser`, `CacheMemoryCost`).
 - [`bit-api`](bit-api/README.md) - Plugin-agnostic Power-On, Continuous, and Initiated Built-In Test (`PBIT` / `CBIT` / `IBIT`) framework (`BitRunner`, `BitComponent`, `BitCodeRegistry`, `BitFinding`, `BitReport`, `BitOutputs`, `BitTable`, live JaCoCo/surface coverage).
 - [`config-bit-api`](config-bit-api/README.md) - Declarative YAML `@type` / `@options` / `@range` / `@pattern` comment-directive schema validation (`DirectiveSchemaParser`, `DirectiveValidator`), cross-key distance constraints (`ConfigConstraint`, `GenericConstraintCheck`), `@<file>` reference checks (`ReferenceSettingCheck`), and locale key-parity verification (`MessageKeyParity`).
+- [`bytecode-api`](bytecode-api/README.md) - Zero-classloading JVM `.class` constant-pool, config-key, and causal-graph bytecode scanner (`BytecodeConfigScanner`, `BytecodeCausalGraphScanner`, `JarConfigScanner`, `SchemaInferrer`, `ServerConfigAtlas`).
 
 ### 3. Stochastic Control, Allocation & Telemetry
 - [`predict-api`](predict-api/README.md) - Zero-dependency online statistical estimators (`EwmaEstimator`, `BernoulliEstimator`, `EwmaLinearFit`), lag-aware AIMD stability limiters (`AimdLimiter`), tick-budget pacers (`BudgetPacer`), variance-gated comparative cost governors (`ComparativeCostGovernor`), max-min water-filling (`WaterFillingAllocator`), per-actor dual-EWMA work attribution (`WorkAttributionLedger`), and Folia probed regional share allocation (`ProbedShareAllocator`).
@@ -31,7 +32,7 @@ All 14 modules uphold four shared architectural guarantees:
 
 ### 4. World Storage, Persistence & Data Decode
 - [`database-api`](database-api/README.md) - Zero-dependency JDBC connection pool (`MiniConnectionPool`, `CloseableDataSource`), dialect abstraction and portable UPSERT builder (`SqlDialect`, `SqlDataSourceFactory`), and bounded-memory Redis RESP2 client and pub/sub engine (`RespEndpoint`, `RespProtocol`, `RespConnection`, `RespPool`, `RespPubSub`).
-- [`anvil-api`](anvil-api/README.md) - Off-tick read-only Minecraft region-file decoder (`.mca` sectors with gzip, zlib, uncompressed, in-house LZ4, and dynamic Zstd; pluggable `RegionFileReader` SPI via `RegionFormatRegistry`), selective NBT parser (`Nbt`), and load-free surface/biome probes (`AnvilPrefilter`, `AnvilChunkView`, `ColumnProbe`).
+- [`anvil-api`](anvil-api/README.md) - Off-tick read-only Minecraft region-file decoder (`.mca` sectors with gzip, zlib, uncompressed, in-house LZ4, and dynamic Zstd; `.linear`/`.b_linear` and `.lca` v2/v3 chunk archive codecs; pluggable `RegionFileReader` SPI via `RegionFormatRegistry`), selective NBT parser (`Nbt`), and load-free surface/biome probes (`AnvilPrefilter`, `AnvilChunkView`, `ColumnProbe`).
 - [`tags-api`](tags-api/README.md) - Dependency-free Minecraft data-pack block-tag JSON loader (`DiskTagSource`, `TagFileParser`, `TinyJsonReader`), cycle-safe `#namespace:tag` fixed-point resolver (`TagResolver`), block-state string parser (`BlockStateString`), and ADR-017 block-predicate/subtraction compiler (`SafetyTokenParser`, `StatePredicate`, `CompiledUnsafeSet`, `SafetyCompilationCache`).
 - [`schematics-api`](schematics-api/README.md) - Dependency-free Sponge Schematic v2/v3 (`.schem`, `.schematic`) and Litematica (`.litematic`) GZIP-NBT decoder (`SpongeSchematicDecoder`), in-memory cache (`SchematicFileLoader`), and 3D coordinate placement planner (`SchematicPlacementPlanner`, `BlockDelta`, `BlockPlacement`, `PlacedBlockEntity`).
 
@@ -48,17 +49,18 @@ All 14 modules uphold four shared architectural guarantees:
 | `commands-api` | `:commands-api` | `commands-api` | `io.github.dailystruggle.commandsapi` | Zero at runtime (`brigadier` compileOnly) | [`commands-api/README.md`](commands-api/README.md) |
 | `menu-api` | `:menu-api` | `menu-api` | `io.github.dailystruggle.menu.api` | `:server-api`, `:commands-api` | [`menu-api/README.md`](menu-api/README.md) |
 | `effects-api` | `:effects-api` | `effects-api` | `io.github.dailystruggle.effectsapi` | Zero on `common` SPI (`spigot-api` compileOnly for `.bukkit`) | [`effects-api/README.md`](effects-api/README.md) |
-| `yaml-api` | `:yaml-api` | `yaml-api` | `io.github.dailystruggle.rtp.common.configuration.yaml` | Zero (JDK 17 only) | [`yaml-api/README.md`](yaml-api/README.md) |
-| `units-api` | `:units-api` | `units-api` | `io.github.dailystruggle.rtp.common.selection.region.util` | Zero (JDK 17 only) | [`units-api/README.md`](units-api/README.md) |
+| `yaml-api` | `:yaml-api` | `yaml-api` | `net.leaf.yaml`, `io.github.dailystruggle.{yaml,search}` | Zero (JDK 17 only) | [`yaml-api/README.md`](yaml-api/README.md) |
+| `units-api` | `:units-api` | `units-api` | `net.leaf.units` | Zero (JDK 17 only) | [`units-api/README.md`](units-api/README.md) |
 | `bit-api` | `:bit-api` | `bit-api` | `io.github.dailystruggle.bit` | Zero (JDK 17 only) | [`bit-api/README.md`](bit-api/README.md) |
-| `config-bit-api` | `:config-bit-api` | `config-bit-api` | `io.github.dailystruggle.rtp.common.bit.config` | `:yaml-api`, `:bit-api`, `:units-api` | [`config-bit-api/README.md`](config-bit-api/README.md) |
-| `predict-api` | `:predict-api` | `predict-api` | `io.github.dailystruggle.rtp.common.predict` | Zero (JDK 17 only) | [`predict-api/README.md`](predict-api/README.md) |
+| `config-bit-api` | `:config-bit-api` | `config-bit-api` | `net.leaf.bit.config`, `io.github.dailystruggle.bit.config` | `:yaml-api`, `:bit-api`, `:units-api` | [`config-bit-api/README.md`](config-bit-api/README.md) |
+| `bytecode-api` | `:bytecode-api` | `bytecode-api` | `io.github.dailystruggle.bytecode` | `:yaml-api`, `:server-api`, `:config-bit-api` | [`bytecode-api/README.md`](bytecode-api/README.md) |
+| `predict-api` | `:predict-api` | `predict-api` | `net.leaf.predict` | Zero (JDK 17 only) | [`predict-api/README.md`](predict-api/README.md) |
 | `metrics-api` | `:metrics-api` | `metrics-api` | `io.github.dailystruggle.metrics.api` | Zero (JDK 17 only) | [`metrics-api/README.md`](metrics-api/README.md) |
 | `bstats-api` | `:bstats-api` | `bstats-api` | `io.github.dailystruggle.bstats.api` | Zero (JDK 17 only) | [`bstats-api/README.md`](bstats-api/README.md) |
-| `database-api` | `:database-api` | `database-api` | `io.github.dailystruggle.database.api` | Zero (JDK 17 only) | [`database-api/README.md`](database-api/README.md) |
+| `database-api` | `:database-api` | `database-api` | `io.github.dailystruggle.database.{api,resp}`, `net.leaf.database.{pool,resp}` | Zero (JDK 17 only) | [`database-api/README.md`](database-api/README.md) |
 | `anvil-api` | `:anvil-api` | `anvil-api` | `io.github.dailystruggle.anvil` | `:bit-api` (JDK 17 only) | [`anvil-api/README.md`](anvil-api/README.md) |
-| `tags-api` | `:tags-api` | `tags-api` | `io.github.dailystruggle.rtp.tags`, `io.github.dailystruggle.rtp.api.{block,safety}` | Zero (JDK 17 only) | [`tags-api/README.md`](tags-api/README.md) |
-| `schematics-api` | `:schematics-api` | `schematics-api` | `io.github.dailystruggle.rtp.api.schematic`, `io.github.dailystruggle.rtp.api.platform` | `:tags-api`, `:server-api` (JDK 17 only) | [`schematics-api/README.md`](schematics-api/README.md) |
+| `tags-api` | `:tags-api` | `tags-api` | `net.leaf.tags`, `net.leaf.tags.{block,safety}` | Zero (JDK 17 only) | [`tags-api/README.md`](tags-api/README.md) |
+| `schematics-api` | `:schematics-api` | `schematics-api` | `net.leaf.schematics.{schematic,platform}` | `:tags-api`, `:server-api` (JDK 17 only) | [`schematics-api/README.md`](schematics-api/README.md) |
 | `maps-api` | `:maps-api` | `maps-api` | `io.github.dailystruggle.mapsapi` | Zero on core/image (`spigot-api` compileOnly for `.bukkit`) | [`maps-api/README.md`](maps-api/README.md) |
 
 > **Flat Gradle project paths:** On disk, these modules live under `api/<module>`, while `settings.gradle` keeps their Gradle project paths flat (`:<module>`, e.g. `./gradlew :predict-api:build`).
@@ -67,7 +69,7 @@ All 14 modules uphold four shared architectural guarantees:
 
 ## Standalone Consumption (Maven Central & JitPack)
 
-Standalone plugin and mod authors can pull individual SDK modules from **Maven Central** (`io.github.dailystruggle:<module>:<version>`) or **JitPack** (`com.github.DailyStruggle.RTP:<module>:<tag>`):
+Standalone plugin and mod authors can pull individual SDK modules from **Maven Central** (`io.github.leafcraftdev:<module>:<version>`) or **JitPack** (`com.github.LeafCraftDev.LeafSDK:<module>:<tag>`):
 
 ### Gradle (`build.gradle`)
 
@@ -79,15 +81,15 @@ repositories {
 
 dependencies {
     // Maven Central coordinates
-    implementation 'io.github.dailystruggle:server-api:3.3.1'
-    implementation 'io.github.dailystruggle:yaml-api:3.3.1'
-    implementation 'io.github.dailystruggle:units-api:3.3.1'
-    implementation 'io.github.dailystruggle:bit-api:3.3.1'
-    implementation 'io.github.dailystruggle:config-bit-api:3.3.1'
-    implementation 'io.github.dailystruggle:predict-api:3.3.1'
+    implementation 'io.github.leafcraftdev:server-api:1.0.0'
+    implementation 'io.github.leafcraftdev:yaml-api:1.0.0'
+    implementation 'io.github.leafcraftdev:units-api:1.0.0'
+    implementation 'io.github.leafcraftdev:bit-api:1.0.0'
+    implementation 'io.github.leafcraftdev:config-bit-api:1.0.0'
+    implementation 'io.github.leafcraftdev:predict-api:1.0.0'
 
     // Or via JitPack tag / branch snapshot
-    // implementation 'com.github.DailyStruggle.RTP:predict-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:predict-api:1.0.0'
 }
 ```
 

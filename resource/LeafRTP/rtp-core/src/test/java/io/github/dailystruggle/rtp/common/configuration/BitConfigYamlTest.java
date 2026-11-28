@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.configuration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

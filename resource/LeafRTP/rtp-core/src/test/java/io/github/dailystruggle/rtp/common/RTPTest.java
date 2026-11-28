@@ -270,7 +270,7 @@ class RTPTest {
         // The addon-facing path must honour the lockAfterUses usage cap: a player
         // who has exhausted the cap (and lacks rtp.nolock) must be rejected with
         // LOCKED rather than teleporting.
-        var cfg = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+        var cfg = (net.leaf.yaml.configuration.ConfigParser<
                 io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
                 ActiveConfigs.get().getParser(
                         io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
@@ -338,7 +338,7 @@ class RTPTest {
         // the /rtp command does: a player who cannot afford the configured price
         // must be rejected with INSUFFICIENT_FUNDS rather than teleported free,
         // and a player who can afford it (or has rtp.free) must be allowed.
-        var eco = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+        var eco = (net.leaf.yaml.configuration.ConfigParser<
                 io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
                 ActiveConfigs.get().getParser(
                         io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);

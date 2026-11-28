@@ -1,19 +1,19 @@
-name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
+name: Release LeafRTP to Modrinth, Hangar and GitHub Releases (markdown sites)
 
-# Owns the public/Lite release side: publishes the lite assembly variant to
+# Owns the public/free release side: publishes the default LeafRTP jar to
 # Modrinth, Hangar, and GitHub Releases.
 #
 # Release cadence (ADR-117):
 #   - Both editions share one version line (`version` in gradle.properties).
 #   - Pro (release-bbb.yml) ships on PR merge and creates the git tag; it also
 #     carries patch releases owed to paying customers under the support terms.
-#   - Lite ships when the maintainer chooses to publish a version, with no
-#     holding period. It may skip patch versions; it never carries code that
-#     no Pro release has shipped.
+#   - Free (default LeafRTP) ships when the maintainer chooses to publish a
+#     version, with no holding period. It may skip patch versions; it never
+#     carries code that no Pro release has shipped.
 #   - Triggered on demand via `workflow_dispatch`, from the commit that was
 #     released (pass `--ref <branch-or-tag>`).
 #
-# Publishes the lite assembly variant (ADR-024, Lite only) to the Modrinth
+# Publishes the default free jar (`LeafRTP-<version>.jar`) to the Modrinth
 # project `leafrtp` (https://modrinth.com/plugin/leafrtp, addressed by its
 # immutable project ID TZNIQSHX so a slug rename cannot break it) and the Hangar
 # project `leaf26/LeafRTP` (https://hangar.papermc.io/leaf26/LeafRTP). Pro is
@@ -96,7 +96,7 @@ jobs:
           fi
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Releasing lite version: ${VERSION} (tag v${VERSION})"
+          echo "Releasing LeafRTP version: ${VERSION} (tag v${VERSION})"
 
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -111,18 +111,18 @@ jobs:
       # Per AGENTS.md `Final Full Build`: prefer the full multi-module build
       # over a scoped `:rtp-plugin:remapLiteJar` so cross-module compile breaks
       # and downstream test regressions are caught before publication. The
-      # lite jar is the artifact we ship; everything else is verification.
+      # default LeafRTP jar is the artifact we ship; everything else is verification.
       # Also generate CycloneDX SBOM, release checksums, and sign deliverables (ENTERPRISE_READINESS.md items 37, 39, 40).
-      - name: Build (full multi-module + lite jar + SBOM + checksums + signing)
+      - name: Build (full multi-module + LeafRTP jar + SBOM + checksums + signing)
         env:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew build :rtp-plugin:remapLiteJar :rtp-plugin:cyclonedxBom :rtp-plugin:generateChecksums :rtp-plugin:signDeliverables
 
-      - name: Locate lite jar and release deliverables
+      - name: Locate LeafRTP jar and release deliverables
         id: artifact
         run: |
-          # ADR-024: the lite artifact is the unclassified `LeafRTP-<version>.jar`
+          # The default free artifact is the unclassified `LeafRTP-<version>.jar`
           # produced by `remapLiteJar` in resource/LeafRTP/rtp-plugin/build/libs/. The
           # classified `*-dev.jar` is the pre-remap intermediate and is NOT
           # the release artifact.
@@ -130,12 +130,12 @@ jobs:
             ! -name 'LeafRTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
             ! -name '*-javadoc.jar' | head -n 1)
           if [ -z "$LITE_JAR" ]; then
-            echo "::error::Could not locate the lite jar under resource/LeafRTP/rtp-plugin/build/libs/"
+            echo "::error::Could not locate the LeafRTP jar under resource/LeafRTP/rtp-plugin/build/libs/"
             ls -la resource/LeafRTP/rtp-plugin/build/libs/ || true
             exit 1
           fi
           echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
-          echo "Found lite jar: ${LITE_JAR}"
+          echo "Found LeafRTP jar: ${LITE_JAR}"
 
           # Locate SBOM (Item 37)
           SBOM_FILE=$(find resource/LeafRTP/rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
@@ -206,13 +206,12 @@ jobs:
           #   ## [1.0.0] - YYYY-MM-DD
           # or
           #   ## [1.0.0-beta.1] - Unreleased
-          # Stop at the next `## [` heading. Bullets tagged `**(Pro)**` (and
-          # their wrapped continuation lines) are dropped so the lite notes
-          # only describe features that ship in rtp-lite -- see the
-          # `Pro-exclusive tagging rule` at the top of CHANGELOG.md.
+          # Stop at the next `## [` heading. Historical bullets tagged `**(Pro)**`
+          # (and their wrapped continuation lines) are dropped if an older section
+          # is re-published -- see ADR-108.
           if [ ! -f resource/LeafRTP/CHANGELOG.md ]; then
             echo "::warning::resource/LeafRTP/CHANGELOG.md not found; falling back to generic release notes."
-            echo "rtp-lite ${VERSION}" > release-notes.md
+            echo "LeafRTP ${VERSION}" > release-notes.md
           else
             awk -v ver="$VERSION" '
               BEGIN { capture = 0; skip = 0 }
@@ -237,7 +236,7 @@ jobs:
             ' resource/LeafRTP/CHANGELOG.md > release-notes.md
             if [ ! -s release-notes.md ]; then
               echo "::warning::No CHANGELOG.md section matched [${VERSION}]; using a placeholder."
-              echo "rtp-lite ${VERSION}" > release-notes.md
+              echo "LeafRTP ${VERSION}" > release-notes.md
             fi
           fi
           echo "--- release-notes.md ---"
@@ -274,7 +273,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: rtp-lite ${{ steps.version.outputs.version }}
+          name: LeafRTP ${{ steps.version.outputs.version }}
           body_path: release-notes.md
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
           # ADR-126: LeafRTP owns the repository-wide /releases/latest pointer on
@@ -294,7 +293,7 @@ jobs:
           modrinth-id: TZNIQSHX
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: ${{ steps.artifact.outputs.lite_jar }}
-          name: rtp-lite ${{ steps.version.outputs.version }}
+          name: LeafRTP ${{ steps.version.outputs.version }}
           version: ${{ steps.version.outputs.version }}
           # Mark beta/alpha versions correctly so they do not surface as
           # "latest stable" in admin filters.
@@ -357,8 +356,8 @@ jobs:
           python3 scripts/release/update_modrinth_description.py --project-id TZNIQSHX \
             --source-file scripts/release/generated/FRONT_PAGE_MODRINTH.md
 
-      # Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the Lite variant
-      # only; Pro is neither published nor advertised there. mc-publish supports
+      # Hangar (https://hangar.papermc.io/leaf26/LeafRTP) hosts the free default
+      # LeafRTP jar only; Pro is neither published nor advertised there. mc-publish supports
       # only CurseForge/Modrinth/GitHub, so Hangar is published directly against
       # its REST API via a stdlib script. The script targets the Paper platform
       # (covers Bukkit/Spigot/Paper/Folia) and filters the MC version list to
@@ -384,7 +383,7 @@ jobs:
           python3 scripts/release/update_hangar_description.py --project LeafRTP \
             --source-file scripts/release/generated/FRONT_PAGE_HANGAR.md
 
-      # Optional fast-publish hook (Option A) to post the release notes + Lite jar
+      # Optional fast-publish hook (Option A) to post the release notes + LeafRTP jar
       # into the locked `🌿 LeafRTP Releases` thread in `#releases` and update the
       # `[plugin-status:leafrtp]` status card in place. If DISCORD_BOT_TOKEN /
       # DISCORD_GUILD_ID are not set in repository secrets, Option B in

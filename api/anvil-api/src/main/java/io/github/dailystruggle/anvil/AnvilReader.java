@@ -114,6 +114,92 @@ public final class AnvilReader implements RegionFileReader {
         return readChunkEntry(regionBytes, regionLength, cx, cz);
     }
 
+    @Override
+    public boolean patchChunkBlocks(
+            java.nio.file.Path regionFile,
+            int cx,
+            int cz,
+            java.util.Collection<BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        return LcaRegionWriter.patchMcaRegionFile(regionFile, cx, cz, patches, isReplaceable);
+    }
+
+    static byte[] patchChunkInMcaBytes(
+            byte[] regionBytes,
+            int cx,
+            int cz,
+            java.util.Collection<BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (!INSTANCE.isChunkGenerated(regionBytes, regionBytes.length, cx, cz)) {
+            return new byte[0];
+        }
+        ChunkEntry entry = readChunkEntry(regionBytes, regionBytes.length, cx, cz);
+        if (entry == null || entry.root == null || !RegionFileReader.isFullChunkRoot(entry.root)) {
+            return new byte[0];
+        }
+        if (patches == null || patches.isEmpty()) {
+            return regionBytes;
+        }
+        if (!RegionFileReader.applyPatchesToChunkRoot(entry.root, patches, isReplaceable)) {
+            return regionBytes;
+        }
+        byte[] updatedNbt = Nbt.writeNamedRoot("", entry.root);
+        return writeCompressedChunkToMcaBytes(regionBytes, cx, cz, updatedNbt);
+    }
+
+    static byte[] writeCompressedChunkToMcaBytes(
+            byte[] regionBytes, int cx, int cz, byte[] uncompressedNbt) throws IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(uncompressedNbt.length);
+        try (java.util.zip.DeflaterOutputStream dos = new java.util.zip.DeflaterOutputStream(baos)) {
+            dos.write(uncompressedNbt);
+        }
+        byte[] compressed = baos.toByteArray();
+        int declaredLen = 1 + compressed.length;
+        int totalBytes = 4 + declaredLen;
+        int neededSectors = (totalBytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
+        if (neededSectors <= 0 || neededSectors > 255) {
+            throw new IOException("Encoded chunk requires invalid sector count: " + neededSectors);
+        }
+
+        int index = (cx & 31) + ((cz & 31) << 5);
+        int locOff = index * 4;
+        int oldSectorOffset =
+                ((regionBytes[locOff] & 0xFF) << 16)
+                        | ((regionBytes[locOff + 1] & 0xFF) << 8)
+                        | (regionBytes[locOff + 2] & 0xFF);
+        int oldSectorCount = regionBytes[locOff + 3] & 0xFF;
+
+        byte[] out;
+        int targetSectorOffset;
+        if (oldSectorOffset >= 2
+                && neededSectors <= oldSectorCount
+                && (long) (oldSectorOffset + neededSectors) * SECTOR_SIZE <= regionBytes.length) {
+            out = regionBytes.clone();
+            targetSectorOffset = oldSectorOffset;
+        } else {
+            targetSectorOffset = Math.max(2, (regionBytes.length + SECTOR_SIZE - 1) / SECTOR_SIZE);
+            out = java.util.Arrays.copyOf(
+                    regionBytes, (targetSectorOffset + neededSectors) * SECTOR_SIZE);
+        }
+
+        int byteStart = targetSectorOffset * SECTOR_SIZE;
+        int byteEnd = (targetSectorOffset + neededSectors) * SECTOR_SIZE;
+        java.util.Arrays.fill(out, byteStart, byteEnd, (byte) 0);
+        ByteBuffer.wrap(out, byteStart, 4).putInt(declaredLen);
+        out[byteStart + 4] = 2; // zlib
+        System.arraycopy(compressed, 0, out, byteStart + 5, compressed.length);
+
+        out[locOff] = (byte) ((targetSectorOffset >>> 16) & 0xFF);
+        out[locOff + 1] = (byte) ((targetSectorOffset >>> 8) & 0xFF);
+        out[locOff + 2] = (byte) (targetSectorOffset & 0xFF);
+        out[locOff + 3] = (byte) neededSectors;
+
+        int tsOff = SECTOR_SIZE + locOff;
+        int epochSec = (int) (System.currentTimeMillis() / 1000L);
+        ByteBuffer.wrap(out, tsOff, 4).putInt(epochSec);
+        return out;
+    }
+
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} from {@code regionBytes}.
      *
@@ -236,6 +322,19 @@ public final class AnvilReader implements RegionFileReader {
         }
         RawChunk raw = decodeSectorPayload(sectorBytes, sectorBytes.length, 0, sectorBytes.length, cx, cz);
         return toView(Nbt.readRootCompound(raw.nbtBytes));
+    }
+
+    /**
+     * As {@link #readChunkViewFromSectors(byte[], int, int)}, preserving canonical sorted
+     * {@code minecraft:id[k1=v1,...]} blockstate properties for 3D map/rendering consumers while
+     * leaving {@link #readChunkViewFromSectors} bare-name behavior unchanged ({@code ADR-016}).
+     */
+    public static AnvilChunkView readChunkStateViewFromSectors(byte[] sectorBytes, int cx, int cz) throws IOException {
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + cx + "," + cz + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, sectorBytes.length, 0, sectorBytes.length, cx, cz);
+        return toStateView(Nbt.readRootCompound(raw.nbtBytes));
     }
 
     /**
@@ -401,6 +500,22 @@ public final class AnvilReader implements RegionFileReader {
         return toView(entry.root);
     }
 
+    /**
+     * Reads chunk {@code (cx, cz)} into an {@link AnvilChunkView} whose section palettes preserve
+     * canonical sorted {@code minecraft:id[k1=v1,...]} blockstate strings.
+     */
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int cx, int cz) throws IOException {
+        return readChunkStateView(regionBytes, regionBytes == null ? 0 : regionBytes.length, cx, cz);
+    }
+
+    /** As {@link #readChunkStateView(byte[], int, int)} over {@code regionBytes[0, regionLength)}. */
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int regionLength, int cx, int cz)
+            throws IOException {
+        ChunkEntry entry = readChunkEntry(regionBytes, regionLength, cx, cz);
+        if (entry == null) return null;
+        return toStateView(entry.root);
+    }
+
     // ----------------------------------------------------------- column probe (ADR-016)
 
     /**
@@ -541,7 +656,9 @@ public final class AnvilReader implements RegionFileReader {
             if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
-            if ("Status".equals(name) && type == Nbt.TAG_STRING) return Nbt.SelectiveFilter.Decision.KEEP;
+            if (("Status".equals(name) || "status".equals(name)) && type == Nbt.TAG_STRING) {
+                return Nbt.SelectiveFilter.Decision.KEEP;
+            }
             // Position guard for sector-only reads (verifyPosition).
             if ("xPos".equals(name) || "zPos".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
             return Nbt.SelectiveFilter.Decision.SKIP;
@@ -626,6 +743,18 @@ public final class AnvilReader implements RegionFileReader {
      * "malformed → UNKNOWN, never crash" posture.
      */
     public static AnvilChunkView toView(LinkedHashMap<String, Object> root) {
+        return toViewInternal(root, false);
+    }
+
+    /**
+     * Lifts an already-parsed chunk root compound into an {@link AnvilChunkView} preserving
+     * canonical sorted {@code Name[k1=v1,...]} blockstate strings from {@code Properties}.
+     */
+    public static AnvilChunkView toStateView(LinkedHashMap<String, Object> root) {
+        return toViewInternal(root, true);
+    }
+
+    private static AnvilChunkView toViewInternal(LinkedHashMap<String, Object> root, boolean preserveProperties) {
         int dataVersion = getDataVersion(root);
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
@@ -638,7 +767,7 @@ public final class AnvilReader implements RegionFileReader {
             out = new ArrayList<>(sections.items.size());
             biomeOut = new ArrayList<>(sections.items.size());
             for (Object raw : sections.items) {
-                PaletteSection ps = sectionFromCompound(raw);
+                PaletteSection ps = sectionFromCompound(raw, preserveProperties);
                 if (ps != null) out.add(ps);
                 // Biome container is decoded independently: a section may carry a
                 // valid biome palette even if its block_states is missing, and vice
@@ -654,8 +783,12 @@ public final class AnvilReader implements RegionFileReader {
                 Collections.unmodifiableList(biomeOut));
     }
 
-    @SuppressWarnings("unchecked")
     private static PaletteSection sectionFromCompound(Object raw) {
+        return sectionFromCompound(raw, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static PaletteSection sectionFromCompound(Object raw, boolean preserveProperties) {
         if (!(raw instanceof Map)) return null;
         Map<String, Object> sec = (Map<String, Object>) raw;
 
@@ -674,7 +807,7 @@ public final class AnvilReader implements RegionFileReader {
 
         List<String> paletteNames = new ArrayList<>(palList.items.size());
         for (Object entry : palList.items) {
-            String name = blockStateName(entry);
+            String name = preserveProperties ? formatCanonicalBlockState(entry) : blockStateName(entry);
             if (name == null) return null;
             paletteNames.add(name);
         }
@@ -683,6 +816,99 @@ public final class AnvilReader implements RegionFileReader {
         long[] data = (dataObj instanceof long[]) ? (long[]) dataObj : null;
 
         return new PaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data);
+    }
+
+    /**
+     * Formats a raw NBT {@code block_states.palette} entry (or structure-template {@code palette}
+     * compound) into canonical sorted {@code namespace:id[k1=v1,k2=v2]} form. Returns {@code null}
+     * when the entry has no valid block identifier.
+     */
+    @SuppressWarnings("unchecked")
+    public static String formatCanonicalBlockState(Object entry) {
+        String baseName = blockStateName(entry);
+        if (baseName == null || !(entry instanceof Map)) {
+            return baseName;
+        }
+        Map<String, Object> m = (Map<String, Object>) entry;
+        Object propsObj = m.get("Properties");
+        if (propsObj == null) {
+            propsObj = m.get("properties");
+        }
+        if (!(propsObj instanceof Map<?, ?> rawProps) || rawProps.isEmpty()) {
+            return baseName;
+        }
+        java.util.TreeMap<String, String> sorted = new java.util.TreeMap<>();
+        for (Map.Entry<?, ?> pe : rawProps.entrySet()) {
+            if (pe.getKey() != null && pe.getValue() != null) {
+                sorted.put(String.valueOf(pe.getKey()), String.valueOf(pe.getValue()));
+            }
+        }
+        if (sorted.isEmpty()) {
+            return baseName;
+        }
+        StringBuilder sb = new StringBuilder(baseName.length() + sorted.size() * 14);
+        sb.append(baseName).append('[');
+        boolean first = true;
+        for (Map.Entry<String, String> se : sorted.entrySet()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(se.getKey()).append('=').append(se.getValue());
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    /**
+     * Normalizes any raw blockstate string (e.g. {@code oak_stairs[half=top,facing=west]}) into
+     * canonical sorted {@code namespace:id[facing=west,half=top]} form so property-order differences
+     * across {@code .mca}, {@code .lca}, and {@code .nbt} sources hash identically.
+     */
+    public static String normalizeCanonicalBlockState(String rawState) {
+        if (rawState == null || rawState.isBlank()) {
+            return "minecraft:air";
+        }
+        String trimmed = rawState.trim();
+        int bracket = trimmed.indexOf('[');
+        String base = (bracket >= 0 ? trimmed.substring(0, bracket) : trimmed).toLowerCase(java.util.Locale.ROOT);
+        if (!base.contains(":")) {
+            base = "minecraft:" + base;
+        }
+        if (bracket < 0 || !trimmed.endsWith("]")) {
+            return base;
+        }
+        String propsRaw = trimmed.substring(bracket + 1, trimmed.length() - 1);
+        if (propsRaw.isEmpty()) {
+            return base;
+        }
+        java.util.TreeMap<String, String> sorted = new java.util.TreeMap<>();
+        int start = 0;
+        while (start < propsRaw.length()) {
+            int comma = propsRaw.indexOf(',', start);
+            String pair = comma < 0 ? propsRaw.substring(start) : propsRaw.substring(start, comma);
+            int eq = pair.indexOf('=');
+            if (eq > 0) {
+                String k = pair.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT);
+                String v = pair.substring(eq + 1).trim().toLowerCase(java.util.Locale.ROOT);
+                if (!k.isEmpty() && !v.isEmpty()) {
+                    sorted.put(k, v);
+                }
+            }
+            if (comma < 0) break;
+            start = comma + 1;
+        }
+        if (sorted.isEmpty()) {
+            return base;
+        }
+        StringBuilder sb = new StringBuilder(base.length() + sorted.size() * 14);
+        sb.append(base).append('[');
+        boolean first = true;
+        for (Map.Entry<String, String> e : sorted.entrySet()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(e.getKey()).append('=').append(e.getValue());
+        }
+        sb.append(']');
+        return sb.toString();
     }
 
     /**
@@ -708,7 +934,11 @@ public final class AnvilReader implements RegionFileReader {
      * Roots without {@code Status} count as complete.
      */
     public static boolean isIncompleteChunk(Map<String, Object> root) {
-        Object status = (root == null) ? null : root.get("Status");
+        if (root == null) return false;
+        Object status = root.get("Status");
+        if (!(status instanceof String)) {
+            status = root.get("status");
+        }
         if (!(status instanceof String s)) return false;
         return !("minecraft:full".equals(s) || "full".equals(s));
     }
@@ -724,7 +954,8 @@ public final class AnvilReader implements RegionFileReader {
      * <p>The biome container has the same wire shape as {@code block_states} except:
      * (1) {@code palette[i]} is a bare {@code TAG_String} (namespaced identifier)
      * rather than a compound with a {@code Name} field, and (2) the packed {@code data}
-     * array is 64 cells (4×4×4) rather than 4096 blocks - see ADR-016 (biome) section 3.
+     * array stores either 64 cells (4×4×4 quartets, MC 1.18–26.3) or 4,096 per-block
+     * cells (16×16×16, MC 26.4+) — see ADR-016 (biome) section 3 and {@link BiomePaletteSection}.
      */
     @SuppressWarnings("unchecked")
     private static BiomePaletteSection biomeSectionFromCompound(Object raw) {

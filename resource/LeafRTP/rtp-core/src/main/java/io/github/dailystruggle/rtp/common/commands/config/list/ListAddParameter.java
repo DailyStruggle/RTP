@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.config.list;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import java.util.Set;
 import java.util.function.Supplier;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 public class ListAddParameter extends CommandParameter {
   private final Supplier<Set<String>> values;

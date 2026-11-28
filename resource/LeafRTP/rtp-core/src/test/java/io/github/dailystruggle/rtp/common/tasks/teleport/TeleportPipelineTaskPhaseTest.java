@@ -580,9 +580,9 @@ class TeleportPipelineTaskPhaseTest {
         }
     }
 
-    private record DummySchematic(int width, int height, int length, int offsetX, int offsetY, int offsetZ) implements io.github.dailystruggle.rtp.api.schematic.LoadedSchematic {
+    private record DummySchematic(int width, int height, int length, int offsetX, int offsetY, int offsetZ) implements net.leaf.schematics.schematic.LoadedSchematic {
         @Override
-        public io.github.dailystruggle.rtp.api.schematic.SchematicSource source() { return null; }
+        public net.leaf.schematics.schematic.SchematicSource source() { return null; }
     }
 
     @Test
@@ -591,16 +591,16 @@ class TeleportPipelineTaskPhaseTest {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("footprint_w");
         io.github.dailystruggle.rtp.api.world.RTPLocation loc = new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 100, 64, 100);
 
-        io.github.dailystruggle.rtp.api.schematic.PasteOptions optionsCenter =
-                new io.github.dailystruggle.rtp.api.schematic.PasteOptions(io.github.dailystruggle.rtp.api.schematic.PasteAnchor.CENTER, false, true);
-        io.github.dailystruggle.rtp.api.schematic.PasteOptions optionsOrigin =
-                new io.github.dailystruggle.rtp.api.schematic.PasteOptions(io.github.dailystruggle.rtp.api.schematic.PasteAnchor.ORIGIN, false, true);
+        net.leaf.schematics.schematic.PasteOptions optionsCenter =
+                new net.leaf.schematics.schematic.PasteOptions(net.leaf.schematics.schematic.PasteAnchor.CENTER, false, true);
+        net.leaf.schematics.schematic.PasteOptions optionsOrigin =
+                new net.leaf.schematics.schematic.PasteOptions(net.leaf.schematics.schematic.PasteAnchor.ORIGIN, false, true);
 
-        io.github.dailystruggle.rtp.api.schematic.LoadedSchematic emptySchematic =
+        net.leaf.schematics.schematic.LoadedSchematic emptySchematic =
                 new DummySchematic(0, 0, 0, 0, 0, 0);
         assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(emptySchematic, loc, optionsCenter, world.name()).join());
 
-        io.github.dailystruggle.rtp.api.schematic.LoadedSchematic nonNullSchematic =
+        net.leaf.schematics.schematic.LoadedSchematic nonNullSchematic =
                 new DummySchematic(2, 2, 2, 1, 0, 1);
         assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(nonNullSchematic, loc, optionsCenter, world.name()).join());
         assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(nonNullSchematic, loc, optionsOrigin, world.name()).join());
@@ -612,10 +612,10 @@ class TeleportPipelineTaskPhaseTest {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("footprint_claim_w");
         io.github.dailystruggle.rtp.api.world.RTPLocation loc = new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 100, 64, 100);
 
-        io.github.dailystruggle.rtp.api.schematic.PasteOptions optionsCenter =
-                new io.github.dailystruggle.rtp.api.schematic.PasteOptions(io.github.dailystruggle.rtp.api.schematic.PasteAnchor.CENTER, false, true);
+        net.leaf.schematics.schematic.PasteOptions optionsCenter =
+                new net.leaf.schematics.schematic.PasteOptions(net.leaf.schematics.schematic.PasteAnchor.CENTER, false, true);
 
-        io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic =
+        net.leaf.schematics.schematic.LoadedSchematic schematic =
                 new DummySchematic(2, 2, 2, 0, 0, 0);
 
         // Test with a verifier that rejects

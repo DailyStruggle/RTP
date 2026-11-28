@@ -4,12 +4,12 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
+import net.leaf.tags.safety.SafetyCompilationCache;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -643,7 +643,11 @@ final class QueueTask {
         if (unqueuedFast) {
             RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator taking UNQUEUED fast-path playerId=" + playerId);
-            LocationGenerator.getLocationFuture(region, biomeNames).whenComplete((res, ex) -> {
+            boolean hasPipelineOwner = playerId != null
+                    && TeleportSessions.current().latestTeleportData.containsKey(playerId);
+            LocationGenerator.getLocationFuture(
+                    region, biomeNames, LoadPurpose.IMMEDIATE, null, null, hasPipelineOwner)
+                    .whenComplete((res, ex) -> {
                 RTPRuntime.log(Level.FINE,
                         "[ENQUEUE_TRACE] LocationGenerator UNQUEUED fast-path result playerId="
                                 + playerId + " resNull=" + (res == null));
@@ -661,7 +665,8 @@ final class QueueTask {
                 if (data != null && !data.completed) {
                     data.attempts = attempts;
                 }
-                result.complete(new GenerationResult(res.coords(), attempts, res.verifiedChunks()));
+                result.complete(new GenerationResult(
+                        res.coords(), attempts, res.verifiedChunks(), res.reservation()));
             });
             return;
         }

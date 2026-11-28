@@ -53,6 +53,7 @@ on:
       - 'api/server-api/**'
       - 'api/anvil-api/**'
       - 'api/bit-api/**'
+      - 'api/bytecode-api/**'
       - 'api/commands-api/**'
       - 'api/config-bit-api/**'
       - 'api/effects-api/**'
@@ -80,6 +81,21 @@ on:
       - '!**/docs/**'
       - '!**/*.md'
   workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Namespace to publish (all, leafcraftdev, or dailystruggle)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - leafcraftdev
+          - dailystruggle
+      module:
+        description: 'Optional single Gradle module path (e.g. :anvil-api) to publish; leave blank for all unpublished'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   publish:
@@ -93,29 +109,167 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Skip when this version is already released: a re-upload would only create
-      # a duplicate deployment that Central rejects on publish. Queries the Portal
-      # (authoritative, no repo1 CDN lag). A failed query does not skip.
-      - name: Skip if version already published
+      # Resolve each present published module's own version (from its build.gradle,
+      # falling back to gradle.properties) and query Sonatype Central Portal per
+      # artifact. Only unpublished (groupId, artifactId, version) coordinates are
+      # staged, signed, zipped, and uploaded -- bumping one module never re-stages
+      # or re-publishes untouched siblings.
+      - name: Determine unpublished modules
         id: published
         env:
           CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
           CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          REQ_NS: ${{ github.event.inputs.namespace || 'all' }}
+          REQ_MODULE: ${{ github.event.inputs.module || '' }}
         run: |
-          VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
-          AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
-          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output published.json \
-            -H "Authorization: Bearer ${AUTH}" \
-            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.dailystruggle&name=rtp-api&version=${VERSION}" || true)
-          if [ "${HTTP_CODE}" = "200" ] && jq -e '.published == true' published.json >/dev/null; then
-            echo "::notice::io.github.dailystruggle:rtp-api:${VERSION} is already published; nothing to upload."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            if [ "${HTTP_CODE}" != "200" ]; then
-              echo "::warning::Central published-check returned HTTP ${HTTP_CODE}; continuing with the upload."
-            fi
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          root = pathlib.Path(".")
+          build_text = (root / "build.gradle").read_text(encoding="utf-8")
+          settings_text = (root / "settings.gradle").read_text(encoding="utf-8")
+          props_text = (root / "gradle.properties").read_text(encoding="utf-8")
+
+          props = {}
+          for line in props_text.splitlines():
+              stripped = line.strip()
+              if stripped and not stripped.startswith("#") and "=" in stripped:
+                  k, v = stripped.split("=", 1)
+                  props[k.strip()] = v.strip()
+
+          rtp_default = props.get("version", "")
+          leaf_default = props.get("leafVersion", rtp_default)
+
+          m_list = re.search(r"def\s+publishedModulePaths\s*=\s*\[(.*?)\]", build_text, re.S)
+          if not m_list:
+              print("::error::Could not locate publishedModulePaths in build.gradle.")
+              sys.exit(1)
+          module_paths = re.findall(r"'([^']+)'", m_list.group(1))
+
+          # Map Gradle project paths to their directory via settings.gradle projectDir overrides.
+          dir_overrides = {}
+          for m in re.finditer(r"project\(\s*'([^']+)'\s*\)\.projectDir\s*=\s*file\(\s*'([^']+)'\s*\)", settings_text):
+              dir_overrides[m.group(1)] = m.group(2)
+
+          def resolve_module_dir(gradle_path: str) -> pathlib.Path | None:
+              bare = gradle_path.lstrip(":")
+              if not re.search(rf"include\s+['\"]{re.escape(bare)}['\"]", settings_text):
+                  return None
+              if gradle_path in dir_overrides:
+                  p = root / dir_overrides[gradle_path]
+                  return p if (p / "build.gradle").is_file() else None
+              parts = [seg for seg in gradle_path.split(":") if seg]
+              candidates = [
+                  root.joinpath(*parts),
+                  root / "api" / parts[-1],
+                  root / "platforms" / pathlib.Path(*parts),
+                  root / "resource" / "LeafRTP" / parts[-1],
+              ]
+              for cand in candidates:
+                  if (cand / "build.gradle").is_file():
+                      return cand
+              return None
+
+          version_re = re.compile(r"^\s*version\s*=\s*['\"]([^'\"]+)['\"]", re.M)
+
+          req_ns = os.environ.get("REQ_NS", "all").strip() or "all"
+          req_module = os.environ.get("REQ_MODULE", "").strip()
+          if req_module and not re.match(r"^(:[A-Za-z0-9_-]+)+$", req_module):
+              print(f"::error::Invalid Gradle project path input: {req_module}")
+              sys.exit(1)
+
+          user = os.environ.get("CENTRAL_TOKEN_USER", "")
+          password = os.environ.get("CENTRAL_TOKEN_PASS", "")
+          auth = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+
+          def is_published(ns: str, artifact: str, ver: str) -> bool:
+              url = (
+                  "https://central.sonatype.com/api/v1/publisher/published?"
+                  + urllib.parse.urlencode({"namespace": ns, "name": artifact, "version": ver})
+              )
+              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {auth}"})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      data = json.loads(resp.read().decode("utf-8"))
+                      return bool(data.get("published") is True)
+              except urllib.error.HTTPError as e:
+                  print(f"::warning::Central published-check for {ns}:{artifact}:{ver} returned HTTP {e.code}; treating as unpublished.")
+                  return False
+              except Exception as e:
+                  print(f"::warning::Central published-check for {ns}:{artifact}:{ver} failed ({e}); treating as unpublished.")
+                  return False
+
+          leaf_tasks = []
+          leaf_coords = []
+          rtp_tasks = []
+          rtp_coords = []
+
+          for gp in module_paths:
+              if req_module and gp != req_module:
+                  continue
+              mod_dir = resolve_module_dir(gp)
+              if mod_dir is None:
+                  continue
+              is_rtp = gp in (":rtp-api", ":rtp-core")
+              ns = "io.github.dailystruggle" if is_rtp else "io.github.leafcraftdev"
+              if req_ns == "leafcraftdev" and is_rtp:
+                  continue
+              if req_ns == "dailystruggle" and not is_rtp:
+                  continue
+
+              mod_gradle = (mod_dir / "build.gradle").read_text(encoding="utf-8")
+              mv = version_re.search(mod_gradle)
+              ver = mv.group(1).strip() if mv else (rtp_default if is_rtp else leaf_default)
+              if not ver:
+                  print(f"::error::Could not resolve version for {gp} ({mod_dir}/build.gradle).")
+                  sys.exit(1)
+
+              artifact = gp.rsplit(":", 1)[-1]
+              if is_published(ns, artifact, ver):
+                  print(f"::notice::{ns}:{artifact}:{ver} is already published — skipping.")
+                  continue
+
+              print(f"Will stage unpublished module: {ns}:{artifact}:{ver} ({gp})")
+              task = f"{gp}:publishMavenJavaPublicationToCentralStagingRepository"
+              if is_rtp:
+                  rtp_tasks.append(task)
+                  rtp_coords.append(f"{artifact}-{ver}")
+              else:
+                  leaf_tasks.append(task)
+                  leaf_coords.append(f"{artifact}-{ver}")
+
+          if req_module and not leaf_tasks and not rtp_tasks:
+              print(f"::notice::Requested module {req_module} is either absent or already published.")
+
+          leaf_label = ""
+          if len(leaf_coords) == 1:
+              leaf_label = leaf_coords[0]
+          elif len(leaf_coords) > 1:
+              leaf_label = f"leafsdk-{len(leaf_coords)}-modules"
+
+          rtp_label = ""
+          if len(rtp_coords) == 1:
+              rtp_label = rtp_coords[0]
+          elif len(rtp_coords) > 1:
+              rtp_label = f"dailystruggle-rtp-{rtp_default or len(rtp_coords)}"
+
+          skip = "true" if (not leaf_tasks and not rtp_tasks) else "false"
+          out_path = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          with out_path.open("a", encoding="utf-8") as fh:
+              fh.write(f"leaf_tasks={' '.join(leaf_tasks)}\n")
+              fh.write(f"rtp_tasks={' '.join(rtp_tasks)}\n")
+              fh.write(f"leaf_label={leaf_label}\n")
+              fh.write(f"rtp_label={rtp_label}\n")
+              fh.write(f"skip={skip}\n")
+          PY
 
       # The published closure (rtp-api / rtp-core + deps) is JDK-21 code, but a
       # release must NOT pass -PexcludeJdk25 (see PUBLISHING.md): the JDK-25
@@ -136,38 +290,19 @@ jobs:
         if: steps.published.outputs.skip != 'true'
         run: chmod +x gradlew
 
-      # Sign + stage the whole published closure into build/central-staging/.
+      # Sign + stage ONLY the unpublished modules into a clean build/central-staging/.
       # With SIGNING_KEY present, each publish task also runs its sign... task.
       # -PpublicSdkOnly ensures private atlas/* classes are excluded from config-bit-api.
-      - name: Sign + stage to Central staging
+      - name: Sign + stage unpublished modules to Central staging
         if: steps.published.outputs.skip != 'true'
-        run: >-
-          ./gradlew --no-daemon -PpublicSdkOnly
-          :server-api:publishMavenJavaPublicationToCentralStagingRepository
-          :bit-api:publishMavenJavaPublicationToCentralStagingRepository
-          :anvil-api:publishMavenJavaPublicationToCentralStagingRepository
-          :commands-api:publishMavenJavaPublicationToCentralStagingRepository
-          :config-bit-api:publishMavenJavaPublicationToCentralStagingRepository
-          :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
-          :units-api:publishMavenJavaPublicationToCentralStagingRepository
-          :metrics-api:publishMavenJavaPublicationToCentralStagingRepository
-          :bstats-api:publishMavenJavaPublicationToCentralStagingRepository
-          :maps-api:publishMavenJavaPublicationToCentralStagingRepository
-          :menu-api:publishMavenJavaPublicationToCentralStagingRepository
-          :predict-api:publishMavenJavaPublicationToCentralStagingRepository
-          :tags-api:publishMavenJavaPublicationToCentralStagingRepository
-          :database-api:publishMavenJavaPublicationToCentralStagingRepository
-          :schematics-api:publishMavenJavaPublicationToCentralStagingRepository
-          :effects-api:publishMavenJavaPublicationToCentralStagingRepository
-          :bukkit:bukkit-common:publishMavenJavaPublicationToCentralStagingRepository
-          :paper:paper-common:publishMavenJavaPublicationToCentralStagingRepository
-          :folia:folia-common:publishMavenJavaPublicationToCentralStagingRepository
-          :proxy:proxy-common:publishMavenJavaPublicationToCentralStagingRepository
-          :rtp-api:publishMavenJavaPublicationToCentralStagingRepository
-          :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
         env:
+          LEAF_TASKS: ${{ steps.published.outputs.leaf_tasks }}
+          RTP_TASKS: ${{ steps.published.outputs.rtp_tasks }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          rm -rf build/central-staging
+          ./gradlew --no-daemon -PpublicSdkOnly ${LEAF_TASKS} ${RTP_TASKS}
 
       # Fail loudly if signing was skipped (missing/invalid key) -- a bundle
       # without .asc signatures is rejected by Central, and a silent skip would
@@ -182,32 +317,53 @@ jobs:
             exit 1
           fi
 
-      # The Portal expects a zip whose internal layout IS the Maven repository
-      # layout (i.e. the contents of build/central-staging).
-      - name: Bundle the staging tree
+      # The Portal expects one namespace per bundle whose internal layout IS the
+      # Maven repository layout. Bundle io.github.leafcraftdev and
+      # io.github.dailystruggle separately so each namespace deploys cleanly.
+      - name: Bundle the staging tree per namespace
         if: steps.published.outputs.skip != 'true'
+        env:
+          LEAF_TASKS: ${{ steps.published.outputs.leaf_tasks }}
+          RTP_TASKS: ${{ steps.published.outputs.rtp_tasks }}
         run: |
           cd build/central-staging
-          zip -r ../central-bundle.zip .
+          if [ -n "${LEAF_TASKS}" ] && [ -d "io/github/leafcraftdev" ]; then
+            zip -r ../central-bundle-leafcraftdev.zip io/github/leafcraftdev
+          fi
+          if [ -n "${RTP_TASKS}" ] && [ -d "io/github/dailystruggle" ]; then
+            zip -r ../central-bundle-dailystruggle.zip io/github/dailystruggle
+          fi
           cd -
-          ls -l build/central-bundle.zip
+          ls -l build/central-bundle-*.zip
 
-      - name: Upload bundle to the Central Portal
+      - name: Upload bundles to the Central Portal
         if: steps.published.outputs.skip != 'true'
         env:
           CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
           CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          LEAF_LABEL: ${{ steps.published.outputs.leaf_label }}
+          RTP_LABEL: ${{ steps.published.outputs.rtp_label }}
         run: |
           AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
-          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output upload-response.txt \
-            -H "Authorization: Bearer ${AUTH}" \
-            -F bundle=@build/central-bundle.zip \
-            https://central.sonatype.com/api/v1/publisher/upload)
-          echo "Portal responded HTTP ${HTTP_CODE}:"
-          cat upload-response.txt || true
-          echo
-          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
-            echo "::error::Central Portal upload failed (HTTP ${HTTP_CODE})."
-            exit 1
-          fi
-          echo "::notice::Deployment uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."
+          upload_bundle() {
+            local label="$1"
+            local file="$2"
+            if [ ! -f "${file}" ] || [ -z "${label}" ]; then
+              return 0
+            fi
+            local code
+            code=$(curl --silent --show-error --write-out '%{http_code}' --output "upload-${label}.txt" \
+              -H "Authorization: Bearer ${AUTH}" \
+              -F "bundle=@${file}" \
+              "https://central.sonatype.com/api/v1/publisher/upload?name=${label}")
+            echo "Portal responded HTTP ${code} for ${label}:"
+            cat "upload-${label}.txt" || true
+            echo
+            if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
+              echo "::error::Central Portal upload failed for ${label} (HTTP ${code})."
+              exit 1
+            fi
+          }
+          upload_bundle "${LEAF_LABEL}" "build/central-bundle-leafcraftdev.zip"
+          upload_bundle "${RTP_LABEL}" "build/central-bundle-dailystruggle.zip"
+          echo "::notice::Deployment(s) uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."

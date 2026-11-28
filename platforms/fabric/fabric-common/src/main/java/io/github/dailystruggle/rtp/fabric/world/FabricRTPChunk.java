@@ -41,7 +41,7 @@ import java.util.UUID;
  * Material IDs are upper-cased {@code NAMESPACE:PATH} on the live path; the
  * anvil path delegates to {@link AnvilChunkView}, which already speaks the
  * canonical reconciled form. The
- * {@link io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet} overload of
+ * {@link net.leaf.tags.safety.CompiledUnsafeSet} overload of
  * {@link #isSafe} delegates to the plain-material bucket only - state-predicate
  * parity with Bukkit is deferred (mirrors Spigot's anvil-mode behaviour);
  * commit-time recheck still guards landing.</p>

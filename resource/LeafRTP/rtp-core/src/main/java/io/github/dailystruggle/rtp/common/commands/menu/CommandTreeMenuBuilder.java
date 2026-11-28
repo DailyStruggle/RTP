@@ -16,7 +16,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.YamlCommentLookup;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -755,7 +755,7 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
             // and attached to every editable row so hovering a config entry
             // surfaces its description. May be null when the file has not been
             // cached or the key carries no comment.
-            io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot =
+            net.leaf.yaml.RtpYamlSection yamlRoot =
                     parser.getYamlRoot();
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
@@ -1014,21 +1014,21 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
     }
 
     /**
-     * Flattens nested {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection},
-     * {@link Map}, or {@link io.github.dailystruggle.rtp.common.factory.FactoryValue} into
+     * Flattens nested {@link net.leaf.yaml.RtpYamlSection},
+     * {@link Map}, or {@link net.leaf.yaml.factory.FactoryValue} into
      * dotted {@code [path, value]} leaf pairs.
      */
     private static java.util.List<String[]> flattenNestedConfigValue(Object value) {
         if (value == null) return null;
-        boolean isSection = value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+        boolean isSection = value instanceof net.leaf.yaml.RtpYamlSection;
         boolean isMap = value instanceof Map;
-        boolean isFactory = value instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue;
+        boolean isFactory = value instanceof net.leaf.yaml.factory.FactoryValue;
         if (!isSection && !isMap && !isFactory) return null;
         java.util.List<String[]> out = new ArrayList<>();
         Map<String, Object> level = isSection
-                ? ((io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) value).getValues(false)
+                ? ((net.leaf.yaml.RtpYamlSection) value).getValues(false)
                 : isFactory
-                        ? factoryValueToMap((io.github.dailystruggle.rtp.common.factory.FactoryValue<?>) value)
+                        ? factoryValueToMap((net.leaf.yaml.factory.FactoryValue<?>) value)
                         : coerceMapKeysToString((Map<?, ?>) value);
         if (level == null || level.isEmpty()) return out;
         Deque<Object[]> stack = new ArrayDeque<>();
@@ -1040,8 +1040,8 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
             Object[] frame = stack.pop();
             String path = (String) frame[0];
             Object node = frame[1];
-            if (node instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
-                Map<String, Object> children = ((io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) node).getValues(false);
+            if (node instanceof net.leaf.yaml.RtpYamlSection) {
+                Map<String, Object> children = ((net.leaf.yaml.RtpYamlSection) node).getValues(false);
                 if (children == null || children.isEmpty()) {
                     out.add(new String[]{path, "&8(empty)"});
                     continue;
@@ -1060,9 +1060,9 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
                 for (int i = kids.size() - 1; i >= 0; i--) {
                     stack.push(new Object[]{path + "." + kids.get(i).getKey(), kids.get(i).getValue()});
                 }
-            } else if (node instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue) {
+            } else if (node instanceof net.leaf.yaml.factory.FactoryValue) {
                 Map<String, Object> children = factoryValueToMap(
-                        (io.github.dailystruggle.rtp.common.factory.FactoryValue<?>) node);
+                        (net.leaf.yaml.factory.FactoryValue<?>) node);
                 if (children.isEmpty()) {
                     out.add(new String[]{path, "&8(empty)"});
                     continue;
@@ -1087,11 +1087,11 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
     }
 
     /**
-     * Converts {@link io.github.dailystruggle.rtp.common.factory.FactoryValue} into an ordered map
+     * Converts {@link net.leaf.yaml.factory.FactoryValue} into an ordered map
      * with leading {@code name} discriminator followed by enum data entries.
      */
     private static Map<String, Object> factoryValueToMap(
-            io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
+            net.leaf.yaml.factory.FactoryValue<?> fv) {
         java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
         // Discriminator first so the type row sits at the top of the flattened view.
         out.put("name", fv.name);
@@ -1112,7 +1112,7 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
      * @return cleaned comment text, or {@code null} when unavailable
      */
     private static String resolveConfigHover(
-            io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot,
+            net.leaf.yaml.RtpYamlSection yamlRoot,
             String key) {
         if (yamlRoot == null || key == null || key.isEmpty()) return null;
         String raw;

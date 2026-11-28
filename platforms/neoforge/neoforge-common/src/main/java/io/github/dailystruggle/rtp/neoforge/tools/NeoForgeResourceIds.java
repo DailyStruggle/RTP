@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Reflection helper that reads Minecraft resource identifiers without naming the
  * identifier class at compile time.
  *
- * <p><b>Why this exists.</b> The resource-identifier class
+ * <p>The resource-identifier class
  * {@code net.minecraft.resources.ResourceLocation} was renamed (to
  * {@code Identifier}) in the MC 1.21.11 mappings. That rename changes the
  * return-type descriptor of {@code ResourceKey#location()},

@@ -46,17 +46,22 @@ Always run targeted unit tests during implementation to verify bugfixes or new b
     3. Final pre-release verification or when explicitly requested by the user.
 - **Exemptions:** Pure documentation or markdown changes (no compiled source or resource files touched) require no Gradle build or test execution.
 
-#### CI-Parity Gate (hand-off check)
-Before handing off a change, run the same gates a pull request would hit, scoped to the change set including **uncommitted and untracked** files:
+#### CI-Parity Gate & 3-Speed Verification Loop (hand-off check)
+Verification follows a 3-speed loop proportional to blast radius, scoped to the change set including **uncommitted and untracked** files:
 
-```bash
-python3 scripts/agent-gate.py            # vs merge-base with origin/V3 (else V3)
-python3 scripts/agent-gate.py --dry-run  # print the scope and commands only
-python3 scripts/agent-gate.py --base origin/V2
-```
-
-It runs `scripts/ci-scope.py --working-tree`, then the `checks` job (traceability, mojibake, front pages, `spotlessCheck`) and every affected set's tasks with `-Pcoverage -PstaticAnalysis` (tests, PMD, JaCoCo floors, SpotBugs). In `full` scope it adds `checkBinaryCompatibility`, the plugin set, the reduced JDK 21 graph and the 80% changed-line coverage gate. Any change under `scripts/`, `gradle/`, `.github/` or root Gradle files is `full`, as in CI. Not covered: SonarCloud and devstack acceptance.
-
+1. **Per-edit check (`< 50 ms`, zero JVM startup):** `repo_ast_project` static + `Gov(c)` check (`action="edit"` or `action="check"`).
+2. **Mid-task checkpoint (`< 2 s`, no Gradle spawn):**
+   ```bash
+   python3 scripts/agent-gate.py --fast --scoped :<module>
+   ```
+   Runs traceability, mojibake, front-page drift, `repo_ast.py audit --check`, and anti-reinvention diff checks without starting Gradle.
+3. **Final hand-off gate (1 Gradle invocation):**
+   ```bash
+   python3 scripts/agent-gate.py --finalize --scoped :<module>  # localized module edit
+   python3 scripts/agent-gate.py --finalize                     # cross-module / SPI / release gate
+   python3 scripts/agent-gate.py --dry-run                      # preview scope and commands only
+   ```
+   `--finalize` (`--pre-submit`) runs `pre_commit.py --check --no-llm --skip-build-check`, deterministic `local_llm_queue.py audit-diff`, `spotlessApply`, and the affected module's `check` tasks (`-Pcoverage -PstaticAnalysis`: tests, PMD, JaCoCo floors, SpotBugs, plus `checkBinaryCompatibility` and PBIT in `full` scope). When deep LLM diff critique is needed before hand-off, run `repo_ast_offload(action="critique_diff", target="HEAD -- <touched_files>")` (see `.junie/skills/gpu-offload-and-audit/SKILL.md`).
 #### Headless Built-In Test (ADR-121)
 Run RTP's shared PBIT checks against a plugin configuration directory or an action-definition directory without starting a server. The task uses the `tier:pbit` selector; `-Pstrict` makes structural action findings errors, `-Pjson` emits the versioned `BitReport` JSON as a single RTP log message, and any `ERROR` finding makes the task fail.
 
@@ -116,6 +121,10 @@ The `devstack/` environment provides end-to-end integration testing for proxies,
 On Linux/POSIX runners or CI:
 ```bash
 ./devstack/run-acceptance.sh --scenario all
+./devstack/run-version-sweep.sh
+./devstack/test-leafsleep-acceptance.sh
+./devstack/test-treegen-acceptance.sh
+./devstack/test-item-compat.sh
 ```
 
 ---

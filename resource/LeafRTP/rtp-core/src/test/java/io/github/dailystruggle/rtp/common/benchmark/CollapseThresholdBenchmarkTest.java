@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * Collapse lever: discard the run table of an outer cell once enough of it is known unsafe, and
  * carry the cell as one bit instead.
  *
- * <p>Why this and not the earlier levers. Resident cost is dominated by the directory, which holds
+ * <p>Resident cost is dominated by the directory, which holds
  * one slot per <i>addressed</i> outer cell whether that cell is useful or not - which is why
  * coarsening the inner cell bought 1.53x bytes for 2.18x over-exclusion and why the resident
  * fraction came out near 0.6 rather than the withdrawn 0.007. Collapsing removes slots rather than

@@ -349,9 +349,44 @@
   "cancel"
  ],
  "speed": [
+  "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "syncLoading",
+  "autoTune",
+  "minQueueFilled",
   "teleport-delay",
-  "cooldown",
-  "warmup"
+  "cooldown"
+ ],
+ "faster": [
+  "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "syncLoading",
+  "autoTune",
+  "minQueueFilled",
+  "maxMSPT"
+ ],
+ "fast": [
+  "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "syncLoading",
+  "autoTune"
+ ],
+ "instant": [
+  "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "minQueueFilled"
+ ],
+ "slow": [
+  "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "syncLoading",
+  "maxMSPT",
+  "autoTune"
  ],
  "timer": [
   "teleport-delay",
@@ -383,6 +418,11 @@
  ],
  "performance": [
   "cacheCap",
+  "postTeleportQueueing",
+  "period",
+  "syncLoading",
+  "autoTune",
+  "maxMSPT",
   "backlogCacheCap",
   "activeChunkCap",
   "ttl"

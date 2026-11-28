@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
@@ -290,8 +290,8 @@ final class MenuWiringSupportInstallerTest {
                 "  centerRadius: 64\n" +
                 "world: world\n" +
                 "version: \"1.0\"\n");
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> mcp =
-                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> mcp =
+                new net.leaf.yaml.configuration.MultiConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class, "regions", "1.0", tempDir.toFile());
         ActiveConfigs.get().multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class, mcp);
 

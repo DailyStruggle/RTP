@@ -9,7 +9,7 @@ import java.util.Locale;
 /**
  * Per-phase garbage-collection and tick-thread allocation accounting.
  *
- * <p>Why this exists: the harness already samples heap-used every 50 ms, but a
+ * <p>The harness already samples heap-used every 50 ms, but a
  * heap curve alone cannot separate memory that is <em>retained</em> from memory
  * that is <em>churned</em>. Two designs can trace the same heap-used line while
  * one keeps its bytes live past the teleport and the other drops them at the

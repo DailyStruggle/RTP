@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import net.leaf.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.CompletionPaced;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;

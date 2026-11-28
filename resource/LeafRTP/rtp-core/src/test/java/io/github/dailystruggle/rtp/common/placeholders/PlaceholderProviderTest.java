@@ -497,11 +497,11 @@ class PlaceholderProviderTest {
         ActiveSelection.get().permRegionLookup.put("default", region);
 
         // Put world parser for "world" in WorldKeys MultiConfigParser
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
-                (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
+                (net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
                         ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
-                new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
+                new net.leaf.yaml.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
                         "world",
                         "1.0",
@@ -512,11 +512,11 @@ class PlaceholderProviderTest {
         worldParsers.addParser(worldConfig);
 
         // Put region parser for "default" in RegionKeys MultiConfigParser
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
-                (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
+                (net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
                         ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
-                new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
+                new net.leaf.yaml.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
                         "default",
                         "1.0",
@@ -575,11 +575,11 @@ class PlaceholderProviderTest {
                 new io.github.dailystruggle.rtp.common.selection.region.Region("default", settings);
         ActiveSelection.get().permRegionLookup.put("default", region);
 
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
-                (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
+                (net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
                         ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
-                new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
+                new net.leaf.yaml.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
                         "world",
                         "1.0",
@@ -589,11 +589,11 @@ class PlaceholderProviderTest {
         worldConfig.set(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.requirePermission, false);
         worldParsers.addParser(worldConfig);
 
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
-                (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
+                (net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
                         ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
-                new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
+                new net.leaf.yaml.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
                         "default",
                         "1.0",
@@ -736,8 +736,8 @@ class PlaceholderProviderTest {
 
     @Test
     void usageLimitPlaceholders_whenCapDisabled_returnsExpectedDefaults() {
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         assertNotNull(configParser);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterUses, 0L);
@@ -757,8 +757,8 @@ class PlaceholderProviderTest {
 
     @Test
     void usageLimitPlaceholders_underCapAndAtCapAndExpired() {
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         assertNotNull(configParser);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterUses, 5L);

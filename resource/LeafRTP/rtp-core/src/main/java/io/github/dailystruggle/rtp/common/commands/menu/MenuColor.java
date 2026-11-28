@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.mapsapi.BiomeColorSource;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource;
 

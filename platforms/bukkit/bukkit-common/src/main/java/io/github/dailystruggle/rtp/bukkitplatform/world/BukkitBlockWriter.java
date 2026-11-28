@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.world;
 
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
-import io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity;
+import net.leaf.schematics.platform.BlockDelta;
+import net.leaf.schematics.schematic.PlacedBlockEntity;
 import io.github.dailystruggle.server.api.ServerAccessors;
 import org.bukkit.Bukkit;
 import org.bukkit.World;

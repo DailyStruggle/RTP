@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import net.leaf.predict.BudgetPacer;
 
 /**
  * A pipe task whose cost is its wall time to completion, which can end after {@code run()}

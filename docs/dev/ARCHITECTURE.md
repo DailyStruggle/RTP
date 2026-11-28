@@ -21,6 +21,7 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 * **anvil-api** (`api/anvil-api`): Standalone, platform-neutral off-tick region decoder and prefilter framework ([anvil-api-ADR-001](../../api/anvil-api/docs/adr/anvil-api-ADR-001-anvil-subsystem.md), [anvil-api-ADR-002](../../api/anvil-api/docs/adr/anvil-api-ADR-002-multi-format-region-support.md)). Defines the `RegionFileReader` SPI and ships the built-in Anvil reader (`.mca` / Zlib / LZ4), decoded off the main thread. Addons may register other formats through `RegionFormatRegistry` or a `RegionFileReaderProvider` service; files in an unregistered format (e.g. `.linear`) are ignored and their chunks fall back to the platform's live async chunk load.
 * **bit-api** (`api/bit-api`): Standalone, plugin-agnostic Built-In Test (PBIT/CBIT/IBIT) contract, findings model, code registry, and CLI runner ([leafrtp-ADR-091](../../resource/LeafRTP/docs/adr/leafrtp-ADR-091-built-in-test-for-configuration-and-the-action-engine.md)).
 * **bstats-api** (`api/bstats-api`): Dependency-free bStats v2 metrics client SPI ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)).
+* **bytecode-api** (`api/bytecode-api`, `:bytecode-api`, `io.github.dailystruggle.bytecode`): Zero-classloading JVM `.class` constant-pool, config-key, and causal-graph bytecode scanner (`BytecodeConfigScanner`, `BytecodeCausalGraphScanner`, `JarConfigScanner`, `SchemaInferrer`, `ServerConfigAtlas`) layered on `yaml-api`, `server-api`, and `config-bit-api`.
 * **commands-api** (`api/commands-api`): Unified platform-neutral command-tree framework and Brigadier bridge ([commands-api-ADR-001](../../api/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)).
 * **config-bit-api** (`api/config-bit-api`): Declarative YAML comment-directive (`@type`, `@options`, `@range`, `@pattern`), cross-file reference, distance-constraint, and locale-key parity PBIT validation library layered on `yaml-api`, `bit-api`, and `units-api` ([ADR-064](../adr/ADR-064-comment-directives-for-finite-value-domains.md), [leafrtp-ADR-091](../../resource/LeafRTP/docs/adr/leafrtp-ADR-091-built-in-test-for-configuration-and-the-action-engine.md)).
 * **effects-api** (`api/effects-api`): Unified cross-platform visual, sound, potion, and hologram effects framework ([effects-api-ADR-003](../../api/effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md), including the `effects-api-fabric-unobf` carrier per [effects-api-ADR-006](../../api/effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md)).
@@ -68,6 +69,7 @@ graph TD
         commands-api
         bit-api
         config-bit-api
+        bytecode-api
         menu-api
         predict-api
         effects-api

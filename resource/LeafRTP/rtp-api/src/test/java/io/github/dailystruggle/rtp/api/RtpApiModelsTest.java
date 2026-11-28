@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.network.RtpTriggerSource;
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;

@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
@@ -89,10 +89,13 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
       return new WorldBorder(
           () -> {
             Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
-            if (shape instanceof Square square) {
-              square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
-              square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
-              square.set(GenericMemoryShapeParams.centerZ, (long) (worldBorder.getCenter().getBlockZ() / 16.0));
+            if (shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms
+                && ms.myClass == GenericMemoryShapeParams.class) {
+              @SuppressWarnings("unchecked")
+              Shape<GenericMemoryShapeParams> gShape = (Shape<GenericMemoryShapeParams>) shape;
+              gShape.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
+              gShape.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
+              gShape.set(GenericMemoryShapeParams.centerZ, (long) (worldBorder.getCenter().getBlockZ() / 16.0));
             }
             return shape;
           },
@@ -604,7 +607,8 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
 
   @Override
   public void stop() {
-    // Implementation
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.closeColumnProbeCoalescer();
+    shutdownBlockingIo(java.time.Duration.ofSeconds(5));
     for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
   }
 
@@ -625,6 +629,7 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
               + plugin.getClass().getName());
     }
     bindPlugin(bukkitPlugin);
+    reopenBlockingIo();
     this.dataFolder = bukkitPlugin.getDataFolder();
     if (!playerLifecycleHookRegistered) {
       playerLifecycleHook.register(bukkitPlugin);

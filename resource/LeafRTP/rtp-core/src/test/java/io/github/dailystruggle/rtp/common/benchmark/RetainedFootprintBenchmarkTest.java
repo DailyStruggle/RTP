@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  * :rtp-core:simulationBenchmark}, which inherits the root build's pinned heap and collector -
  * retained-heap figures are only comparable between runs with identical JVM args.
  *
- * <p><b>Why this is measurable here.</b> Every subject is a real shipped class: {@link MemoryShape}
+ * <p><b>Direct measurement scope.</b> Every subject is a real shipped class: {@link MemoryShape}
  * (run-length 1D spans with cause-typed expiry), {@link LockFreeLocationBuffer} and {@link
  * BacklogLocationBuffer}. The counterfactual - a chunk-keyed map of failures with a wall-clock TTL -
  * is a *strategy class* reconstruction, not a competitor's code, so it is labelled MODELED wherever

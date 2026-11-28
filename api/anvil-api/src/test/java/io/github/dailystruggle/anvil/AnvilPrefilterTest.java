@@ -198,7 +198,8 @@ class AnvilPrefilterTest {
 
     // Additional branches:
     // 1. worldFolder == null in probeDetailed
-    AnvilPrefilter.ProbeResult nullWorldRes = AnvilPrefilter.probeDetailed(null, null, 0, 0, Set.of(), null).join();
+    AnvilPrefilter.ProbeResult nullWorldRes =
+        AnvilPrefilter.probeDetailed(null, null, 0, 0, Set.of(), null, Runnable::run).join();
     assertEquals(Verdict.UNKNOWN, nullWorldRes.verdict());
 
     // 2. probeSyncDetailed with null unsafe set returns ACCEPT

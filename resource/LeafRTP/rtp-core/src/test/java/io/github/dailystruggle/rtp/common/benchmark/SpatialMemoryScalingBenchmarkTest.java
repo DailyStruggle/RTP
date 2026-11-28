@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>Opt-in.</b> Tagged {@code simulation}; {@code test} excludes it. Run via {@code ./gradlew
  * :rtp-core:simulationBenchmark}.
  *
- * <p><b>Why a model, and why it is the only instrument that can answer this.</b> The real harness
+ * <p><b>Horizon limitation of live runs.</b> The real harness
  * (helpers/StressTestRTP) measures per-operation cost on real servers, and it must - no model can
  * substitute for that. What it cannot reach is the horizon: 30-60 minutes per data point of setup,
  * run, collection and analysis buys a window of minutes, and the behaviour under test only diverges

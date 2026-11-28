@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import java.util.function.BooleanSupplier;
 import org.bukkit.Bukkit;

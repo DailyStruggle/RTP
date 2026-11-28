@@ -1,13 +1,13 @@
 package io.github.dailystruggle.rtp.common.search;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import net.leaf.yaml.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.importer.AbstractForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ImportResult;

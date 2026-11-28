@@ -46,6 +46,25 @@ public final class AnvilRegionByteCache {
   /** Max distinct region files retained simultaneously. */
   private static final int CAPACITY = 16;
 
+  /** Default byte budget for resident region files (64 MiB). */
+  private static final long DEFAULT_MEMORY_BUDGET_BYTES = 64L * 1024L * 1024L;
+
+  /** Configurable memory budget for resident region files; defaults to 64 MiB. */
+  private static volatile long memoryBudgetBytes = DEFAULT_MEMORY_BUDGET_BYTES;
+
+  /** Returns the current memory budget (in bytes) for resident region files. */
+  public static long getMemoryBudgetBytes() {
+    return memoryBudgetBytes;
+  }
+
+  /**
+   * Configures the memory budget (in bytes) for resident region files. Negative values are clamped
+   * to {@code 0}.
+   */
+  public static void setMemoryBudgetBytes(long bytes) {
+    memoryBudgetBytes = Math.max(0L, bytes);
+  }
+
   /** Reuse slack: a pooled buffer serves a file when {@code len <= buf <= len + slack(len)}. */
   private static final int MIN_SLACK_BYTES = 1 << 20;
 
@@ -328,7 +347,7 @@ public final class AnvilRegionByteCache {
             retireLocked(old);
           }
           currentCachedBytes += loaded.length;
-          long budget = AnvilIoPool.getMemoryBudgetBytes();
+          long budget = memoryBudgetBytes;
           while (CACHE.size() > 1 && currentCachedBytes > budget) {
             var it = CACHE.entrySet().iterator();
             if (!it.hasNext()) break;

@@ -223,4 +223,11 @@ maxHeapПроцент: 85.0
   bakRetention: 3
 
 # НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
+
+# Folia only: max concurrent in-flight regional tasks.
+# Omit to use the default: max(1, availableProcessors / 2).
+# Set a positive integer for a fixed cap, or <= 0 to disable the cap (uncapped).
+# Also overridable via JVM property -Drtp.folia.maxRegionalInflight=<n>.
+# maxRegionalInflight: 0
+
 version: 1.0

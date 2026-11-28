@@ -5,7 +5,7 @@ import java.util.ArrayDeque;
 /**
  * Distance from every chunk to the nearest chunk of a desired biome, measured two ways.
  *
- * <p><b>Why this exists.</b> Every biome-constrained figure so far has scored a destination on
+ * <p>Every biome-constrained figure so far has scored a destination on
  * membership - "is this chunk in biome B". That is not what is being asked for. A player who wants
  * a jungle wants a jungle they can <i>reach</i>, and a chunk one chunk from the jungle edge is a
  * correct answer to that request. So the predicate is accessibility, not membership, and the radius

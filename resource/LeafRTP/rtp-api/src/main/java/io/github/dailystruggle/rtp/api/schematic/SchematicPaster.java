@@ -1,5 +1,9 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.PasteResult;
+import net.leaf.schematics.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 

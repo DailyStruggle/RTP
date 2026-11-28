@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
@@ -761,9 +761,9 @@ public final class EditorSessionManager {
 
     private static Map<String, Object> factoryParams(FactoryNames which, Map<String, Object> curveParams) {
         Map<String, Object> out = new TreeMap<>();
-        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = FactoryRegistry.get(which);
+        net.leaf.yaml.factory.Factory<?> factory = FactoryRegistry.get(which);
         if (factory == null) return out;
-        for (Map.Entry<String, ? extends io.github.dailystruggle.rtp.common.factory.FactoryValue<?>> e : factory.map.entrySet()) {
+        for (Map.Entry<String, ? extends net.leaf.yaml.factory.FactoryValue<?>> e : factory.map.entrySet()) {
             String name = e.getKey();
             if (name.endsWith(".YML")) name = name.substring(0, name.length() - 4);
             Map<String, Object> params = new TreeMap<>();
@@ -961,9 +961,9 @@ public final class EditorSessionManager {
      * region of that shape exists. A name already carrying another class's helper keeps it.
      */
     static void addRegisteredCurveHelpers(Map<String, String> curveSources, Map<String, Map<String, Object>> samples) {
-        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
+        net.leaf.yaml.factory.Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
         if (factory == null) return;
-        for (io.github.dailystruggle.rtp.common.factory.FactoryValue<?> value : factory.map.values()) {
+        for (net.leaf.yaml.factory.FactoryValue<?> value : factory.map.values()) {
             if (!(value instanceof MemoryShape<?> template)) continue;
             String name = EditorCurveModel.registeredName(template);
             try {

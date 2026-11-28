@@ -85,8 +85,8 @@ class TeleportPipelineTaskBranchTest {
         DeathTeleports.effectInFlight().clear();
         DeathTeleports.pending().clear();
         PvPGate.nativeTracker().clearAll();
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         if (safety != null) {
             safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpCheckEnabled, false);
@@ -173,8 +173,8 @@ class TeleportPipelineTaskBranchTest {
         setField(task, "teleportData", data);
         TeleportSessions.current().processingPlayers.add(pid);
 
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         assertNotNull(safety);
         safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpCheckEnabled, true);
@@ -280,8 +280,8 @@ class TeleportPipelineTaskBranchTest {
         data.time = System.currentTimeMillis();
         setField(task, "teleportData", data);
 
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> cfg =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> cfg =
+                (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
                         ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         if (cfg != null) {
             cfg.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.setRespawnOnTeleport, true);

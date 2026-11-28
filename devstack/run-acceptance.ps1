@@ -1050,7 +1050,7 @@ function Test-KillMidFlight {
   $backendId = 'backend-a'
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $expiry = $now + 30000
-  $claimScriptPath = Join-Path $PSScriptRoot '..\platforms\rtp-proxy\rtp-proxy-common\src\main\resources\redis\claim.lua'
+  $claimScriptPath = Join-Path $PSScriptRoot '..\platforms\proxy\proxy-common\src\main\resources\redis\claim.lua'
   $sha = (cmd /c "type `"$claimScriptPath`" | docker exec -i rtp-devstack-redis redis-cli -x SCRIPT LOAD").Trim()
   $claim = Invoke-RedisCli EVALSHA $sha 2 "rtp:net:tok:$tokenId" "rtp:net:tokactive:$playerId" $tokenId $backendId $playerId $expiry $now 30 '' ''
   Write-Evidence 'killmidflight.claim' "tokenId=$tokenId result=$claim"

@@ -2,7 +2,7 @@
 
 **Current Plugin Version:** `@version@`
 
-Switching from another rtp plugin? Start with [Migrating from Another RTP Plugin](#migrating-from-another-rtp-plugin) right below. Upgrading an existing RTP install? Skip to [Upgrading to 3.x](#upgrading-to-3x-current-release-330).
+Switching from another rtp plugin? Start with [Migrating from Another RTP Plugin](#migrating-from-another-rtp-plugin) right below. Upgrading an existing RTP install? Skip to [Upgrading to 3.x](#upgrading-to-3x-current-release-333).
 
 > 📎 For the **mechanics** of how RTP upgrades on-disk YAML files (what `.old1`/`.old2` files are, how your customizations are read into memory before the file is replaced, and how they are overlaid onto the new defaults), see [CONFIG_LIFECYCLE.md](configuration/CONFIG_LIFECYCLE.md).
 
@@ -268,7 +268,7 @@ permissions:
 
 ---
 
-## Upgrading to 3.x (Current Release: 3.3.0)
+## Upgrading to 3.x (Current Release: 3.3.3)
 
 > ⚠️ **3.x is a major upgrade from 2.x:** config files move into subfolders, distances and times accept units, bare `/rtp` can open a menu, the addon API changed, and Fabric, NeoForge and Velocity are supported. Back up `plugins/RTP/` first.
 
@@ -282,10 +282,31 @@ permissions:
 | **Early 3.0.x / 3.0.0-beta.x** | Update command syntax to `key=value`, adjust `uniquePlacements` (now chunk radius integer rather than boolean), review bundled add-on jar auto-extraction (`LeafRTPGuiAddon`, `LeafRTPClaimAddon`), and check `rtp.admin` permission umbrella. |
 | **3.1.x** | Note that in 3.2.0+ bare `/rtp` opens the GUI picker by default if an inventory/menu renderer is available; claim integrations moved to bundled `LeafRTPClaimAddon` (`plugins/RTP/addons/LeafRTPClaimAddon.jar`); `LINEAR` vertical search defaults to middle-out (`direction: 2`) with sky light requirement (`vert.requireSkyLight: true`). |
 | **3.2.x** | Config files and definitions are organized in tiered folders (`definitions/`, `advanced/`, `addons/`). Database configuration lives in `advanced/database.yml`, biome weighting in `advanced/biomes.yml`, and messages in `advanced/messages/*.yml`. The terrain memory files upgrade themselves on first load. |
+| **3.3.0 – 3.3.2** | Drop-in upgrade for server configs. Optional Folia-only `maxRegionalInflight` in `advanced/performance.yml` (or `-Drtp.folia.maxRegionalInflight=<n>`) requires a server restart if customized. Addon developers compiling against extracted SDK types (`net.leaf.*` / `io.github.dailystruggle.anvil.*`) must update imports and recompile. |
 
 ---
 
 ## Detailed Version Upgrade Notes
+
+### Upgrading to 3.3.3 (from 3.3.0 – 3.3.2)
+
+1. **Server Configurations (Drop-In Compatible):**
+   - Existing 3.3.x configuration files and databases require no manual edits.
+   - **Folia optional concurrency cap:** `advanced/performance.yml` adds an optional commented `maxRegionalInflight` setting (also configurable via `-Drtp.folia.maxRegionalInflight=<n>`, which takes precedence). Omitting it preserves the default `max(1, availableProcessors / 2)`. Because this setting is read when the Folia scheduler initializes, changes require a **server restart** rather than `/rtp reload`. See [PERFORMANCE.md](configuration/PERFORMANCE.md#folia-regional-concurrency-maxregionalinflight).
+
+2. **Addon Developers (Standalone SDK Package Relocations):**
+   - Shared platform-neutral SDK modules extracted from `rtp-core` and `rtp-api` relocated from `io.github.dailystruggle.rtp.*` to standalone packages:
+     - `yaml-api`: `net.leaf.yaml.*` and `io.github.dailystruggle.{yaml,search}.*`
+     - `units-api`: `net.leaf.units.*`
+     - `tags-api`: `net.leaf.tags.*` (`CompiledUnsafeSet`, `SafetyToken`, `SafetyTokenParser`, `BlockStateString`, `TagResolver`)
+     - `schematics-api`: `net.leaf.schematics.{schematic,platform}.*` (`BlockDelta`, `LoadedSchematic`, `PasteOptions`, `PasteResult`, `SchematicCoordinate`, `SchematicFileLoader`)
+     - `predict-api`: `net.leaf.predict.*`
+     - `config-bit-api`: `net.leaf.bit.config.*` and `io.github.dailystruggle.bit.config.*`
+     - `database-api`: `net.leaf.database.{pool,resp}.*` (including `RespPool`, `RespConnection`, `RespProtocol`) and `io.github.dailystruggle.database.{api,resp}.*`
+     - `anvil-api`: `io.github.dailystruggle.anvil.*` (including `.lca` v3 codecs)
+   - Addons referencing `RTPWorld.restoreBlocks`/`setBlocks`, `RTPChunk`, `RTPLocation`, `SchematicPaster`, or `PendingPlatformRestore` must update imports for `BlockDelta`, `CompiledUnsafeSet`, `SchematicCoordinate`, and schematic value types and recompile against `3.3.3`.
+
+---
 
 ### Upgrading to 3.3.0 (from 3.2.x or earlier)
 

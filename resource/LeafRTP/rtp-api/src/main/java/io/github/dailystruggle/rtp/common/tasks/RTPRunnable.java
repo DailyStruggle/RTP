@@ -105,7 +105,7 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
    */
   public static io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler;
 
-  protected UUID trackingId;
+  protected volatile UUID trackingId;
 
   /** Creates a task with a default maximum lifespan of 5 minutes (300 000 ms). */
   public RTPRunnable() { this(300000L); }
@@ -260,9 +260,12 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   @Override
   public void setCancelled(boolean cancel) {
     cancelled.set(cancel);
-    if (cancel && trackingId != null) {
-      untrackHook.accept(trackingId);
-      trackingId = null;
+    if (cancel) {
+      UUID id = trackingId;
+      if (id != null) {
+        trackingId = null;
+        untrackHook.accept(id);
+      }
     }
   }
 

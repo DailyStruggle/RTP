@@ -75,20 +75,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
 
         List<String> worldNames = SetupHandlerSupport.collectWorldNames();
         List<Prefab> recipe = SetupRecipe.compileRecipe(session, worldNames);
-
-        Map<String, Map<String, Object>> baseline = SetupHandlerSupport.loadLiveBaseline(baseDir, recipe);
-
-        PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
-        Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
-
-        if (diff.isEmpty()) {
-            sessionRegistry.remove(effectiveCaller);
-            SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Setup finished (identity overlay - no configuration changes needed).");
-            return true;
-        }
-
         sessionRegistry.remove(effectiveCaller);
-        SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Applying setup recipe in background...");
 
         Runnable applyTask = () -> {
             List<String> writtenFiles = new ArrayList<>();
@@ -96,6 +83,16 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
 
             try {
+                Map<String, Map<String, Object>> baseline = SetupHandlerSupport.loadLiveBaseline(baseDir, recipe);
+                PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
+                Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
+
+                if (diff.isEmpty()) {
+                    SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Setup finished (identity overlay - no configuration changes needed).");
+                    return;
+                }
+
+                SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Applying setup recipe in background...");
                 Map<String, String> candidateOverlays = new LinkedHashMap<>();
                 for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
                     String fileId = entry.getKey();

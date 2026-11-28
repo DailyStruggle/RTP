@@ -37,6 +37,7 @@ class FabricTestUmbrellaWiringTest {
     previousAccessor = RTPRuntime.serverAccessor();
     previousScheduler = RTPRuntime.scheduler();
     RTP.testUmbrellaContext = null;
+    RTPRuntime.setScheduler(null);
   }
 
   @AfterEach

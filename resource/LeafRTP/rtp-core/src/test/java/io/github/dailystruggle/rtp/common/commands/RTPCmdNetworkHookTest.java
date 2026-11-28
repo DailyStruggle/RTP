@@ -84,8 +84,8 @@ public class RTPCmdNetworkHookTest {
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
             Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
-            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
-                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
+            if (fv instanceof net.leaf.yaml.configuration.ConfigParser) {
+                ((net.leaf.yaml.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
             }
         });
   }
@@ -159,8 +159,8 @@ public class RTPCmdNetworkHookTest {
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
             Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
-            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
-                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
+            if (fv instanceof net.leaf.yaml.configuration.ConfigParser) {
+                ((net.leaf.yaml.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
             }
         });
 

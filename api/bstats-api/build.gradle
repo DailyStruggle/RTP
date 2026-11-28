@@ -8,6 +8,8 @@ plugins {
     id 'java-library'
 }
 
+version = '1.0.0'
+
 dependencies {
     // ArchUnit -- bytecode guard that the module stays free of platform and
     // RTP imports. Same artifact + version as metrics-api.

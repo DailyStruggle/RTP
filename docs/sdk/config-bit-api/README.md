@@ -4,14 +4,14 @@ Declarative YAML configuration schema, cross-key constraint, reference-token, an
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:config-bit-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:config-bit-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:config-bit-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:config-bit-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:config-bit-api:3.3.1'
+    implementation 'io.github.leafcraftdev:config-bit-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:config-bit-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:config-bit-api:1.0.0'
 }
 ```
 
@@ -26,7 +26,7 @@ dependencies {
 - `ConfigSnapshot` - side-effect-free, read-only directory or in-memory YAML snapshot (`ConfigSnapshot.read(Path)`, `ConfigSnapshot.of(Map)`, `withOverlay(Map)`), resolving localized keys via `.lang.yml` rename maps without mutating running state.
 - `DirectiveCodes` - `BitCode` mapping for directive validation findings (`DirectiveCodes.DEFAULT` under namespace `CFG`, or caller-supplied codes).
 - `MessageParityCodes` - `BitCode` mapping and finding translator (`MessageParityCodes.DEFAULT`) for `MessageKeyParity.Gap` and operator message-file checks (`bundledFindings(...)`, `operatorFindings(...)`).
-- `BytecodeCausalGraphScanner` - zero-classloading JVM `.class` causal graph mapper, white-box command schema extractor (`BytecodeCommandSchema`), and Order-1 / Order-2 claim delivery auditor (`scanJar(Path)`, `analyzeClasses(...)`) reporting `Claims: <X> -> Does Not Deliver: <Y>` findings across commands, `@EventHandler` / `@SubscribeEvent` listeners (`REGISTERED_UNCONDITIONAL`, `REGISTERED_CONFIG_GATED`, `UNREGISTERED`), and async supplier/lambda chains.
+- `BytecodeCausalGraphScanner` - zero-classloading JVM `.class` causal graph mapper, white-box command schema extractor (`BytecodeCommandSchema`), and Order-1 / Order-2 bytecode causal auditor (`scanJar(Path)`, `analyzeClasses(...)`) reporting `CausalFinding` (`<DeclaredSurface> -> <CausalDefect>`) findings across commands, `@EventHandler` / `@SubscribeEvent` listeners (`REGISTERED_UNCONDITIONAL`, `REGISTERED_CONFIG_GATED`, `UNREGISTERED`), and async supplier/lambda chains.
 - `LlmCausalChainAuditor` - optional subscribed LLM causal-chain auditor and AST-grounded fault explainer (`explainProvenFuzzFault(...)`, `enrichFindingsWithExplanations(...)`, `auditCausalChainsWithLlm(...)`) that verifies every cited `Class#method` symbol against `CausalGraphReport#closedWorldSymbols()`.
 
 ## Usage

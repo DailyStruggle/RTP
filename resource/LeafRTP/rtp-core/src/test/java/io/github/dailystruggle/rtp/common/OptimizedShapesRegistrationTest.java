@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 
 /**
  * Typed, null-safe view over the {@code guimenu.yml} {@link ConfigParser}.

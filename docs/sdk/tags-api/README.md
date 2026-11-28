@@ -4,14 +4,14 @@ Platform-neutral Minecraft data-pack block-tag JSON parser, cycle-safe `#namespa
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:tags-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:tags-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:tags-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:tags-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:tags-api:3.3.1'
+    implementation 'io.github.leafcraftdev:tags-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:tags-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:tags-api:1.0.0'
 }
 ```
 

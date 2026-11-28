@@ -17,6 +17,8 @@ plugins {
     id 'java-library'
 }
 
+version = '1.0.0'
+
 dependencies {
     compileOnly 'org.jetbrains:annotations:24.1.0'
 

@@ -43,7 +43,7 @@ import java.util.logging.Level;
  * post-refactor {@code DistanceManager}/{@code TicketStorage} API range
  * (1.21.5 through the next breaking change). See {@code rtp-fabric-ADR-004}.
  *
- * <p><b>Why a separate module from {@code v1_21_R1}:</b> Mojang refactored
+ * <p><b>Module split from {@code v1_21_R1}:</b> Mojang refactored
  * the chunk-ticket API in 1.21.5. {@code DistanceManager#addRegionTicket}
  * (and the matching {@code removeRegionTicket}) was removed; the public
  * entry points now live on {@link ServerChunkCache} itself:
@@ -66,7 +66,7 @@ import java.util.logging.Level;
  * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md} for the
  * radius-correctness and non-expiring-type rationale.</p>
  *
- * <p><b>Why not {@code TicketType.UNKNOWN}:</b> in 1.21.5+ {@code TicketType}
+ * <p><b>Avoidance of {@code TicketType.UNKNOWN}:</b> in 1.21.5+ {@code TicketType}
  * is a record {@code (long timeout, boolean persist, TicketUse use)} and the
  * vanilla {@code UNKNOWN} constant is registered with {@code timeout = 1L}
  * and {@code use = LOADING} only. A 1-tick auto-expiry would silently evict

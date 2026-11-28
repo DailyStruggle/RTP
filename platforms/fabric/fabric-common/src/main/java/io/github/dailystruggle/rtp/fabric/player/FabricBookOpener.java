@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec;
  * Optional capability marker for an {@link io.github.dailystruggle.rtp.api.entity.RTPPlayer}
  * that can open a written-book modal for itself.
  *
- * <p><b>Why this exists.</b> {@code FabricBookMenuRenderer} (in
+ * <p>{@code FabricBookMenuRenderer} (in
  * {@code rtp-fabric-common}) needs to open the book on the viewer's underlying
  * {@code net.minecraft.server.level.ServerPlayer}. Rather than expose that raw
  * {@code ServerPlayer} to the common module (which then has to hand it back to

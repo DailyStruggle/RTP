@@ -11,7 +11,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -734,10 +734,13 @@ public final class NeoForgeServerAccessor
                     () -> {
                         Shape<?> shape =
                                 (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
-                        if (shape instanceof Square square) {
-                            square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
-                            square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
-                            square.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
+                        if (shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms
+                                && ms.myClass == GenericMemoryShapeParams.class) {
+                            @SuppressWarnings("unchecked")
+                            Shape<GenericMemoryShapeParams> gShape = (Shape<GenericMemoryShapeParams>) shape;
+                            gShape.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
+                            gShape.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
+                            gShape.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
                         }
                         return shape;
                     },
@@ -759,10 +762,13 @@ public final class NeoForgeServerAccessor
         ServerLevel level = nw.level();
         net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
         Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
-        if (shape instanceof Square square) {
-            square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
-            square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
-            square.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
+        if (shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms
+                && ms.myClass == GenericMemoryShapeParams.class) {
+            @SuppressWarnings("unchecked")
+            Shape<GenericMemoryShapeParams> gShape = (Shape<GenericMemoryShapeParams>) shape;
+            gShape.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
+            gShape.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
+            gShape.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
         }
         return shape;
     }
@@ -824,6 +830,8 @@ public final class NeoForgeServerAccessor
 
     @Override
     public void stop() {
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.closeColumnProbeCoalescer();
+        shutdownBlockingIo(java.time.Duration.ofSeconds(5));
         unbindServer();
     }
 

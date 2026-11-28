@@ -11,7 +11,7 @@ plugin — it is useful on any Spigot server.
 
 ---
 
-## Why this exists
+## Background
 
 Empirically (Spigot 1.20.1 + Chunky, observed 2026-05-01 — see
 [`docs/dev/LESSONS_LEARNED.md`](../../docs/dev/LESSONS_LEARNED.md)

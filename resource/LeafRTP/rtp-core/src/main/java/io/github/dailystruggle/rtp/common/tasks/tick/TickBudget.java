@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
 import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.TemporalUnit;
 
 import java.util.concurrent.TimeUnit;
 

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,6 +48,8 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
   private final Map<String, String> chunkDataStore = new ConcurrentHashMap<>();
   private final Map<String, CopyOnWriteArrayList<BiConsumer<UUID, byte[]>>> messagingChannels =
       new ConcurrentHashMap<>();
+  private final ManagedBlockingIoExecutor blockingIoExecutor =
+      new ManagedBlockingIoExecutor("LeafMod");
 
   /** Constructs a mod server accessor with default logger {@code "RTP"} and {@code config/rtp}. */
   protected AbstractModServerAccessor() {
@@ -179,15 +183,43 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
   }
 
   @Override
-  public void scheduleRepeatingTask(Runnable task, long delayTicks, long periodTicks) {
-    if (task == null) return;
-    scheduledTasks.add(new ScheduledTask(task, delayTicks, periodTicks));
+  public Executor blockingIoExecutor() {
+    return blockingIoExecutor;
   }
 
-  /** Advances all registered repeating tasks by one server tick. */
+  @Override
+  public boolean shutdownBlockingIo(Duration timeout) {
+    return blockingIoExecutor.shutdownAndDrain(timeout);
+  }
+
+  /** Re-opens the managed blocking-I/O executor after a prior shutdown on server reload. */
+  protected void reopenBlockingIo() {
+    blockingIoExecutor.reopen();
+  }
+
+  @Override
+  public void scheduleRepeatingTask(Runnable task, long delayTicks, long periodTicks) {
+    if (task == null) return;
+    scheduledTasks.add(new ScheduledTask(task, delayTicks, Math.max(1L, periodTicks)));
+  }
+
+  @Override
+  public void scheduleDelayedTask(
+      String worldName, int chunkX, int chunkZ, Runnable task, long delayTicks) {
+    if (task == null) return;
+    if (delayTicks <= 0L) {
+      task.run();
+    } else {
+      scheduledTasks.add(new ScheduledTask(task, delayTicks, 0L));
+    }
+  }
+
+  /** Advances all registered repeating and one-shot tasks by one server tick. */
   protected final void tickScheduledTasks() {
     for (ScheduledTask t : scheduledTasks) {
-      t.tick();
+      if (t.tick()) {
+        scheduledTasks.remove(t);
+      }
     }
   }
 
@@ -519,17 +551,21 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
 
     ScheduledTask(Runnable task, long delayTicks, long periodTicks) {
       this.task = task;
-      this.period = Math.max(1L, periodTicks);
+      this.period = periodTicks;
       this.remaining = Math.max(0L, delayTicks);
     }
 
-    void tick() {
+    boolean tick() {
       if (remaining > 0) {
         remaining--;
-        return;
+        return false;
       }
       task.run();
+      if (period <= 0L) {
+        return true;
+      }
       remaining = period - 1;
+      return false;
     }
   }
 }

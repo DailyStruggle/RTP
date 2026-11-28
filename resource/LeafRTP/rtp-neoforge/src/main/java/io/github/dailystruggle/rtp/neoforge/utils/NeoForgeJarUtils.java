@@ -62,15 +62,13 @@ public final class NeoForgeJarUtils {
         File docVersionFile = new File(docsDir, ".version");
         String currentVersion = version;
         String lastVersion = "";
-
         if (docVersionFile.exists()) {
             try {
                 lastVersion = new String(Files.readAllBytes(docVersionFile.toPath())).trim();
-            } catch (Exception ignored) {
-                // best effort - treat as missing version marker
+            } catch (Exception e) {
+                RTP.log(Level.FINE, "[RTP] Could not read docs .version marker; treating as missing: " + e.getMessage());
             }
         }
-
         boolean forceOverwrite = (!lastVersion.isBlank() && !currentVersion.equals(lastVersion));
 
         try {

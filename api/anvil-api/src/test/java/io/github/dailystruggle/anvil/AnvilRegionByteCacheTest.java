@@ -101,10 +101,10 @@ class AnvilRegionByteCacheTest {
 
   @Test
   void lru_evictsWhenMemoryBudgetExceeded(@TempDir Path tmp) throws Exception {
-    long originalBudget = AnvilIoPool.getMemoryBudgetBytes();
+    long originalBudget = AnvilRegionByteCache.getMemoryBudgetBytes();
     try {
       // 100 KiB budget
-      AnvilIoPool.setMemoryBudgetBytes(100 * 1024L);
+      AnvilRegionByteCache.setMemoryBudgetBytes(100 * 1024L);
       // Write 3 files of 40 KiB each (total 120 KiB > 100 KiB)
       Path f1 = tmp.resolve("r.1.0.mca");
       Path f2 = tmp.resolve("r.2.0.mca");
@@ -124,7 +124,7 @@ class AnvilRegionByteCacheTest {
       assertTrue(AnvilRegionByteCache.size() <= 2, "must evict eldest to stay within budget");
       assertTrue(AnvilRegionByteCache.cachedBytes() <= 100 * 1024L, "retained bytes must be <= budget");
     } finally {
-      AnvilIoPool.setMemoryBudgetBytes(originalBudget);
+      AnvilRegionByteCache.setMemoryBudgetBytes(originalBudget);
     }
   }
 

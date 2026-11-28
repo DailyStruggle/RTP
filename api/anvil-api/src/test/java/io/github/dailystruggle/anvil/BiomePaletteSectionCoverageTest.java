@@ -92,4 +92,72 @@ class BiomePaletteSectionCoverageTest {
         assertTrue(str.contains("sectionY=1"));
         assertTrue(str.contains("minecraft:plains"));
     }
+
+    @Test
+    @DisplayName("16x16x16 per-block biome grid helpers and decoding across palette sizes 1..65 (MC 26.4)")
+    void testPerBlockBiomeGrid16x16x16() {
+        assertEquals(0, BiomePaletteSection.biomeVoxelIndex(0, 0, 0));
+        assertEquals((5 << 8) | (11 << 4) | 13, BiomePaletteSection.biomeVoxelIndex(13, 5, 11));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeVoxelIndex(-1, 0, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeVoxelIndex(0, 16, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> BiomePaletteSection.biomeVoxelIndex(0, 0, 16));
+
+        // Single-entry palette is resolution-invariant
+        BiomePaletteSection uniform = new BiomePaletteSection(0, List.of("minecraft:plains"), null);
+        assertEquals(BiomePaletteSection.CELLS_PER_AXIS_4X4X4, uniform.cellsPerAxis());
+        assertFalse(uniform.hasMalformedData());
+        assertFalse(BiomePaletteSection.isPerBlockGrid(1, null));
+
+        // Verify 4x4x4 vs 16x16x16 long counts are strictly disjoint and decode accurately across bit widths 1..7
+        int[] paletteSizes = {2, 3, 4, 8, 9, 17, 33, 64, 65};
+        for (int pSize : paletteSizes) {
+            int longs4 = BiomePaletteSection.requiredLongs(pSize, BiomePaletteSection.CELL_COUNT_4X4X4);
+            int longs16 = BiomePaletteSection.requiredLongs(pSize, BiomePaletteSection.CELL_COUNT_16X16X16);
+            assertTrue(longs16 > longs4, "16x16x16 long count must strictly exceed 4x4x4 for paletteSize=" + pSize);
+
+            List<String> palette = new java.util.ArrayList<>(pSize);
+            for (int i = 0; i < pSize; i++) {
+                palette.add("minecraft:biome_" + i);
+            }
+
+            // Pack 4,096 distinct pattern indices using Mojang's non-spanning bit packing
+            int bits = BiomePaletteSection.biomeBitsPerEntry(pSize);
+            int perLong = 64 / bits;
+            long mask = (1L << bits) - 1L;
+            long[] packed16 = new long[longs16];
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int idx = BiomePaletteSection.biomeVoxelIndex(x, y, z);
+                        int pIdx = (x * 7 + y * 13 + z * 3) % pSize;
+                        packed16[idx / perLong] |= (pIdx & mask) << ((idx % perLong) * bits);
+                    }
+                }
+            }
+
+            assertTrue(BiomePaletteSection.isPerBlockGrid(pSize, packed16));
+            BiomePaletteSection sec16 = new BiomePaletteSection(2, palette, packed16);
+            assertEquals(BiomePaletteSection.CELLS_PER_AXIS_16X16X16, sec16.cellsPerAxis());
+            assertFalse(sec16.hasMalformedData(), "valid 16x16x16 data must not be flagged malformed for pSize=" + pSize);
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int expectedIdx = (x * 7 + y * 13 + z * 3) % pSize;
+                        assertEquals("minecraft:biome_" + expectedIdx, sec16.biomeIdAt(x, y, z));
+                    }
+                }
+            }
+
+            // Truncated 16x16x16 array (longs16 - 1) must be flagged malformed (S-004 fail-closed)
+            long[] truncated = java.util.Arrays.copyOf(packed16, longs16 - 1);
+            BiomePaletteSection malformed = new BiomePaletteSection(2, palette, truncated);
+            assertTrue(malformed.hasMalformedData(), "truncated 16x16x16 array must be malformed for pSize=" + pSize);
+        }
+
+        // > 64 biome palette with 4x4x4-sized array is malformed (cannot fit >64 entries in 64 cells)
+        List<String> palette65 = new java.util.ArrayList<>(65);
+        for (int i = 0; i < 65; i++) palette65.add("minecraft:biome_" + i);
+        BiomePaletteSection tooShortFor65 = new BiomePaletteSection(0, palette65, new long[8]);
+        assertTrue(tooShortFor65.hasMalformedData());
+    }
 }

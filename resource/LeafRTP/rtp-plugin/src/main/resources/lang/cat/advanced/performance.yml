@@ -193,4 +193,11 @@ prefab_blanket:
   bakRetention: 3
 
 # Do not bite the version number, sacred catnip
+
+# Folia only: max concurrent in-flight regional tasks.
+# Omit to use the default: max(1, availableProcessors / 2).
+# Set a positive integer for a fixed cap, or <= 0 to disable the cap (uncapped).
+# Also overridable via JVM property -Drtp.folia.maxRegionalInflight=<n>.
+# maxRegionalInflight: 0
+
 version: 1.0

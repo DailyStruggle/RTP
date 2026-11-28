@@ -4,14 +4,14 @@ Zero-dependency, block-comment-preserving YAML configuration substrate and atomi
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:yaml-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:yaml-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:yaml-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:yaml-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:yaml-api:3.3.1'
+    implementation 'io.github.leafcraftdev:yaml-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:yaml-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:yaml-api:1.0.0'
 }
 ```
 

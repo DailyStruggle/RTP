@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;

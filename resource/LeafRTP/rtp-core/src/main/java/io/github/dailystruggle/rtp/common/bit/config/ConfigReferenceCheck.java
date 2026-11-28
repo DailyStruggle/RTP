@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.bit.config;
 
+import net.leaf.bit.config.ConfigConstraint;
+import net.leaf.bit.config.ConfigSnapshot;
+import net.leaf.bit.config.ReferenceSettingCheck;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitTier;
@@ -13,7 +16,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RegionSchematicService;
 import java.io.IOException;
 import java.io.InputStream;

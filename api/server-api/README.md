@@ -4,14 +4,14 @@ Platform-neutral server identity, version compatibility, logging, and regionaliz
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:server-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:server-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:server-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:server-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:server-api:3.3.1'
+    implementation 'io.github.leafcraftdev:server-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:server-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:server-api:1.0.0'
 }
 ```
 

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -44,11 +45,18 @@ public class SetupStatusCmd extends BaseRTPCmdImpl {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, @Nullable CommandsAPICommand nextCommand) {
         SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);
-        Map<String, List<io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier.Change>> diff =
-                SetupHandlerSupport.computeDiffPreview(session);
-        List<String> lines = SetupConsoleFormatter.formatStatus(session, diff);
-        for (String line : lines) {
-            SetupHandlerSupport.sendMessage(callerId, line);
+        Runnable statusTask = () -> {
+            Map<String, List<io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier.Change>> diff =
+                    SetupHandlerSupport.computeDiffPreview(session);
+            List<String> lines = SetupConsoleFormatter.formatStatus(session, diff);
+            for (String line : lines) {
+                SetupHandlerSupport.sendMessage(callerId, line);
+            }
+        };
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(statusTask);
+        } else {
+            statusTask.run();
         }
         return true;
     }

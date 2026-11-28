@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -141,7 +141,7 @@ class PregenStateTest {
     @Test
     @DisplayName("build compiles unsafe blocks and handles invalid tokens via SafetyCompilationCache")
     void build_unsafeBlocksAndTokens() {
-        io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache.clear();
+        net.leaf.tags.safety.SafetyCompilationCache.clear();
         MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
         ConfigParser<BlocksKeys> blocksParser =

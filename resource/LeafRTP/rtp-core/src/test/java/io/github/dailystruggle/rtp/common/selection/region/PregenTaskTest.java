@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -495,7 +495,7 @@ class PregenTaskTest {
                 }
 
                 @Override
-                public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet unsafeBlocks) {
+                public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet unsafeBlocks) {
                     return false;
                 }
             };
@@ -647,7 +647,7 @@ class PregenTaskTest {
         MockRTPChunk chunk = new MockRTPChunk(0, 0, spyWorld) {
             @Override public boolean isSelfContained() { return true; }
             @Override public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) { return true; }
-            @Override public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
+            @Override public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
         };
         doReturn(CompletableFuture.completedFuture(chunk)).when(spyWorld).getOrLoadChunk(anyInt(), anyInt(), any());
 
@@ -722,7 +722,7 @@ class PregenTaskTest {
         MockRTPChunk chunk = new MockRTPChunk(0, 0, spyWorld) {
             @Override public boolean isSelfContained() { return true; }
             @Override public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) { return true; }
-            @Override public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
+            @Override public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
             @Override public String getBiome(int x, int y, int z) { return "PLAINS"; }
         };
 
@@ -762,7 +762,7 @@ class PregenTaskTest {
         MockRTPChunk chunk = new MockRTPChunk(0, 0, spyWorld) {
             @Override public boolean isSelfContained() { return true; }
             @Override public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) { return true; }
-            @Override public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
+            @Override public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
             @Override public String getBiome(int x, int y, int z) { return "PLAINS"; }
         };
 
@@ -804,7 +804,7 @@ class PregenTaskTest {
         MockRTPChunk chunk = new MockRTPChunk(0, 0, spyWorld) {
             @Override public boolean isSelfContained() { return true; }
             @Override public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) { return true; }
-            @Override public boolean isSafe(int x, int y, int z, io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
+            @Override public boolean isSafe(int x, int y, int z, net.leaf.tags.safety.CompiledUnsafeSet unsafeBlocks) { return true; }
             @Override public String getBiome(int x, int y, int z) { return "PLAINS"; }
         };
         doReturn(CompletableFuture.completedFuture(chunk)).when(spyWorld).getOrLoadChunk(anyInt(), anyInt(), any());

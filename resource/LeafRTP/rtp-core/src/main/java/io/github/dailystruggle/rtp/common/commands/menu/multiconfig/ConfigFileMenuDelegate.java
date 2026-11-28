@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.menu.multiconfig;
 
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import java.util.LinkedHashMap;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;

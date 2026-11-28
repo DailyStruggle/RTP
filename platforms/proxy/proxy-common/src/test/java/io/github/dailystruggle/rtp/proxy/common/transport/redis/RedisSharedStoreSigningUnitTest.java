@@ -9,8 +9,8 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist.WaitEnvelope
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

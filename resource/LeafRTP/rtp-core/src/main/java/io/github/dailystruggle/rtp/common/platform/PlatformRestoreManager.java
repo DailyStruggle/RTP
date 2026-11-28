@@ -134,7 +134,7 @@ public final class PlatformRestoreManager {
 
   private void scheduleRestore(RTPWorld<?> world, PendingPlatformRestore entry) {
     if (!inFlight.add(entry.id())) return;
-    List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks = entry.blocks();
+    List<net.leaf.schematics.platform.BlockDelta> blocks = entry.blocks();
     int x = blocks.get(0).x();
     int y = blocks.get(0).y();
     int z = blocks.get(0).z();

@@ -1,6 +1,12 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.schematic.BlockEntityData;
+import net.leaf.schematics.schematic.LoadedSchematic;
+import net.leaf.schematics.schematic.PasteOptions;
+import net.leaf.schematics.schematic.PasteResult;
+import net.leaf.schematics.schematic.PlacedBlockEntity;
+import net.leaf.schematics.schematic.SchematicSource;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;

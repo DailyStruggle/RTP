@@ -11,7 +11,7 @@
 [![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
 
-**[LeafRTP (`resource/LeafRTP`)](resource/LeafRTP/README.md)** · **[LeafTreeGen (`resource/LeafTreeGen`)](resource/LeafTreeGen/README.md)** · **[SDK Catalog (`api/*`)](api/README.md)** · **[Plugin Author Guide](docs/FOR_PLUGIN_AUTHORS.md)** · **[Documentation Site](https://dailystruggle.github.io/RTP/)** · **[Get Help](SUPPORT.md)**
+**[LeafRTP (`resource/LeafRTP`)](resource/LeafRTP/README.md)** · **[LeafAnvil (`resource/LeafAnvil`)](resource/LeafAnvil/README.md)** · **[LeafFuzz (`resource/LeafFuzz`)](resource/LeafFuzz/README.md)** · **[LeafTreeGen (`resource/LeafTreeGen`)](resource/LeafTreeGen/README.md)** · **[SDK Catalog (`api/*`)](api/README.md)** · **[Plugin Author Guide](docs/FOR_PLUGIN_AUTHORS.md)** · **[Documentation Site](https://dailystruggle.github.io/RTP/)** · **[Get Help](SUPPORT.md)**
 
 ---
 
@@ -20,10 +20,11 @@
 | I want to... | Start here |
 |---|---|
 | **Install or configure LeafRTP (`/rtp`) on my server** | **[LeafRTP README](resource/LeafRTP/README.md)** · [Quick Start](resource/LeafRTP/docs/admin/QUICK_START.md) · [Recipes](resource/LeafRTP/docs/admin/RECIPES.md) · [Download on Modrinth](https://modrinth.com/plugin/leafrtp) |
+| **Cut world disk size by 50% & speed up shutdown saves with `.lca` world storage** | **[LeafAnvil README](resource/LeafAnvil/README.md)** · [`.lca` Spec (`ICD.md`)](api/anvil-api/docs/ICD.md) · [Commands](resource/LeafAnvil/docs/admin/COMMANDS.md) · [Configuration](resource/LeafAnvil/docs/admin/CONFIGURATION.md) · [Changelog](resource/LeafAnvil/CHANGELOG.md) |
+| **Audit, security-scan, fuzz, or swarm-benchmark a server or plugin (`/fuzz`)** | **[LeafFuzz README](resource/LeafFuzz/README.md)** · [Commands & CLI](resource/LeafFuzz/docs/admin/COMMANDS.md) · [Whole-Server Fuzzer (`ADR-125`)](docs/adr/ADR-125-whole-server-discovery-fuzzing.md) · [StressTestRTP Harness](helpers/StressTestRTP/README.md) · [Devstack Acceptance](devstack/README.md) |
 | **Generate custom procedural trees & jigsaw worldgen datapacks** | **[LeafTreeGen README](resource/LeafTreeGen/README.md)** · [Biome Tree Catalog](resource/LeafTreeGen/docs/biome-trees.md) · [Changelog](resource/LeafTreeGen/CHANGELOG.md) |
 | **Build a standalone multi-loader plugin/mod using the `api/*` SDK** | **[SDK Catalog (`api/README.md`)](api/README.md)** · [Plugin Author Guide](docs/FOR_PLUGIN_AUTHORS.md) · [Architecture](docs/dev/ARCHITECTURE.md) |
 | **Write an addon for LeafRTP (`:rtp-api`)** | **[Addon Quickstart](resource/LeafRTP/docs/ADDON_QUICKSTART.md)** · [For Addon Developers](resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md) · [Bundled Addons (`resource/LeafRTP`)](resource/LeafRTP/addons/) |
-| **Fuzz or benchmark a Minecraft server or plugin** | **[Whole-Server Fuzzer (`ADR-125`)](docs/adr/ADR-125-whole-server-discovery-fuzzing.md)** · [StressTestRTP Harness](helpers/StressTestRTP/README.md) · [Devstack Acceptance](devstack/README.md) |
 | **Contribute code, translations, or documentation** | **[For Contributors](docs/FOR_CONTRIBUTORS.md)** · [Developer Index](docs/dev/INDEX.md) · [Testing Guide](docs/dev/TESTING_GUIDE.md) · [ADR Index](docs/adr/README.md) |
 
 ---
@@ -35,6 +36,8 @@ Each plugin under `resource/` ships its own deliverable jar, changelog, and rele
 | Plugin | Path | Loaders | Tag Namespace | Description |
 |---|---|---|---|---|
 | **[LeafRTP](resource/LeafRTP/README.md)** | [`resource/LeafRTP`](resource/LeafRTP/README.md) | Paper, Spigot, Folia, Fabric, NeoForge, Velocity | `v<semver>` / `leafrtp-v<semver>` | Zero-wait random teleportation (`/rtp`) with background queue preparation, Hilbert/spiral spatial memory, browser map editor (`/rtp editor`), and cross-server proxy routing. |
+| **[LeafAnvil](resource/LeafAnvil/README.md)** | [`resource/LeafAnvil/`](resource/LeafAnvil/README.md) | Paper, Spigot, Folia, Fabric, NeoForge (`1.20+` - `26.3`) | `leafanvil-v<semver>` / `v<semver>` | Drop-in `.lca` (LeafCraft Anvil) world storage & wire streaming engine (`LeafAnvil` & MIT companion `LeafAnvil-Net`): `50%` smaller worlds, `15.5x` faster shutdown saves, `256B` Copy-on-Write slabs, and 4-tier `SEC-DED` bit-rot recovery (`/leafanvil`). |
+| **[LeafFuzz](resource/LeafFuzz/README.md)** | [`resource/LeafFuzz/`](resource/LeafFuzz/README.md) | Paper, Spigot, Folia, Fabric, NeoForge (`1.20+` - `26.3`) + CLI | `leaffuzz-v<semver>` / `v<semver>` | 5-stage automated server & plugin QC suite (`/fuzz check`, `/fuzz report`, `/fuzz test`), static bytecode & backdoor scanner (`java -jar LeafFuzz.jar triage`), post-GC leak screener, and 100-player external TCP swarm CLI (`java -jar LeafFuzz.jar swarm`). |
 | **[LeafTreeGen](resource/LeafTreeGen/README.md)** | [`resource/LeafTreeGen/`](resource/LeafTreeGen/README.md) | Paper, Folia, Fabric, NeoForge | `leaftreegen-v<semver>` | Pure-Java procedural tree generator that bakes `.nbt` structure variants into native vanilla jigsaw worldgen datapacks and custom saplings (`/leaftree`). |
 | **[LeafSleep](resource/LeafSleep/README.md)** | [`resource/LeafSleep/`](resource/LeafSleep/README.md) | Paper, Folia, Fabric, NeoForge, Velocity | `leafsleep-v<semver>` | Tick-budgeted multiplayer sleep and night-skip coordination built on the shared `api/*` SDK. |
 
@@ -73,6 +76,41 @@ Each plugin under `resource/` ships its own deliverable jar, changelog, and rele
 | `resource/LeafTreeGen/treegen-fabric/` | `:resource:LeafTreeGen:treegen-fabric` | Fabric server adapter (`26.1+` unobf & `1.21.1` Mojmap). |
 | `resource/LeafTreeGen/treegen-neoforge/` | `:resource:LeafTreeGen:treegen-neoforge` | NeoForge server adapter (`26.1+` & `1.21.1`). |
 | `resource/LeafTreeGen/treegen-plugin/` | `:resource:LeafTreeGen:treegen-plugin` | Unified shaded deliverable (`LeafTreeGen-<version>.jar`) with SHA-256/512 checksums and PGP signing. |
+
+</details>
+
+<details>
+<summary><b>LeafAnvil (`resource/LeafAnvil/`) - Modules, `.lca` world storage, and `LeafAnvil-Net`</b></summary>
+
+<br>
+
+**[Full LeafAnvil README](resource/LeafAnvil/README.md)** · **[`.lca` Spec (`ICD.md`)](api/anvil-api/docs/ICD.md)** · **[Commands](resource/LeafAnvil/docs/admin/COMMANDS.md)** · **[Configuration](resource/LeafAnvil/docs/admin/CONFIGURATION.md)** · **[BIT & 4-Tier Self-Healing](resource/LeafAnvil/docs/dev/BIT_CODES.md)** · **[Changelog](resource/LeafAnvil/CHANGELOG.md)**
+
+| Module | Gradle Path | Purpose |
+|---|---|---|
+| `resource/LeafAnvil/leafanvil-common/` | `:resource:LeafAnvil:leafanvil-common` | Runtime `NmsRegionStorageInterceptor`, `LeafAnvilWorldConverter`, `/leafanvil` (`/lca`) command tree, `[LCA bit]` suite, and `LcaInMemoryChunkCoordinator` / `LcaWireStreamProtocol`. |
+| `resource/LeafAnvil/leafanvil-paper/` | `:resource:LeafAnvil:leafanvil-paper` | Paper/Folia/Spigot `STARTUP` lifecycle adapter (`PaperLeafAnvilPlugin`). |
+| `resource/LeafAnvil/leafanvil-fabric/` | `:resource:LeafAnvil:leafanvil-fabric` | Fabric server & client mod adapters (`FabricLeafAnvilMod`, `FabricLeafAnvilClientMod`) and `MixinPlayerChunkSender`. |
+| `resource/LeafAnvil/leafanvil-neoforge/` | `:resource:LeafAnvil:leafanvil-neoforge` | NeoForge server & client mod adapters (`NeoForgeLeafAnvilMod`, `NeoForgeLeafAnvilClientMod`). |
+| `resource/LeafAnvil/leafanvil-plugin/` | `:resource:LeafAnvil:leafanvil-plugin` | Unified shaded server & client deliverable (`LeafAnvil-<version>.jar`). |
+| `resource/LeafAnvil/leafanvil-net/` | `:resource:LeafAnvil:leafanvil-net` | Standalone MIT-licensed wire-only server TX + client RX companion deliverable (`LeafAnvil-Net-<version>.jar`). |
+
+</details>
+
+<details>
+<summary><b>LeafFuzz (`resource/LeafFuzz/`) - Modules, 5-stage QC suite, and standalone CLI</b></summary>
+
+<br>
+
+**[Full LeafFuzz README](resource/LeafFuzz/README.md)** · **[Commands & CLI](resource/LeafFuzz/docs/admin/COMMANDS.md)** · **[Configuration](resource/LeafFuzz/docs/admin/CONFIGURATION.md)** · **[BIT Codes (`[FUZZ bit]`)](resource/LeafFuzz/docs/dev/BIT_CODES.md)** · **[ADR Index](resource/LeafFuzz/docs/adr/README.md)** · **[Changelog](resource/LeafFuzz/CHANGELOG.md)**
+
+| Module | Gradle Path | Purpose |
+|---|---|---|
+| `resource/LeafFuzz/leaffuzz-common/` | `:resource:LeafFuzz:leaffuzz-common` | 5-stage QC orchestrator (`/fuzz check`, `/fuzz report`, `/fuzz reset`, `/fuzz test`, `/fuzz reload`), `[FUZZ bit]` suite, `LeafFuzzBatchTriageRunner` (`triage`), and `LeafFuzzTcpSwarmClient` (`swarm`). |
+| `resource/LeafFuzz/leaffuzz-paper/` | `:resource:LeafFuzz:leaffuzz-paper` | Paper/Folia/Spigot adapter (`PaperLeafFuzzPlugin`), live command tree inspector, and embedded synthetic player session driver. |
+| `resource/LeafFuzz/leaffuzz-fabric/` | `:resource:LeafFuzz:leaffuzz-fabric` | Fabric server adapter (`FabricLeafFuzzMod`). |
+| `resource/LeafFuzz/leaffuzz-neoforge/` | `:resource:LeafFuzz:leaffuzz-neoforge` | NeoForge server adapter (`NeoForgeLeafFuzzMod`). |
+| `resource/LeafFuzz/leaffuzz-plugin/` | `:resource:LeafFuzz:leaffuzz-plugin` | Unified multi-loader & standalone CLI deliverable (`LeafFuzz-<version>.jar`, `Main-Class: LeafFuzzStandaloneCli`). |
 
 </details>
 
@@ -219,9 +257,12 @@ cd RTP
 ./gradlew assemble                         # Windows: .\gradlew.bat assemble
 
 # Build a specific plugin or SDK module
-./gradlew :rtp-plugin:remapJar             # LeafRTP unified jar -> resource/LeafRTP/rtp-plugin/build/libs/
+./gradlew :rtp-plugin:remapJar                        # LeafRTP unified jar -> resource/LeafRTP/rtp-plugin/build/libs/
+./gradlew :resource:LeafAnvil:leafanvil-plugin:build  # LeafAnvil jar -> resource/LeafAnvil/leafanvil-plugin/build/libs/
+./gradlew :resource:LeafAnvil:leafanvil-net:build     # LeafAnvil-Net MIT jar -> resource/LeafAnvil/leafanvil-net/build/libs/
+./gradlew :resource:LeafFuzz:leaffuzz-plugin:build    # LeafFuzz jar -> resource/LeafFuzz/leaffuzz-plugin/build/libs/
 ./gradlew :resource:LeafTreeGen:treegen-plugin:build  # LeafTreeGen jar -> resource/LeafTreeGen/treegen-plugin/build/libs/
-./gradlew :predict-api:build               # Single api/* SDK module
+./gradlew :predict-api:build                          # Single api/* SDK module
 
 # Run verification gates
 python3 scripts/agent-gate.py              # Scoped PR gate (Spotless, tests, PMD, SpotBugs, JaCoCo)
@@ -236,6 +277,8 @@ python3 scripts/agent-gate.py              # Scoped PR gate (Spotless, tests, PM
 | Directory | Purpose |
 |---|---|
 | [`resource/LeafRTP`](resource/LeafRTP/README.md) | **LeafRTP** (`rtp-api`, `rtp-core`, `rtp-neoforge`, `rtp-plugin`) and its addons (`resource/LeafRTP/addons`). |
+| [`resource/LeafAnvil/`](resource/LeafAnvil/README.md) | **LeafAnvil & LeafAnvil-Net** (`leafanvil-common`, `leafanvil-paper`, `leafanvil-fabric`, `leafanvil-neoforge`, `leafanvil-plugin`, `leafanvil-net`). |
+| [`resource/LeafFuzz/`](resource/LeafFuzz/README.md) | **LeafFuzz** (`leaffuzz-common`, `leaffuzz-paper`, `leaffuzz-fabric`, `leaffuzz-neoforge`, `leaffuzz-plugin`). |
 | [`resource/LeafTreeGen/`](resource/LeafTreeGen/README.md) | **LeafTreeGen** (`treegen-common`, `treegen-paper`, `treegen-fabric`, `treegen-neoforge`, `treegen-plugin`). |
 | [`api/`](api/README.md) | 16 standalone, platform-neutral SDK libraries (`server-api`, `commands-api`, `menu-api`, `effects-api`, `yaml-api`, `units-api`, `bit-api`, `config-bit-api`, `predict-api`, `metrics-api`, `bstats-api`, `anvil-api`, `tags-api`, `maps-api`, `database-api`, `schematics-api`). |
 | [`platforms/`](platforms/) | Generic `bukkit`, `paper`, `folia`, `fabric`, `neoforge`, and `proxy` platform carriers and adapters. |

@@ -25,6 +25,17 @@ class BiomeColorSourceTest {
     for (int c : BiomeColorSource.FALLBACK_PALETTE) {
       assertNotEquals(0, c);
     }
+
+    // Verify canonical vanilla and namespaced biomes resolve to distinct terrain colors
+    assertEquals(0x6DA346, BiomeColorSource.fallback("PLAINS"));
+    assertEquals(0x6DA346, BiomeColorSource.fallback("minecraft:plains"));
+    assertEquals(0x1F569E, BiomeColorSource.fallback("OCEAN"));
+    assertEquals(0xE0CC82, BiomeColorSource.fallback("DESERT"));
+    assertEquals(0x9E222A, BiomeColorSource.fallback("CRIMSON_FOREST"));
+    assertEquals(0xC8C48B, BiomeColorSource.fallback("THE_END"));
+    assertEquals(0xE89BB5, BiomeColorSource.fallback("terralith:sakura_cherry_valley"));
+    assertTrue(BiomeColorSource.fallback("custom:totally_unknown_xyz") > 0);
+    assertTrue(BiomeColorSource.fallback(null) > 0);
   }
 
   @Test

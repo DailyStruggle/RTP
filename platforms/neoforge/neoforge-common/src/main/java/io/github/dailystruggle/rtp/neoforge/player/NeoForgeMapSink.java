@@ -5,7 +5,7 @@ package io.github.dailystruggle.rtp.neoforge.player;
  * that can render an RTP map chart onto a vanilla filled-map for itself
  * (NeoForge analogue of {@code FabricMapSink}).
  *
- * <p><b>Why this exists.</b> {@code NeoForgeMapBinding} needs to hand a rendered
+ * <p>{@code NeoForgeMapBinding} needs to hand a rendered
  * ARGB snapshot to the viewer's underlying {@code net.minecraft.server.level.ServerPlayer}.
  * Rather than expose that raw {@code ServerPlayer} to the binding, the player
  * object itself owns the handle and exposes

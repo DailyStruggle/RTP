@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.rtp.common.selection.region.util.BaseDistanceParameter;
-import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
+import net.leaf.units.DistanceParser;
 
 import java.util.UUID;
 import java.util.function.BiFunction;

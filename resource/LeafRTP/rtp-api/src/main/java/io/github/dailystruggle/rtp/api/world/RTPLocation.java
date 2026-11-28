@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.api.world;
 
-import io.github.dailystruggle.rtp.api.schematic.SchematicCoordinate;
+import net.leaf.schematics.schematic.SchematicCoordinate;
 import java.util.Objects;
 
 /**

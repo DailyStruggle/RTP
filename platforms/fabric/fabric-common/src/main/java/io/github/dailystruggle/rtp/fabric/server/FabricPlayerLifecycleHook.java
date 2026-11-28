@@ -18,7 +18,7 @@ import java.util.logging.Level;
  * {@code io.github.dailystruggle.rtp.fabric.events.FabricEventBridge}, which is
  * registered reflectively at mod-init time to avoid linking against
  * intermediary {@code ServerGamePacketListenerImpl} on the deobf 26.x runtime
- * (see {@link io.github.dailystruggle.rtp.fabric.events.FabricEventBridge}
+ * (see {@code io.github.dailystruggle.rtp.fabric.events.FabricEventBridge}
  * and rtp-fabric-ADR-009 for the obf / unobf carrier split). To avoid
  * duplicating that fragile reflection, this shim exposes
  * {@link #fireJoinFromPlayer(Object)} / {@link #fireQuitFromPlayer(Object)}

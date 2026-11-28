@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * 1.2x as the cap - at which coarsening the shipped spiral stops paying, by charting the time and
  * memory curves against measured over-exclusion and taking their crossing.
  *
- * <p>Why a crossing rather than an argmin. Time and memory both improve as the cell coarsens, and
+ * <p><b>Crossing vs. argmin.</b> Time and memory both improve as the cell coarsens, and
  * they improve at different rates: memory falls roughly with run count while selection falls only
  * with the logarithm of it plus a cache effect. Normalised against the full-precision point, the
  * two curves therefore cross, and the crossing is the coarsest unit at which the marginal byte

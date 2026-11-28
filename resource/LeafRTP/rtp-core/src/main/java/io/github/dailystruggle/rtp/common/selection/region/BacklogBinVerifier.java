@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.anvil.AnvilIoPool;
 import io.github.dailystruggle.anvil.ChunkCoord;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision;
@@ -14,15 +13,21 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
  * Batched backlog pre-filter: one {@link Provider#classifyBatch} call per region-file bin,
- * dispatched to {@link AnvilIoPool} so the async pulse never blocks on region-file I/O (S-005).
+ * dispatched to the server's lifecycle-managed blocking-I/O executor so the async pulse never
+ * blocks on region-file I/O (S-005).
  *
  * <p>Each {@link #pulse} first applies every finished batch on the calling (pulse) thread - all
  * validity writes, stats and bad-chunk marks happen there, never on an I/O thread - then submits
@@ -44,6 +49,10 @@ final class BacklogBinVerifier {
   private static final int DEFAULT_DEPTH = 2;
   private static final int MAX_DEPTH = 8;
 
+  private static final int STATE_PENDING = 0;
+  private static final int STATE_RUNNING = 1;
+  private static final int STATE_CANCELLED = 2;
+
   /** Abandon a batch, and expire a world-wide bin claim, after this long. */
   static final long TIMEOUT_NANOS =
       Math.max(1L, Long.getLong("rtp.backlog.batchTimeoutMillis", 10_000L)) * 1_000_000L;
@@ -55,19 +64,22 @@ final class BacklogBinVerifier {
 
   private final Executor executor;
   private final ArrayDeque<Batch> inFlight = new ArrayDeque<>();
+  private final Set<CountDownLatch> activeBatches = ConcurrentHashMap.newKeySet();
 
   private record Batch(
       RegionFileCoord key,
       WorldBacklogBinIndex index,
       List<BacklogLocationBuffer.BacklogEntry> entries,
       CompletableFuture<Map<ChunkCoord, Decision>> future,
+      AtomicInteger state,
+      CountDownLatch done,
       long submittedNanos) {}
 
   BacklogBinVerifier() {
     this(null);
   }
 
-  /** @param executor batch executor; {@code null} resolves {@link AnvilIoPool#get()} per submit */
+  /** @param executor batch executor; {@code null} resolves {@link RTPRuntime#blockingIoExecutor()} per submit */
   BacklogBinVerifier(Executor executor) {
     this.executor = executor;
   }
@@ -117,16 +129,39 @@ final class BacklogBinVerifier {
       if (!index.tryClaim(key, now, TIMEOUT_NANOS)) return;
       List<BacklogLocationBuffer.BacklogEntry> entries = binEntries(index, oldest);
       List<ChunkCoord> chunks = chunksOf(entries);
+      AtomicInteger batchState = new AtomicInteger(STATE_PENDING);
+      CountDownLatch batchDone = new CountDownLatch(1);
       CompletableFuture<Map<ChunkCoord, Decision>> future;
       try {
-        Executor exec = (executor != null) ? executor : AnvilIoPool.get();
-        future = CompletableFuture.supplyAsync(() -> classify(provider, world, chunks), exec);
+        Executor exec = (executor != null) ? executor : RTPRuntime.blockingIoExecutor();
+        future =
+            CompletableFuture.supplyAsync(
+                () -> {
+                  activeBatches.add(batchDone);
+                  try {
+                    if (!batchState.compareAndSet(STATE_PENDING, STATE_RUNNING)) {
+                      return Collections.emptyMap();
+                    }
+                    return classify(provider, world, chunks);
+                  } finally {
+                    batchDone.countDown();
+                    activeBatches.remove(batchDone);
+                  }
+                },
+                exec);
       } catch (RuntimeException e) {
-        // Rejected submit: the bin goes UNKNOWN (cold fill checks) rather than stay stuck.
+        // Rejected submit: log and fall back to UNKNOWN so the cold fill checks live (S-004).
+        RTPRuntime.log(
+            Level.WARNING,
+            "[RTP] Backlog batch submit rejected for region file " + key
+                + "; leaving candidate(s) to the cold fill's chunk-load check",
+            e);
+        batchState.set(STATE_CANCELLED);
+        batchDone.countDown();
         future = CompletableFuture.completedFuture(Collections.emptyMap());
       }
       SUBMITTED.incrementAndGet();
-      inFlight.addLast(new Batch(key, index, entries, future, now));
+      inFlight.addLast(new Batch(key, index, entries, future, batchState, batchDone, now));
     }
   }
 
@@ -141,6 +176,7 @@ final class BacklogBinVerifier {
             ? Collections.emptyMap() : b.future().getNow(Collections.emptyMap());
         APPLIED.incrementAndGet();
       } else if (now - b.submittedNanos() > TIMEOUT_NANOS) {
+        b.state().compareAndSet(STATE_PENDING, STATE_CANCELLED);
         b.future().cancel(false);
         TIMED_OUT.incrementAndGet();
         RTPRuntime.log(Level.WARNING, "[RTP] Backlog batch for region file " + b.key() + " exceeded "
@@ -156,10 +192,36 @@ final class BacklogBinVerifier {
     }
   }
 
-  /** Cancels in-flight batches and releases their claims; entries stay UNVERIFIED for re-pick. */
+  /**
+   * Cancels pending batches, awaits in-flight batches within a bounded drain window so disk reads
+   * finish before world/region teardown (S-002), and releases all bin claims.
+   */
   synchronized void close() {
+    Set<CountDownLatch> toAwait = new LinkedHashSet<>();
     for (Batch b : inFlight) {
+      boolean cancelledBeforeStart = b.state().compareAndSet(STATE_PENDING, STATE_CANCELLED);
       b.future().cancel(false);
+      if (!cancelledBeforeStart) {
+        toAwait.add(b.done());
+      }
+    }
+    toAwait.addAll(activeBatches);
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    for (CountDownLatch latch : toAwait) {
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      if (remainingNanos <= 0L) {
+        break;
+      }
+      try {
+        if (!latch.await(remainingNanos, TimeUnit.NANOSECONDS)) {
+          break;
+        }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    for (Batch b : inFlight) {
       b.index().release(b.key());
     }
     inFlight.clear();

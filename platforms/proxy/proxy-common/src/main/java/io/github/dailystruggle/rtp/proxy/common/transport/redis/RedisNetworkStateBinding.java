@@ -11,10 +11,10 @@ import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocol;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPubSub;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespPool;
+import net.leaf.database.resp.RespProtocol;
+import net.leaf.database.resp.RespPubSub;
 
 import java.time.Duration;
 import java.time.Instant;

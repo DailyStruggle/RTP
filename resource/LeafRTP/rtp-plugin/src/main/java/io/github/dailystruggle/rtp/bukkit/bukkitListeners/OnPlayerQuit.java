@@ -49,7 +49,12 @@ public final class OnPlayerQuit implements Listener {
       } else {
         // Player completed teleport: offload to disk file bin and evict from local heap
         if (RTP.getInstance().fileBinStore != null) {
-          RTP.getInstance().fileBinStore.save(data);
+          TeleportData toSave = data;
+          RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+            if (RTP.getInstance().fileBinStore != null) {
+              RTP.getInstance().fileBinStore.save(toSave);
+            }
+          });
         }
         TeleportSessions.current().latestTeleportData.remove(uuid);
         TeleportSessions.current().priorTeleportData.remove(uuid);

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.schematic.*;
+import net.leaf.schematics.schematic.*;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.*;
@@ -3517,7 +3518,7 @@ public class TeleportPipelineTaskMutationTest {
     @Test
     @DisplayName("ConfigCache reload handles null cfg and non-null values")
     void configCache_reload_branches() {
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cfgParser =
+        net.leaf.yaml.configuration.ConfigParser<?> cfgParser =
             ActiveConfigs.get().configParserMap.remove(ConfigKeys.class);
         try {
             assertDoesNotThrow(TeleportPipelineTask.ConfigCache::reload);

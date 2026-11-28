@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.anvil.AnvilPrefilter;
+import io.github.dailystruggle.anvil.ColumnProbeCoalescer;
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.annotations.PublicApi;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -67,6 +70,77 @@ public class RTPAPI {
 
   /** Air check predicate delegate populated by core during initialization. */
   public static volatile Predicate<String> isAirDelegate = null;
+
+  private static final Object COALESCER_LOCK = new Object();
+  private static volatile ColumnProbeCoalescer columnProbeCoalescer;
+
+  /**
+   * Returns the lifecycle-managed {@link ColumnProbeCoalescer} bound to the active
+   * {@link RTPServerAccessor#blockingIoExecutor()} (or {@link ServerAccessors#blockingIoExecutor()}).
+   * Closed and drained during server/plugin shutdown via {@link #closeColumnProbeCoalescer()}.
+   */
+  public static ColumnProbeCoalescer columnProbeCoalescer() {
+    ColumnProbeCoalescer current = columnProbeCoalescer;
+    if (current != null && !current.isClosed()) {
+      return current;
+    }
+    synchronized (COALESCER_LOCK) {
+      if (columnProbeCoalescer == null || columnProbeCoalescer.isClosed()) {
+        Executor exec = resolveBlockingIoExecutor();
+        columnProbeCoalescer = AnvilPrefilter.createColumnProbeCoalescer(exec);
+      }
+      return columnProbeCoalescer;
+    }
+  }
+
+  /**
+   * Installs a custom {@link ColumnProbeCoalescer} (primarily for deterministic tests) and closes
+   * any previously active coalescer.
+   */
+  public static void setColumnProbeCoalescer(ColumnProbeCoalescer coalescer) {
+    ColumnProbeCoalescer previous;
+    synchronized (COALESCER_LOCK) {
+      previous = columnProbeCoalescer;
+      columnProbeCoalescer = coalescer;
+    }
+    if (previous != null && previous != coalescer) {
+      previous.close();
+    }
+  }
+
+  /**
+   * Closes and drains the active {@link ColumnProbeCoalescer} so in-flight region probes complete
+   * before world unload or server shutdown ({@code S-002}, {@code S-005}).
+   */
+  public static void closeColumnProbeCoalescer() {
+    ColumnProbeCoalescer toClose;
+    synchronized (COALESCER_LOCK) {
+      toClose = columnProbeCoalescer;
+      columnProbeCoalescer = null;
+    }
+    if (toClose != null) {
+      toClose.close();
+    }
+  }
+
+  private static Executor resolveBlockingIoExecutor() {
+    RTPServerAccessor accessor = serverAccessor;
+    if (accessor != null) {
+      try {
+        Executor exec = accessor.blockingIoExecutor();
+        if (exec != null) {
+          return exec;
+        }
+      } catch (IllegalStateException ignored) {
+        // Fall through to ServerAccessors.
+      }
+    }
+    return ServerAccessors.blockingIoExecutor()
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "RTPAPI has no ServerAccessor or TaskScheduler installed for blocking I/O"));
+  }
 
   /**
    * Checks if the given material name represents air (either vanilla air or configured air blocks).

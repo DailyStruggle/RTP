@@ -4,7 +4,7 @@ package io.github.dailystruggle.rtp.fabric.player;
  * Optional capability marker for an {@link io.github.dailystruggle.rtp.api.entity.RTPPlayer}
  * that can render an RTP map chart onto a vanilla filled-map for itself.
  *
- * <p><b>Why this exists.</b> {@code FabricMapBinding} (in {@code rtp-fabric-common})
+ * <p>{@code FabricMapBinding} (in {@code rtp-fabric-common})
  * needs to hand a rendered ARGB snapshot to the viewer's underlying
  * {@code net.minecraft.server.level.ServerPlayer}. Rather than expose that raw
  * {@code ServerPlayer} to the common module, the player object itself owns the

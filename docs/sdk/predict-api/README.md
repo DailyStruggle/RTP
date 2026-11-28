@@ -4,14 +4,14 @@ Zero-dependency online statistical estimation, adaptive rate/budget control, fai
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:predict-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:predict-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:predict-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:predict-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:predict-api:3.3.1'
+    implementation 'io.github.leafcraftdev:predict-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:predict-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:predict-api:1.0.0'
 }
 ```
 

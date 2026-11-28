@@ -7,7 +7,7 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #   - Both editions share one version line (`version` in gradle.properties).
 #   - LeafRTP Pro ships on PR merge (or manual workflow_dispatch), including
 #     patch releases owed to paying customers under the support terms.
-#   - LeafRTP (Lite) ships when the maintainer chooses, via `release.yml`
+#   - LeafRTP (free default) ships when the maintainer chooses, via `release.yml`
 #     (workflow_dispatch), with no holding period. It may skip patch versions.
 #
 # Automates the BuiltByBit side on PR merge:
@@ -30,8 +30,8 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #   - LeafRTP-Pro-<version>.jar (uploaded EXCLUSIVELY to BuiltByBit, NOT publicly on GitHub Releases)
 #   - CycloneDX Software Bill of Materials (bom.json)
 #
-# The Lite jar, Modrinth publish, Hangar publish, and the public GitHub Release
-# are handled separately on demand by release.yml.
+# The default free LeafRTP jar, Modrinth publish, Hangar publish, and the public
+# GitHub Release are handled separately on demand by release.yml.
 #
 # Required repository secrets:
 #   Either:
@@ -142,8 +142,8 @@ jobs:
         run: chmod +x gradlew
 
       # Full multi-module build for verification; only the Pro jar is published
-      # from this workflow (to BuiltByBit). The Lite jar is built, published, and
-      # attested by release.yml on the tag this workflow pushes after publishing.
+      # from this workflow (to BuiltByBit). The default free LeafRTP jar is built,
+      # published, and attested by release.yml on the tag this workflow pushes after publishing.
       - name: Build Pro jar + Checksums + SBOM + Signing
         env:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
@@ -182,9 +182,8 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Pro / Full release notes only: the full section including **(Pro)**
-          # bullets. The Lite-filtered notes are produced by release.yml for the
-          # Modrinth and GitHub Release listings.
+          # Pro release notes: the full section for this version. The public
+          # Modrinth, Hangar, and GitHub Release notes are produced by release.yml.
           if [ ! -f resource/LeafRTP/CHANGELOG.md ]; then
             echo "::warning::resource/LeafRTP/CHANGELOG.md not found; falling back to generic release notes."
             echo "LeafRTP Pro ${VERSION}" > release-notes-pro.md
@@ -311,7 +310,7 @@ jobs:
 
       # Modrinth, Hangar, and the public GitHub Release are intentionally NOT
       # handled here: release.yml owns them and is dispatched manually for the
-      # versions Lite ships (ADR-117). Keeping them out of this workflow keeps
+      # versions published to the free channels (ADR-117). Keeping them out of this workflow keeps
       # each site's publish in exactly one place (no Modrinth version collision,
       # no duplicate GitHub Release).
 
@@ -319,7 +318,7 @@ jobs:
         uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           # Only the Pro jar is published from this workflow (to BuiltByBit).
-          # The Lite jar is attested by release.yml where it is published.
+          # The default LeafRTP jar is attested by release.yml where it is published.
           subject-path: |
             ${{ steps.artifacts.outputs.pro_jar }}
 

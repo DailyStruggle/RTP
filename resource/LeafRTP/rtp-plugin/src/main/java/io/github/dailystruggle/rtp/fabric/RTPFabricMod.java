@@ -190,7 +190,8 @@ public final class RTPFabricMod implements ModInitializer {
             try {
                 io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
                         io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("fabric"),
-                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveServiceId(RTPFabricMod.class),
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveAssemblyVariant(RTPFabricMod.class),
                         accessor.getPluginDirectory());
             } catch (Throwable t) {
                 RTP.log(Level.FINE, "[RTP][fabric] bStats setup skipped or failed: " + t.getMessage());
@@ -533,7 +534,7 @@ public final class RTPFabricMod implements ModInitializer {
      * {@code rtp-fabric-vXX_YY_R1} submodule, then install it into
      * {@link FabricVersionAdapterRegistry}.
      *
-     * <p><b>Why reflection (and not a direct {@code new}):</b> the v26_1_R1
+     * <p><b>Reflective loading (not direct {@code new}):</b> the v26_1_R1
      * adapter is compiled to Java 25 bytecode (MC 26.1's mandated minimum).
      * Servers running on a Java 21 JVM cannot resolve Java 25 classes -
      * they would throw {@code UnsupportedClassVersionError} the moment the

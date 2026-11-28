@@ -29,7 +29,7 @@ When a player is teleported in, vanilla adds the player's own view-distance tick
 
 The non-persistent, no-timeout `TicketType` shape established by ADR-006 (and the R11/26.x flag-bitfield variant) is unchanged; S-002 (no permanently force-loaded persisted chunks) remains satisfied.
 
-### Why not level 33 (distance 0)
+### Level 32 vs. level 33 (distance 0)
 
 Level 33 is the only strictly non-ticking loaded level, but it sits exactly on the eviction boundary (level 34 = unloaded). The user has previously observed chunk drops/reloads when the ticket level was insufficient. Level 32 keeps a one-level margin against eviction while still suppressing entity ticking, and has in-repo empirical precedent (the 1.20.1 fix). Level 33 is therefore deliberately avoided.
 

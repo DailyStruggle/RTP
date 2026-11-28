@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;

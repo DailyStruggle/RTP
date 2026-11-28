@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.action;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
-import io.github.dailystruggle.rtp.common.bit.config.ConfigConstraint;
-import io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit;
+import net.leaf.bit.config.ConfigConstraint;
+import net.leaf.units.SpatialUnit;
 import java.lang.System.Logger.Level;
 import java.util.List;
 

@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
  * ./gradlew :rtp-core:simulationBenchmark}; that task pins heap and collector, without which
  * allocation and GC figures are not comparable between runs.
  *
- * <p><b>Why this exists.</b> {@code AnvilRegionByteCache} pools region-file byte arrays rather than
+ * <p>{@code AnvilRegionByteCache} pools region-file byte arrays rather than
  * reallocating per probe. A real-server benchmark cannot isolate that: 30-60 minutes of setup and
  * analysis, and the plugin's own allocation is buried under the platform's. Allocation is a
  * property of our code alone, so it is measurable here in seconds, deterministically, against the

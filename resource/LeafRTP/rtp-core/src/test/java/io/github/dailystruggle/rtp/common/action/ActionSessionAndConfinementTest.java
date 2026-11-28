@@ -255,8 +255,8 @@ class ActionSessionAndConfinementTest {
     serverAccessor.addPlayer(p2);
 
     // Setup Shape Factory for Square lobby shape
-    io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
-        new io.github.dailystruggle.rtp.common.factory.Factory<>();
+    net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
+        new net.leaf.yaml.factory.Factory<>();
     shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
     FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
@@ -594,8 +594,8 @@ class ActionSessionAndConfinementTest {
     serverAccessor.addPlayer(mockP1);
     serverAccessor.addPlayer(mockP2);
 
-    io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
-        new io.github.dailystruggle.rtp.common.factory.Factory<>();
+    net.leaf.yaml.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
+        new net.leaf.yaml.factory.Factory<>();
     shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
     FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 

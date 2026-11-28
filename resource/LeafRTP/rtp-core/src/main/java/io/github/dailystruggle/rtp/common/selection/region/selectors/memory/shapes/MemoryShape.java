@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.predict.DistributionSampler;
+import net.leaf.predict.DistributionSampler;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
@@ -2539,8 +2539,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       // Lowest power of 2 at or under standard server view distance (default 10 -> 8 chunks)
       int viewDistance = 10;
       if (io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get() != null) {
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> parser =
-            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+        net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> parser =
+            (net.leaf.yaml.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
                 io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (parser != null) {
           Number n = parser.getNumber(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.viewDistanceSelect, 10L);

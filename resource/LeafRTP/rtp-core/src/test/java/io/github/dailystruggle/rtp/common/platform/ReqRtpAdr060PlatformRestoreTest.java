@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.platform;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.api.platform.BlockDelta;
+import net.leaf.schematics.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
 import io.github.dailystruggle.rtp.common.database.options.H2DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;

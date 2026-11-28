@@ -26,7 +26,7 @@ One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-lic
 ## Contents
 
 - [What servers use it for](#what-servers-use-it-for)
-- [Why LeafRTP](#why-leafrtp)
+- [Design highlights](#design-highlights)
 - [Quick start](#quick-start)
 - [Features](#features)
 - [Supported platforms](#supported-platforms)
@@ -52,7 +52,7 @@ One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-lic
 
 ---
 
-## Why LeafRTP
+## Design highlights
 
 Speed is the obvious part. These are the other things it's built to get right.
 

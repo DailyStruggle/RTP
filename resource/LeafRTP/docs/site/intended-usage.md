@@ -60,7 +60,7 @@ This spatial memory is tied to the region's specific shape and bounds - which is
 
 ---
 
-## Why a shape change wipes a region's memory
+## Shape changes and region memory
 
 A region's **shape** is its geometry - the boundary (circle, square, ...), size, and center that decide which coordinates are eligible. The cache and failure map are indexed against the exact coordinate set the shape produces (the engine maps the 2D area onto a 1D Archimedean spiral, and every cached or failed spot is a position in that sequence).
 

@@ -387,7 +387,55 @@ class PrefabCommandTest {
         Map<String, List<String>> params = new HashMap<>();
         params.put("id", List.of("low-performance"));
         boolean result = rb.onCommand(caller, params, null);
-        assertFalse(result, "rollback stub returns false until 4b lands");
+        assertTrue(result, "valid rollback command arguments must dispatch async check and return true");
+    }
+
+    @Test
+    void prefabCommands_offloadDiskIoToAsyncScheduler() throws Exception {
+        java.util.List<Runnable> queuedAsync = new java.util.ArrayList<>();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler delegate =
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler queuingScheduler =
+                org.mockito.Mockito.spy(delegate);
+        org.mockito.Mockito.doAnswer(inv -> {
+            queuedAsync.add(inv.getArgument(0));
+            return null;
+        }).when(queuingScheduler).runTaskAsynchronously(org.mockito.Mockito.any(Runnable.class));
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(queuingScheduler);
+
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabApplyCmd apply = new PrefabApplyCmd(null, store);
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        PrefabRollbackCmd rollback = new PrefabRollbackCmd(null);
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        Map<String, List<String>> params = Map.of("id", List.of("low-performance"));
+
+        // 1. PrefabApplyCmd offloads snapshotLiveBaseline + nonce minting to async scheduler
+        assertTrue(apply.onCommand(caller, params, null));
+        assertEquals(0, store.size(), "PrefabApplyCmd must not snapshot disk and mint nonce synchronously on command thread");
+        assertEquals(1, queuedAsync.size());
+        queuedAsync.remove(0).run();
+        assertEquals(1, store.size(), "Queued async apply task must mint pending nonce entry");
+
+        // 2. PrefabConfirmCmd consumes nonce synchronously (replay protection) and offloads disk writes to async scheduler
+        java.io.File perfFile = new java.io.File(tempDir.toFile(), "advanced/performance.yml");
+        assertTrue(confirm.onCommand(caller, params, null));
+        assertEquals(0, store.size(), "Nonce must be consumed immediately on command thread");
+        assertFalse(perfFile.exists(), "PrefabConfirmCmd must not write files synchronously on command thread");
+        assertEquals(1, queuedAsync.size());
+        queuedAsync.remove(0).run();
+        queuedAsync.clear();
+        assertTrue(perfFile.exists(), "Queued async confirm task must write advanced/performance.yml");
+
+        // 3. PrefabRollbackCmd offloads .bak restoration to async scheduler
+        Path bakPath = perfFile.toPath().resolveSibling("performance.yml.bak.1000");
+        java.nio.file.Files.writeString(bakPath, "period: 42\n");
+        assertTrue(rollback.onCommand(caller, params, null));
+        assertTrue(java.nio.file.Files.exists(bakPath), "PrefabRollbackCmd must not consume .bak synchronously on command thread");
+        assertEquals(1, queuedAsync.size());
+        queuedAsync.remove(0).run();
+        assertFalse(java.nio.file.Files.exists(bakPath), "Queued async rollback task must consume .bak file");
     }
 
     @Test

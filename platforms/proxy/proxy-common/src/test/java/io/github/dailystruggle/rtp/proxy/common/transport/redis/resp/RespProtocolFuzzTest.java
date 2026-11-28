@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis.resp;
 
+import net.leaf.database.resp.RespException;
+import net.leaf.database.resp.RespProtocol;
 import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -19,7 +21,7 @@ class RespProtocolFuzzTest {
         try {
             ByteArrayInputStream in = new ByteArrayInputStream(data);
             RespProtocol.readReply(in);
-        } catch (RespException | IOException | NumberFormatException expected) {
+        } catch (RespException | IOException expected) {
             // Expected safe fail-closed exceptions for corrupt or out-of-bounds streams
         }
     }

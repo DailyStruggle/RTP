@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Progressive, world-wide, coarse-first chunk-biome survey feeding {@link WorldBiomeStore} (ADR-104 §4.6).
@@ -59,10 +61,10 @@ public final class WorldLandSurvey {
     private final Set<Long> missing = new HashSet<>();
     private final boolean truncated;
     private final Deque<int[]> priority = new ArrayDeque<>();
-    private int level;
-    private int cursor;
-    private long decodes;
-    private int filesRead;
+    private final AtomicInteger level = new AtomicInteger();
+    private final AtomicInteger cursor = new AtomicInteger();
+    private final AtomicLong decodes = new AtomicLong();
+    private final AtomicInteger filesRead = new AtomicInteger();
 
     /**
      * @param regionFiles listed region-file coordinates, or {@code null} to probe around the origin
@@ -145,21 +147,21 @@ public final class WorldLandSurvey {
 
     /** Current pass ({@code 0..FINEST_LEVEL}); {@code LEVELS} once every pass finished. */
     public int level() {
-        return level;
+        return level.get();
     }
 
     /** Files visited in the current pass. */
     public int cursor() {
-        return cursor;
+        return cursor.get();
     }
 
     /** Sampled reads that returned land. */
     public int filesRead() {
-        return filesRead;
+        return filesRead.get();
     }
 
     public long decodes() {
-        return decodes;
+        return decodes.get();
     }
 
     /** {@code true} when the tile cap left region files out. */
@@ -169,12 +171,13 @@ public final class WorldLandSurvey {
 
     /** Overall progress in [0, 1] across the three passes. */
     public double progress() {
-        if (files.isEmpty() || level >= BiomeBinCodec.LEVELS) return 1.0;
-        return (level + cursor / (double) files.size()) / BiomeBinCodec.LEVELS;
+        int curLevel = level.get();
+        if (files.isEmpty() || curLevel >= BiomeBinCodec.LEVELS) return 1.0;
+        return (curLevel + cursor.get() / (double) files.size()) / BiomeBinCodec.LEVELS;
     }
 
     public boolean isDone() {
-        return level >= BiomeBinCodec.LEVELS && priority.isEmpty();
+        return level.get() >= BiomeBinCodec.LEVELS && priority.isEmpty();
     }
 
     /**
@@ -225,13 +228,14 @@ public final class WorldLandSurvey {
                     continue;
                 }
             } else {
-                if (cursor >= files.size()) {
-                    level++;
-                    cursor = 0;
+                int cur = cursor.get();
+                if (cur >= files.size()) {
+                    level.incrementAndGet();
+                    cursor.set(0);
                     continue;
                 }
-                f = files.get(cursor++);
-                lvl = level;
+                f = files.get(cursor.getAndIncrement());
+                lvl = level.get();
                 if (!listed && lvl > 0 && missing.contains(BiomeBinCodec.binKey(f[0], f[1]))) continue;
             }
             visits++;
@@ -259,14 +263,14 @@ public final class WorldLandSurvey {
             cost += idx.length;
             local = sample(rx, rz, idx);
         }
-        decodes += cost;
+        decodes.addAndGet(cost);
         if (local.isEmpty()) {
             if (!listed) {
                 missing.add(BiomeBinCodec.binKey(rx, rz));
                 return new int[]{cost, 0, -1};
             }
         } else {
-            filesRead++;
+            filesRead.incrementAndGet();
         }
         boolean changed = store.apply(rx, rz, y, lvl, idx, local, m);
         return new int[]{cost, changed ? 1 : 0, lvl};

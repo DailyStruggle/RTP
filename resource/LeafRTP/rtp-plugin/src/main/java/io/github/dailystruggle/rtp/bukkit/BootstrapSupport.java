@@ -18,13 +18,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
 
 /**
- * Shared bootstrap helpers used by both {@code RTPBukkitPlugin} (full / Pro) and
- * {@code io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin} (ADR-024).
+ * Shared bootstrap helpers used by {@link RTPBukkitPlugin}.
  *
- * <p>The two bootstraps must remain top-to-bottom readable with no {@code if (lite)}
- * conditionals. Genuinely shared steps live here so both classes call the same
- * helpers; genuinely divergent steps (login cache, language bootstrap, integrations,
- * effect parsing, Folia branch) stay in {@code RTPBukkitPlugin} alone.
+ * <p>Keeps {@code RTPBukkitPlugin} top-to-bottom readable by housing reflection-based
+ * server-model wiring, neutral command registration, and startup-task draining.
  *
  * <p>This class is intentionally package-private at construction time - it is a
  * static-helper holder, not a service.
@@ -37,12 +34,11 @@ public final class BootstrapSupport {
      * Resolve the server model, instantiate the matching {@link RTPServerAccessor}
      * and {@link RTPScheduler}, and assign them to the static {@code RTP} fields.
      *
-     * <p>Mirrors the reflection block at the head of both bootstraps' {@code onEnable}.
-     * Returns {@code true} on success; the caller is responsible for {@code onDisable()}
+     * <p>Returns {@code true} on success; the caller is responsible for {@code onDisable()}
      * on failure.
      *
-     * @param plugin the JavaPlugin instance (full or lite bootstrap)
-     * @param logTag short tag inserted in lifecycle logs ("LIFECYCLE" or "LIFECYCLE-LITE")
+     * @param plugin the JavaPlugin instance
+     * @param logTag short tag inserted in lifecycle logs ("LIFECYCLE")
      * @return {@code true} on success, {@code false} if reflection failed
      */
     public static boolean wireServerAccessorAndScheduler(JavaPlugin plugin, String logTag) {

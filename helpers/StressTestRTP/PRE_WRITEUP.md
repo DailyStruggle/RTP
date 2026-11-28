@@ -83,7 +83,7 @@ to match.
 | Client load | 3 real OPed accounts, concurrency 4, burst 10 | No fake-player infrastructure. |
 | Server JVM | Java 21, `-Xmx` 16 GB, default G1GC | REQ-RTP-SYS-001. |
 
-**Why the world got bigger.** At 4096 blocks the whole selectable area is small
+**16,384-block radius rationale.** At 4096 blocks the whole selectable area is small
 enough that every engine's cache converges on a few hundred region files, the OS
 page cache absorbs the reads, and cached candidates are reused before they can
 cost anything. That makes every cache look free, which is the one thing the
@@ -141,7 +141,7 @@ Test A: Burst Saturation ("Faster 4,096")     Test B: Steady-State Paced ("Slowe
 • Memory Churn: JFR-attributed target package bytes allocated across 4,096 attempts.
 ```
 
-#### Why Test A Matters (Burst Saturation / Queue Clearance)
+#### Test A: Burst Saturation / Queue Clearance
 When multiple players join simultaneously, a faction runs an automated command script, or an
 adversary attempts to DoS the server via command spam, how does each engine behave?
 Test A runs unthrottled with `immediate-redispatch: true` and `per-player-gap-ticks: 0`. It
@@ -151,7 +151,7 @@ measures:
 3. **Resilience & Watchdogs:** Does the engine lock up region threads, trip Folia watchdogs,
    or crash into multi-second GC pauses?
 
-#### Why Test B Matters (Steady-State Server Overhead)
+#### Test B: Steady-State Server Overhead
 During ordinary gameplay, player traffic is paced. An administrator wants to know:
 *"At 5 teleports per second, which plugin introduces the least lag and jitter?"*
 Comparing gross CPU in Test A penalizes fast engines for executing more work per second.
@@ -164,7 +164,7 @@ isolating pure algorithmic overhead:
    collection pauses while recycling candidate objects.
 4. **Off-Tick Chunk Share:** Percentage of chunk reads performed asynchronously (S-005 compliance).
 
-#### Spatial Analysis Parity (Why Constant N is Essential)
+#### Spatial Analysis Parity (Constant N)
 Nearest-neighbor spatial metrics like the Clark-Evans dispersion index ($R = \bar{r}_A / \bar{r}_E$)
 rely on expected Poisson distance $\bar{r}_E = 1 / (2\sqrt{\rho})$, where spatial point density
 $\rho = N / A$. If $N$ diverges across plugins (e.g. 130,000 dots vs 16,000 dots within the same

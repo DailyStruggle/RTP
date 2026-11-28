@@ -14,7 +14,7 @@ import java.util.logging.Level;
 
 /**
  * {@code /rtp admin setup radius radius=<distance>}
- * Configures the region radius preset or custom distance via {@link io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser}.
+ * Configures the region radius preset or custom distance via {@link net.leaf.units.DistanceParser}.
  */
 public class SetupRadiusCmd extends AbstractSetupStepCmd {
 

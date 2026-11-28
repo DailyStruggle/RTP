@@ -1,6 +1,6 @@
 package io.github.dailystruggle.database.api;
 
-import io.github.dailystruggle.rtp.common.database.pool.MiniConnectionPool;
+import net.leaf.database.pool.MiniConnectionPool;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Properties;

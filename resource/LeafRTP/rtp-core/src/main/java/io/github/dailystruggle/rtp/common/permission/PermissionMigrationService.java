@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.permission;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;

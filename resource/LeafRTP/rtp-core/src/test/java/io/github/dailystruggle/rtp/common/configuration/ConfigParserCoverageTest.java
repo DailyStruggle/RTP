@@ -1,13 +1,15 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import net.leaf.yaml.configuration.ConfigBackups;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlConfig;
+import net.leaf.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import net.leaf.yaml.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import net.leaf.yaml.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

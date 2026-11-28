@@ -4,14 +4,14 @@ Cross-platform declarative menu, navigation session, expiring click-token, and a
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:menu-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:menu-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:menu-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:menu-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:menu-api:3.3.1'
+    implementation 'io.github.leafcraftdev:menu-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:menu-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:menu-api:1.0.0'
 }
 ```
 

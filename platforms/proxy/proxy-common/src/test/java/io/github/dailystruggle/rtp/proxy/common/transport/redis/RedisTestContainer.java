@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import net.leaf.database.resp.RespPool;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;

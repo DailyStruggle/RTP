@@ -132,6 +132,7 @@ function intArg(flag, envName, def) {
 
 const host = getArg('--host', 'BENCH_HOST', '127.0.0.1');
 const port = intArg('--port', 'BENCH_PORT', 25565);
+const fakeHost = getArg('--fake-host', 'BENCH_FAKE_HOST', '');
 const count = Math.max(1, intArg('--count', 'BENCH_COUNT', 64));
 const prefix = getArg('--prefix', 'BENCH_PREFIX', 'bench_');
 const startIndex = Math.max(0, intArg('--start-index', 'BENCH_START_INDEX', 0));
@@ -142,6 +143,7 @@ const joinDelayMs = Math.max(0, intArg('--join-delay-ms', 'BENCH_JOIN_DELAY_MS',
 const viewDistanceRaw = getArg('--view-distance', 'BENCH_VIEW_DISTANCE', '2');
 const viewDistance = /^\d+$/.test(viewDistanceRaw) ? Math.max(2, parseInt(viewDistanceRaw, 10)) : viewDistanceRaw;
 const physicsEnabled = hasFlag('--physics', 'BENCH_PHYSICS');
+const activeWalk = hasFlag('--active-walk', 'BENCH_ACTIVE_WALK');
 const fullPlugins = hasFlag('--full-plugins', 'BENCH_FULL_PLUGINS');
 const reconnectBaseMs = Math.max(500, intArg('--reconnect-base-ms', null, 5000));
 const reconnectMaxMs = Math.max(reconnectBaseMs, intArg('--reconnect-max-ms', null, 60000));
@@ -155,6 +157,10 @@ const logChat = hasFlag('--log-chat', null);
 const keepWorld = hasFlag('--keep-world', 'BENCH_KEEP_WORLD');
 const fuzzTaskMode = hasFlag('--fuzz-task-mode', 'BENCH_FUZZ_TASK_MODE');
 const churnRename = hasFlag('--churn-rename', 'BENCH_CHURN_RENAME');
+const autonomousPolicy = hasFlag('--autonomous-policy', 'BENCH_AUTONOMOUS_POLICY');
+const policyMixRaw = getArg('--policy-mix', 'BENCH_POLICY_MIX', 'explorer,house,mineshaft,caving');
+const policyStepMs = Math.max(100, intArg('--policy-step-ms', 'BENCH_POLICY_STEP_MS', 400));
+const policyRtpCmd = getArg('--policy-rtp-cmd', 'BENCH_POLICY_RTP_CMD', '');
 const fuzzControlRaw = getArg('--fuzz-control', 'BENCH_FUZZ_CONTROL', '');
 const fuzzMode = fuzzControlRaw !== '';
 const fuzzSpawnTimeoutMs = Math.max(1000, intArg('--fuzz-spawn-timeout-ms', null, 30000));
@@ -243,6 +249,8 @@ const BUSY_RE = /already teleporting|already rtp'?ing|have some patience|cool ?d
 
 const stats = {
   connects: 0, spawns: 0, kicks: 0, ends: 0, errors: 0, deaths: 0, busyChat: 0, swaps: 0,
+  policySteps: 0, blocksDug: 0, blocksPlaced: 0, chunksVisited: 0,
+  visitedChunkSet: new Set(),
   kickReasons: new Map()
 };
 // Teleport (server position packet) times seen by this worker's bots in the last 60 s.
@@ -367,7 +375,7 @@ function connect(state) {
   state.online = false;
   let bot;
   try {
-    bot = mineflayer.createBot({
+    const botOpts = {
       host,
       port,
       username: state.username,
@@ -379,7 +387,20 @@ function connect(state) {
       hideErrors: true,
       checkTimeoutInterval: 60 * 1000,
       plugins: pluginOverrides
-    });
+    };
+    if (fakeHost) botOpts.fakeHost = fakeHost;
+    bot = mineflayer.createBot(botOpts);
+    const origWrite = bot._client.write.bind(bot._client);
+    const hasTickEnd = !!(activeVersion && minecraftData(activeVersion)?.protocol?.play?.toServer?.types?.packet_tick_end);
+    if (hasTickEnd) {
+      bot._client.write = function (name, params) {
+        const res = origWrite(name, params);
+        if (bot._client.state === 'play' && (name === 'position' || name === 'position_look' || name === 'look' || name === 'flying')) {
+          origWrite('tick_end', {});
+        }
+        return res;
+      };
+    }
   } catch (err) {
     stats.errors++;
     console.error(`[bench] [${state.username}] createBot failed: ${err.message}`);
@@ -399,6 +420,13 @@ function connect(state) {
 
   bot.on('forcedMove', () => {
     const now = Date.now();
+    if (bot.entity && bot.entity.position) {
+      state.walkAnchor = {
+        x: bot.entity.position.x,
+        y: bot.entity.position.y,
+        z: bot.entity.position.z
+      };
+    }
     // Login and respawn positions are not teleports.
     if (!state.online || now - state.spawnAt < 3000) return;
     state.lastTp = now;
@@ -410,7 +438,44 @@ function connect(state) {
     state.online = true;
     state.spawnAt = state.lastTp = Date.now();
     state.failures = 0; // a clean spawn resets backoff
+    if (bot.entity && bot.entity.position) {
+      state.walkAnchor = {
+        x: bot.entity.position.x,
+        y: bot.entity.position.y,
+        z: bot.entity.position.z
+      };
+    }
     console.log(`[bench] [${state.username}] spawned (${onlineCount()}/${count} online)`);
+    if (activeWalk) {
+      let angle = (state.username.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 628) / 100.0;
+      const walkTimer = setInterval(() => {
+        if (!state.online || !bot._client || bot._client.state !== 'play' || !state.walkAnchor) return;
+        angle += 0.15;
+        const nx = state.walkAnchor.x + Math.cos(angle) * 2.0;
+        const ny = state.walkAnchor.y;
+        const nz = state.walkAnchor.z + Math.sin(angle) * 2.0;
+        const yawDeg = ((angle * 180.0 / Math.PI) % 360.0) - 180.0;
+        if (bot.entity && bot.entity.position) {
+          bot.entity.position.set(nx, ny, nz);
+        }
+        try {
+          bot._client.write('position_look', {
+            x: nx,
+            y: ny,
+            z: nz,
+            yaw: yawDeg,
+            pitch: 0,
+            onGround: true,
+            flags: { onGround: true, hasHorizontalCollision: false }
+          });
+        } catch (e) { /* socket closing */ }
+      }, 100);
+      walkTimer.unref();
+      bot.once('end', () => clearInterval(walkTimer));
+    }
+    if (autonomousPolicy) {
+      startAutonomousPolicyLoop(state, bot);
+    }
   });
 
   bot.on('death', () => {
@@ -514,7 +579,11 @@ function writeStatsFile() {
   if (!statsFile) return;
   const { rx, tx } = wireTotals();
   const rec = { t: Date.now(), w: isWorker ? Number(process.env.BENCH_WORKER_ID) : 0,
-    rx, tx, online: onlineCount() };
+    rx, tx, online: onlineCount(),
+    policy_steps: stats.policySteps,
+    blocks_dug: stats.blocksDug,
+    blocks_placed: stats.blocksPlaced,
+    chunks_visited: stats.chunksVisited };
   if (swapStuck) rec.swaps = stats.swaps;
   const line = JSON.stringify(rec) + '\n';
   try { fs.appendFileSync(statsFile, line); } catch (e) {
@@ -539,8 +608,62 @@ function printStats(prefixLabel) {
     + ` kicks=${stats.kicks} ends=${stats.ends} errors=${stats.errors} deaths=${stats.deaths}`
     + ` busy_chat=${stats.busyChat} queued=${joinQueue.length} rss=${Math.round(mem.rss / 1048576)}MB`
     + ` rx_mb=${(w.rx / 1048576).toFixed(1)} tx_mb=${(w.tx / 1048576).toFixed(1)}`
+    + (autonomousPolicy ? ` steps=${stats.policySteps} dug=${stats.blocksDug} placed=${stats.blocksPlaced} chunks=${stats.chunksVisited}` : '')
     + (swapStuck ? ` swaps=${stats.swaps}` : '')
     + ` heap=${Math.round(mem.heapUsed / 1048576)}MB${top ? ' top_kicks: ' + top : ''}`);
+}
+
+function startAutonomousPolicyLoop(state, bot) {
+  const mix = policyMixRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const presets = mix.length > 0 ? mix : ['explorer', 'house', 'mineshaft', 'caving'];
+  const slotIdx = states.indexOf(state);
+  const globalIdx = startIndex + (slotIdx >= 0 ? slotIdx : 0);
+  const presetName = presets[globalIdx % presets.length];
+  const weights = decodePolicyWeights(presetName, 'autonomous_policy');
+  const rng = makeIntRng(1337 + globalIdx * 31);
+  const logits = new Int32Array(POLICY_NUM_ACTIONS);
+  state.botIdx = globalIdx;
+  state.persona = 'distinct';
+  state.conn = { spawned: true, ended: false, bot };
+  const ts = ensureTaskState(state, (globalIdx & 1) ? 32 : -32);
+  ts.yawIdx = globalIdx & 3;
+  ensureBiometricState(state, 'distinct');
+  const autoEp = {
+    id: `auto_${globalIdx}`,
+    cmd: policyRtpCmd || 'rtp',
+    autonomousSwarm: true,
+    aborted: null,
+    wakers: new Set(),
+    emit: () => {}
+  };
+  let stepIdx = 0;
+  const stepOnce = async () => {
+    if (shuttingDown || !state.online || state.bot !== bot) {
+      if (state.conn) state.conn.ended = true;
+      return;
+    }
+    try {
+      const ctx = computeContextInt8(bot, state);
+      const skillIdx = selectPolicyActionInt(weights, ctx, 10, rng, logits);
+      // Only send /rtp chat command if --policy-rtp-cmd was explicitly configured
+      const effIdx = (skillIdx === 1 && !policyRtpCmd) ? 3 : skillIdx;
+      const res = await executeMicroSkill(autoEp, state, bot, effIdx, stepIdx++);
+      stats.policySteps++;
+      if (res && res.skill) {
+        if (res.skill.startsWith('harvest_') || res.skill.startsWith('dig_')) stats.blocksDug++;
+        else if (res.skill.startsWith('place_')) stats.blocksPlaced++;
+      }
+      const p = posOf(bot) || ts.pos;
+      if (p) {
+        stats.visitedChunkSet.add(`${Math.floor(p.x) >> 4},${Math.floor(p.z) >> 4}`);
+        stats.chunksVisited = stats.visitedChunkSet.size;
+      }
+    } catch (e) { /* ignore transient step errors */ }
+    if (!shuttingDown && state.online && state.bot === bot) {
+      setTimeout(stepOnce, policyStepMs).unref();
+    }
+  };
+  setTimeout(stepOnce, 250 + (globalIdx % 8) * 50).unref();
 }
 
 function shutdown(signal) {
@@ -2541,25 +2664,35 @@ async function executeMicroSkill(ep, bs, bot, skillIdx, stepIdx) {
       if (bot) await fuzzMove(ep, bs, wireAct);
       break;
     }
-    case 'step_away_anchor': {
-      const dx = dirX * 2;
-      const dz = dirZ * 2;
-      ts.pos.x = (ts.pos.x + dx) | 0;
-      ts.pos.z = (ts.pos.z + dz) | 0;
-      ts.yawIdx = (ts.yawIdx + 1) & 3;
-      const cellKey = `${ts.pos.x >> 2},${ts.pos.z >> 2}`;
-      if (!ts.chunksExplored.has(cellKey)) {
-        ts.chunksExplored.add(cellKey);
-        progressed = true;
-        if ((ts.chunksExplored.size & 1) === 0) {
-          ts.cavesFound = (ts.cavesFound + 1) | 0;
-          ts.inv.emeralds = (ts.inv.emeralds + 1) | 0;
+      case 'step_away_anchor': {
+        const stride = (ep && ep.autonomousSwarm) ? 8 : 4;
+        const dx = dirX * stride;
+        const dz = dirZ * stride;
+        ts.pos.x = (ts.pos.x + dx) | 0;
+        ts.pos.z = (ts.pos.z + dz) | 0;
+        ts.awayLegStep = ((ts.awayLegStep || 0) + 1) | 0;
+        const legLen = Math.max(2, ts.awayLegLength || 2);
+        if (ts.awayLegStep >= legLen) {
+          ts.awayLegStep = 0;
+          ts.yawIdx = (ts.yawIdx + 1) & 3;
+          ts.awayTurnCount = ((ts.awayTurnCount || 0) + 1) | 0;
+          if ((ts.awayTurnCount & 1) === 0) {
+            ts.awayLegLength = Math.min(32, legLen + 1);
+          }
         }
+        const cellKey = `${ts.pos.x >> 2},${ts.pos.z >> 2}`;
+        if (!ts.chunksExplored.has(cellKey)) {
+          ts.chunksExplored.add(cellKey);
+          progressed = true;
+          if ((ts.chunksExplored.size & 1) === 0) {
+            ts.cavesFound = (ts.cavesFound + 1) | 0;
+            ts.inv.emeralds = (ts.inv.emeralds + 1) | 0;
+          }
+        }
+        wireAct = { a: 'move', dx, dz, ms: 100 };
+        if (bot) await fuzzMove(ep, bs, wireAct);
+        break;
       }
-      wireAct = { a: 'move', dx, dz, ms: 100 };
-      if (bot) await fuzzMove(ep, bs, wireAct);
-      break;
-    }
     case 'harvest_nearest': {
       const bonus = ts.inv.tool_tier >= 3 ? 2 : 1;
       if (ts.pos.y < 58 || ts.cavesFound >= 2) {

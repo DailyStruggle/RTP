@@ -238,7 +238,7 @@ Hitting the density was the easy half and would have been misleading on its own.
 
 The first attempt had the right density and the wrong world: a coastline seven times too smooth and 14 unusable patches where the save has 1 199. Both errors run in the direction that flatters a run-length table, so a mask calibrated on density alone would have improved every figure in sections 8 and 9 for free. Deepening the elevation octaves and shortening the pond wavelength closed the boundary and mixed-cell gaps, but left patch size at 1.93x - still too smooth.
 
-**Why an interpolated field cannot fix that.** Value noise is continuous, so its smallest feature is a few lattice cells across; no wavelength produces a one-chunk water body, and the save's unusable set is dominated *in count* by exactly those. A threshold on the raw lattice - one independent draw per chunk - is the only term that can, and it is what closed the axis: patch size 1.93x to **0.77x**. The rate was swept rather than guessed (0.045 over-dotted at 0.32x, 0.015 read 0.62x, 0.008 reads 0.77x), because over-dotting is the opposite error and equally misleading - it manufactures short runs. Boundary fraction runs 1.35x as a consequence, so the mock is now slightly rough where it was previously slightly smooth.
+**Interpolated fields cannot reproduce one-chunk ponds.** Value noise is continuous, so its smallest feature is a few lattice cells across; no wavelength produces a one-chunk water body, and the save's unusable set is dominated *in count* by exactly those. A threshold on the raw lattice - one independent draw per chunk - is the only term that can, and it is what closed the axis: patch size 1.93x to **0.77x**. The rate was swept rather than guessed (0.045 over-dotted at 0.32x, 0.015 read 0.62x, 0.008 reads 0.77x), because over-dotting is the opposite error and equally misleading - it manufactures short runs. Boundary fraction runs 1.35x as a consequence, so the mock is now slightly rough where it was previously slightly smooth.
 
 **Lava is bounded to one chunk and made rare.** It is hashed per chunk rather than drawn from a field, so a pool cannot grow, at a rate of 0.0015 of inland chunks. The real save measured a lava share of 0.000 at chunk-centre granularity, so lava is present for shape, not for area; the suite asserts the share stays below 0.005 rather than reporting it.
 
@@ -309,7 +309,7 @@ On both curves and both worlds, `gap = 64` and above discards over 90% of usable
 
 The test-scope coalescer is a transcription of `MemoryShape#coalesceRuns` and is asserted **equal run-for-run to a real `flushAndRebuild`** at every swept gap before anything is compared against it (1 523 / 1 335 / 721 / 267 / 2 / 2 runs at gaps 2 / 3 / 8 / 16 / 64 / 256). Widths are not exposed by shipped API and the dynamic rule needs them on both sides of every gap, which is why the table is rebuilt in test scope rather than read out.
 
-#### 12a. Why a flat loss share is the wrong denominator
+#### 12a. Flat loss share as the wrong denominator
 
 Every accuracy figure in sections 8-11 counted discarded usable chunks and divided, which prices all usable ground alike. It is not alike. Traffic lights: ocean is red, land is green, and a beach is yellow - but only when the water beside it is a **large body**. Land beside a one-chunk pool is not marginal at all; the pool is an obstacle, not a frontier.
 

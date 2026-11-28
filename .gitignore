@@ -169,6 +169,8 @@ helpers/StressTestRTP/runs/
 *.log.gz
 # Agent / contributor scratch notes (per .junie/AGENTS.md, Checklist-Based State Tracking)
 docs/dev/scratch/
+.atlas-swap/
+**/.atlas-swap/
 
 # Retired GitHub wiki working clone (separate RTP.wiki.git repo, never part of this repo).
 # Its content now lives under docs/ (operator reference in docs/admin/, narrative in docs/site/).
@@ -196,6 +198,7 @@ scripts/release/generated/
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.
 /site/
+/dist/
 
 # Node.js dependencies and devstack client artifacts
 node_modules/
@@ -209,7 +212,8 @@ rtp-core/*.png
 rtp-core/docs/
 resource/LeafRTP/rtp-core/*.png
 resource/LeafRTP/rtp-core/docs/
-# Nested module path and plugin data dir produced when a test runs with rtp-core/ as cwd
+# Nested module path and plugin data dir produced when a test or CLI runs with repo/module root as cwd
+/plugins/
 rtp-core/rtp-core/
 rtp-core/plugins/
 resource/LeafRTP/rtp-core/rtp-core/

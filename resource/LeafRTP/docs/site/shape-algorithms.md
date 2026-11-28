@@ -220,7 +220,7 @@ Strategies: Standard PRP vs. Best-of-3 Tournament vs. Dyadic Interleaved Subsets
 
 ![Spacing Strategies Comparison](../assets/img/spacing_strategies_comparison_chart.png)
 
-### Why Selections Are Clearly Spaced in This Benchmark
+### Spacing Factors in This Benchmark
 
 When evaluating this visual benchmark, readers often notice that placements appear distinct, crisp, and separated by wide open territory compared to dense all-time simulation runs. This clarity is driven by four algorithmic and experimental design factors:
 

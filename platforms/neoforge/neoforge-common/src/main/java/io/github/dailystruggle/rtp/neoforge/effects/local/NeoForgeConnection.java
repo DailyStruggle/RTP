@@ -11,7 +11,7 @@ import java.lang.reflect.Modifier;
  * connection and its single-arg packet {@code send} method, shared by the
  * NeoForge TITLE and SOUND effect prototypes.
  *
- * <p><b>Why capability- (signature-) based rather than name-based.</b> The
+ * <p><b>Signature-based resolution:</b> the
  * earlier implementation matched the connection field by the literal type name
  * {@code ServerGamePacketListenerImpl} and the send method by the literal name
  * {@code send}. Both of those identifiers drift in the MC 1.21.11 mojmap (the

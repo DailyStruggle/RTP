@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.tools.MiniMessageRenderer;
 import io.github.dailystruggle.server.api.BlockPos3i;
 import io.github.dailystruggle.server.api.BookMenuSpec;
 import io.github.dailystruggle.server.api.CallerLocation;
+import io.github.dailystruggle.server.api.ManagedBlockingIoExecutor;
 import io.github.dailystruggle.server.api.MiniMessageColorExpander;
 import io.github.dailystruggle.server.api.PlayerLifecycleHook;
 import io.github.dailystruggle.server.api.PlayerSleepSnapshot;
@@ -22,6 +23,7 @@ import io.github.dailystruggle.server.api.WorldEventHook;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -33,6 +35,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
@@ -106,6 +109,8 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   private final AtomicLong lastRepeatingTickWallNanos = new AtomicLong(Long.MIN_VALUE);
   private volatile double sampledTickIntervalNanos = 50_000_000.0;
   private volatile double sampledWorkDurationNanos = 500_000.0;
+  private final ManagedBlockingIoExecutor blockingIoExecutor =
+      new ManagedBlockingIoExecutor("LeafBukkit");
 
   /** No-arg constructor for subclasses that bind a {@link Plugin} later via {@link #bindPlugin}. */
   protected BukkitPluginServerAccessor() {
@@ -291,8 +296,18 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   @Override
   public Set<String> getOnlinePlayerNames() {
     Set<String> out = new HashSet<>();
-    for (Player p : Bukkit.getOnlinePlayers()) {
-      out.add(p.getName());
+    for (PlayerSleepSnapshot snap : playerSleepSnapshotCache.values()) {
+      if (snap != null && snap.playerName() != null) {
+        out.add(snap.playerName());
+      }
+    }
+    try {
+      for (Player p : Bukkit.getOnlinePlayers()) {
+        if (p != null && p.getName() != null) {
+          out.add(p.getName());
+        }
+      }
+    } catch (RuntimeException ignored) {
     }
     return Collections.unmodifiableSet(out);
   }
@@ -348,10 +363,14 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
                 return noopTaskHandle();
               } catch (RuntimeException ex) {
-                logger().log(Level.WARNING, "Async task dispatch fallback", ex);
+                logger().log(Level.WARNING, "Async task dispatch failed", ex);
+                return noopTaskHandle();
               }
             }
-            task.run();
+            logger()
+                .log(
+                    Level.WARNING,
+                    "Rejected async task submission because plugin is disabled (S-005)");
             return noopTaskHandle();
           }
 
@@ -418,6 +437,21 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
             return BukkitPluginServerAccessor.this.isPrimaryThread();
           }
         });
+  }
+
+  @Override
+  public Executor blockingIoExecutor() {
+    return blockingIoExecutor;
+  }
+
+  @Override
+  public boolean shutdownBlockingIo(Duration timeout) {
+    return blockingIoExecutor.shutdownAndDrain(timeout);
+  }
+
+  /** Re-opens the managed blocking-I/O executor after a prior shutdown on plugin reload. */
+  protected void reopenBlockingIo() {
+    blockingIoExecutor.reopen();
   }
 
   private static TaskHandle noopTaskHandle() {
@@ -747,7 +781,21 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
     World world = Bukkit.getWorld(worldName);
     if (world == null) return false;
     try {
-      world.getBlockAt(x, y, z).setBlockData(getCachedBlockData(blockData), false);
+      BlockData bd = getCachedBlockData(blockData);
+      if (!isOwnedByCurrentRegion(world, x >> 4, z >> 4)) {
+        scheduleDelayedTask(
+            worldName,
+            x >> 4,
+            z >> 4,
+            () -> {
+              if (world.isChunkLoaded(x >> 4, z >> 4)) {
+                world.getBlockAt(x, y, z).setBlockData(bd, false);
+              }
+            },
+            0L);
+        return true;
+      }
+      world.getBlockAt(x, y, z).setBlockData(bd, false);
       return true;
     } catch (Exception ex) {
       logger()
@@ -846,11 +894,22 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
                 : null);
     if (target == null) return false;
     ItemStack stack = buildItemStack(spec);
-    target
-        .getInventory()
-        .addItem(stack)
-        .values()
-        .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+    Runnable deliver =
+        () -> {
+          if (!target.isOnline()) return;
+          target
+              .getInventory()
+              .addItem(stack)
+              .values()
+              .forEach(
+                  leftover ->
+                      target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+        };
+    if (isEntityOwnedByCurrentRegion(target)) {
+      deliver.run();
+    } else {
+      runOnEntityOrMain(target, deliver);
+    }
     return true;
   }
 
@@ -858,8 +917,14 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   public void dropItem(String worldName, int x, int y, int z, TaggedItemSpec spec) {
     World world = Bukkit.getWorld(worldName);
     if (world == null || spec == null) return;
+    ItemStack stack = buildItemStack(spec);
     Location dropAt = new Location(world, x + 0.5, y + 0.5, z + 0.5);
-    world.dropItemNaturally(dropAt, buildItemStack(spec));
+    if (isOwnedByCurrentRegion(world, x >> 4, z >> 4)) {
+      world.dropItemNaturally(dropAt, stack);
+    } else {
+      scheduleDelayedTask(
+          worldName, x >> 4, z >> 4, () -> world.dropItemNaturally(dropAt, stack), 0L);
+    }
   }
 
   @SuppressWarnings("deprecation")
@@ -1217,7 +1282,8 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
               litCtor.newInstance(sub.name(), brigCmd, requirement, null, null, false);
           if (argsChild != null
               && sub instanceof TreeCommand subTree
-              && !subTree.getParameterLookup().isEmpty()) {
+              && (!subTree.getParameterLookup().isEmpty()
+                  || !subTree.getCommandLookup().isEmpty())) {
             addChild.invoke(subNode, argsChild);
           }
           addChild.invoke(cmdNode, subNode);

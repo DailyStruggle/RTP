@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import net.leaf.yaml.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -137,7 +137,7 @@ public class SubReloadCmdTest {
         try {
             ActiveConfigs.set(null);
             assertFalse(cmd.subReloadSingle(UUID.randomUUID(),
-                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?>) perfParser));
+                    (net.leaf.yaml.configuration.ConfigParser<?>) perfParser));
             assertFalse(cmd.subReloadMulti(UUID.randomUUID(), null));
         } finally {
             ActiveConfigs.set(savedConfigs);
@@ -147,8 +147,8 @@ public class SubReloadCmdTest {
         assertFalse(cmd.onCommand(UUID.randomUUID(), new java.util.HashMap<>(), null) && false);
 
         // Non-Region/non-World MultiConfigParser hits finishMultiReload branch
-        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> customMulti =
-                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+        net.leaf.yaml.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> customMulti =
+                new net.leaf.yaml.configuration.MultiConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class,
                         "logging-multi",
                         "1.0",

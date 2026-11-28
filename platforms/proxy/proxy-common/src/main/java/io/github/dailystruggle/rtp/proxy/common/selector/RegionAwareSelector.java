@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  *       reservation.</li>
  * </ul>
  *
- * <p><strong>Why one selector, two call sites:</strong> operators tune curves
+ * <p><strong>Shared selector across lobby and proxy:</strong> operators tune curves
  * and weights in one place. Lobby and proxy disagree only when they observe
  * different snapshots, which is acceptable and self-corrects on the next
  * heartbeat tick.</p>

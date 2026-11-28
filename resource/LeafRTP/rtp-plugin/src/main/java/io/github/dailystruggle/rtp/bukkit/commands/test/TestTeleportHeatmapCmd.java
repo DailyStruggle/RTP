@@ -307,8 +307,8 @@ public final class TestTeleportHeatmapCmd extends BaseRTPCmdImpl {
         private final ProbeBitReport.Builder report = ProbeBitReport.forProbe(COMPONENT.id());
         private final List<MockTeleportRecord> landings = new ArrayList<>();
         private final AtomicBoolean completed = new AtomicBoolean();
-        private RTPWorld<?> world;
-        private Path outputDirectory;
+        private volatile RTPWorld<?> world;
+        private volatile Path outputDirectory;
 
         private Probe(
                 String regionName,

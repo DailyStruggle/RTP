@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
+import net.leaf.tags.safety.SafetyCompilationCache;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
@@ -87,6 +87,8 @@ final class PregenState {
     final List<String> attemptOutcomes = new ArrayList<>();
     /** ADR-110: whether native chunk loads may verify candidates; set once before dispatch. */
     LoadPurpose purpose = LoadPurpose.IMMEDIATE;
+    /** Whether {@code completeSuccess} transfers a {@link io.github.dailystruggle.rtp.api.world.ChunkReservation} in {@code GenerationResult} for immediate pipeline handoff. */
+    boolean transferReservation = false;
     /** ADR-028: backlog whose UNKNOWN entries replace shape draws; {@code null} draws from the shape. */
     @Nullable BacklogLocationBuffer backlog = null;
     /** Admission slot for a cache fill, consumed by its first native chunk load. */

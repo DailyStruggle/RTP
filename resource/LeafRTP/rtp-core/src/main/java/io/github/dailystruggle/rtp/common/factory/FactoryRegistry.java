@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import net.leaf.yaml.factory.Factory;
 import java.util.EnumMap;
 import java.util.Map;
 

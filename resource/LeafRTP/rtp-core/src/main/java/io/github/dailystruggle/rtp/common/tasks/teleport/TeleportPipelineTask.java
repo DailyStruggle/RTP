@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import net.leaf.yaml.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -26,7 +26,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
-import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
+import net.leaf.units.TemporalUnit;
 import io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
@@ -246,21 +246,20 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     teleportPostActions.add(task -> task.isRunning.set(false));
     cleanupPostActions.add(task -> task.isRunning.set(false));
   }
-
   private Phase currentPhase = Phase.SETUP;
   private final GenerationContext context;
   private final ConfigCache.Snapshot configSnapshot = ConfigCache.snapshot();
 
-  private Region region;
-  private RTPCoords coords;
-  private TeleportData teleportData;
-  private ChunkReservation reservation;
-  private ChunkSet chunkSet;
+  private volatile Region region;
+  private volatile RTPCoords coords;
+  private volatile TeleportData teleportData;
+  private volatile ChunkReservation reservation;
+  private volatile ChunkSet chunkSet;
 
   public final Map<String, String> placeholderMap = new ConcurrentHashMap<>();
-  private double distance = 0.0;
-  private double distanceFromCenter = 0.0;
-  private RTPLocation destination = null;
+  private volatile double distance = 0.0;
+  private volatile double distanceFromCenter = 0.0;
+  private volatile RTPLocation destination = null;
   // First pre-teleport player location; the post-teleport recompute would otherwise read the
   // player at the destination and report 0 when teleportData.originalCoords is absent.
   private RTPLocation originSnapshot = null;
@@ -272,7 +271,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
    * platform. Both stay {@code null} when no schematic file exists for the region.
    */
   private java.util.concurrent.CompletableFuture<
-      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic> schematicLoad;
+      net.leaf.schematics.schematic.LoadedSchematic> schematicLoad;
   private io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster;
   /**
    * ADR-058 / S-004 - the schematic source resolved for this teleport, kept so {@link #runTeleport}
@@ -280,7 +279,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
    * reached a successful paste (decode failure, no paster, or zero placed blocks). Stays
    * {@code null} when no {@code schematics/<region>.schem} file exists (the silent, expected case).
    */
-  private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
+  private net.leaf.schematics.schematic.SchematicSource schematicSource;
   /**
    * ADR-058 / REQ-RTP-S-003: footprint claim verdict, started off-thread in {@link #runLoad} once
    * the schematic decodes, so the destination region thread never joins a claim verifier.
@@ -290,10 +289,10 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
   private volatile java.util.concurrent.CompletableFuture<Boolean> schematicFootprint;
 
   /** ADR-058 arrival paste options; shared by the off-thread footprint check and the paste. */
-  static io.github.dailystruggle.rtp.api.schematic.PasteOptions arrivalPasteOptions() {
+  static net.leaf.schematics.schematic.PasteOptions arrivalPasteOptions() {
     // SURFACE_CENTER: the player lands on a standable floor in the schematic's center column.
-    return new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
-        io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER, false, true);
+    return new net.leaf.schematics.schematic.PasteOptions(
+        net.leaf.schematics.schematic.PasteAnchor.SURFACE_CENTER, false, true);
   }
 
   /**
@@ -849,7 +848,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         try {
           RTPWorld<?> schemWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
           if (schemWorld == null) schemWorld = region.getWorld();
-          io.github.dailystruggle.rtp.api.schematic.SchematicSource src =
+          net.leaf.schematics.schematic.SchematicSource src =
               (schemWorld != null) ? RegionSchematicService.resolveSource(region.name) : null;
           if (src != null) {
             // A schematic file exists for this region: from here on, any failure to actually
@@ -1079,7 +1078,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       // the schematic provides the footing the platform would have. The paste is best-effort
       // (S-004) - any skip/failure is audited and the default platform path still runs so the
       // player never lands without footing.
-      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
+      net.leaf.schematics.schematic.LoadedSchematic loadedSchematic =
           (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
       // S-004 - a region with a schematic file on disk that nonetheless reaches this point
       // with nothing loaded must not fall through to the platform silently: tell the operator
@@ -1104,7 +1103,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         // On non-Folia platforms this dispatches to the main thread / runs inline.
         // S-001: setLocation is chained after the paste/platform inside that task, so the
         // player never arrives before the footing exists; a throw there fails closed.
-        final io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedFinal =
+        final net.leaf.schematics.schematic.LoadedSchematic loadedFinal =
             loadedSchematic;
         final RTPLocation locFinal = location;
         final boolean buildPlatformFinal = buildPlatform;
@@ -1118,7 +1117,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         RTPRuntime.scheduler().runTask(locFinal, () -> {
           try {
             boolean pasted = false;
-            io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
+            net.leaf.schematics.schematic.PasteOptions pasteOptions =
                 arrivalPasteOptions();
             // Footprint claim check (sanctioned GlobalRegionVerifiers registry, never an inline
             // claim-plugin call): any protected, pending or failed verdict suppresses the paste
@@ -1130,7 +1129,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                   + "; paste suppressed (S-003), falling back to default platform.");
             } else {
               try {
-                io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
+                net.leaf.schematics.schematic.PasteResult pasteResult =
                     schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
                 if (pasteResult != null && pasteResult.placed()) {
                   pasted = true;
@@ -1536,9 +1535,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
    *     {@code false} when any cell is protected or any check errors (fail-safe)
    */
   static CompletableFuture<Boolean> schematicFootprintClearAsync(
-      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic,
+      net.leaf.schematics.schematic.LoadedSchematic schematic,
       RTPLocation at,
-      io.github.dailystruggle.rtp.api.schematic.PasteOptions options,
+      net.leaf.schematics.schematic.PasteOptions options,
       String fallbackWorldName) {
     int width = schematic.width();
     int length = schematic.length();

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
-import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import net.leaf.database.resp.RespConnection;
+import net.leaf.database.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

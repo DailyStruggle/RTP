@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import net.leaf.yaml.RtpYamlSection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
