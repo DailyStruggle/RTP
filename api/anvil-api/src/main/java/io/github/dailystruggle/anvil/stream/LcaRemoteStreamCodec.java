@@ -1069,7 +1069,7 @@ public final class LcaRemoteStreamCodec {
         int i = 0;
         int len = slabBytes.length;
         for (; i + 8 <= len; i += 8) {
-            long word = ((long) (slabBytes[i] & 0xFF))
+            long word = (slabBytes[i] & 0xFF)
                     | ((long) (slabBytes[i + 1] & 0xFF) << 8)
                     | ((long) (slabBytes[i + 2] & 0xFF) << 16)
                     | ((long) (slabBytes[i + 3] & 0xFF) << 24)
@@ -1077,7 +1077,7 @@ public final class LcaRemoteStreamCodec {
                     | ((long) (slabBytes[i + 5] & 0xFF) << 40)
                     | ((long) (slabBytes[i + 6] & 0xFF) << 48)
                     | ((long) (slabBytes[i + 7] & 0xFF) << 56);
-            accA = splitMix64(accA ^ word ^ ((long) i * 0xBF58476D1CE4E5B9L));
+            accA = splitMix64(accA ^ word ^ (i * 0xBF58476D1CE4E5B9L));
             accB = Long.rotateLeft(accB ^ word, 17) + 0x94D049BB133111EBL;
             bitPosXor ^= Long.rotateLeft(word, i & 63);
         }
@@ -1086,7 +1086,7 @@ public final class LcaRemoteStreamCodec {
             for (int shift = 0; i < len; i++, shift += 8) {
                 tail |= ((long) (slabBytes[i] & 0xFF)) << shift;
             }
-            accA = splitMix64(accA ^ tail ^ ((long) len * 0x9E3779B97F4A7C15L));
+            accA = splitMix64(accA ^ tail ^ (len * 0x9E3779B97F4A7C15L));
             accB = Long.rotateLeft(accB ^ tail, 23) ^ 0xD6E8FEB86659FD93L;
             bitPosXor ^= Long.rotateLeft(tail, len & 63);
         }
@@ -1529,7 +1529,9 @@ public final class LcaRemoteStreamCodec {
                             mLen++;
                         }
                         int mode = dist4 <= 256 ? 0 : 1;
-                        int cost = (mode == 0 ? 1 : 2) + (mLen >= (mode == 0 ? 10 : 11) ? 1 : 0);
+                        int baseCost = mode == 0 ? 1 : 2;
+                        int extraLenThreshold = mode == 0 ? 10 : 11;
+                        int cost = baseCost + (mLen >= extraLenThreshold ? 1 : 0);
                         int sav = mLen - cost;
                         if (sav > bestSavings) {
                             bestSavings = sav;

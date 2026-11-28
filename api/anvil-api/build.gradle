@@ -4,6 +4,8 @@
 //   - any platform package (org.bukkit.*, io.papermc.*, net.minecraft.*, net.fabricmc.*).
 // Java 21 toolchain, JUnit 5, and Mockito are inherited from the root build.gradle subprojects block.
 
+version = '1.0.1'
+
 dependencies {
     api project(':bit-api')
     compileOnly 'org.jetbrains:annotations:24.1.0'

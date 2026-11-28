@@ -1455,8 +1455,6 @@ class LcaAdr005EntropyPerfTradeoffTest {
         long[] inQueue = new long[64];
         byte[] decScratch = new byte[SECTION_VOXELS];
 
-        List<byte[]> lResiduals = new ArrayList<>(allLight.size());
-        List<byte[]> lV2Gray = new ArrayList<>(allLight.size());
         List<byte[]> lAdr4Gray = new ArrayList<>(allLight.size());
         List<byte[]> lB1OctBit = new ArrayList<>(allLight.size());
         List<byte[]> lB2OctRc = new ArrayList<>(allLight.size());
@@ -1485,7 +1483,6 @@ class LcaAdr005EntropyPerfTradeoffTest {
             for (int i = 0; i < SECTION_VOXELS; i++) {
                 res[i] = (byte) ((ls.nibs[i] - hatL[i]) & 0x0F);
             }
-            lResiduals.add(res);
 
             byte[] adr4g = encodeGrayPlanesSimple(res, curve);
             decodeGrayPlanesSimple(adr4g, curve, decScratch);
@@ -1504,7 +1501,6 @@ class LcaAdr005EntropyPerfTradeoffTest {
             byte[] b1Best = b1.length + 2 < v2g.length ? b1 : v2g;
             byte[] b2Best = b2.length + 2 < v2g.length ? b2 : v2g;
 
-            lV2Gray.add(v2g);
             lAdr4Gray.add(adr4g);
             lB1OctBit.add(b1);
             lB2OctRc.add(b2);

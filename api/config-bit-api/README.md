@@ -4,14 +4,14 @@ Declarative YAML configuration schema, cross-key constraint, reference-token, an
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:config-bit-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:config-bit-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:config-bit-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:config-bit-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:config-bit-api:3.3.1'
+    implementation 'io.github.leafcraftdev:config-bit-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:config-bit-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:config-bit-api:1.0.0'
 }
 ```
 

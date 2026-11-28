@@ -22,21 +22,4 @@ jdk:
   - openjdk21
 
 install:
-  - ./gradlew --no-daemon -PexcludeJdk25
-      :server-api:publishToMavenLocal
-      :anvil-api:publishToMavenLocal
-      :bit-api:publishToMavenLocal
-      :bstats-api:publishToMavenLocal
-      :commands-api:publishToMavenLocal
-      :config-bit-api:publishToMavenLocal
-      :effects-api:publishToMavenLocal
-      :maps-api:publishToMavenLocal
-      :menu-api:publishToMavenLocal
-      :metrics-api:publishToMavenLocal
-      :predict-api:publishToMavenLocal
-      :tags-api:publishToMavenLocal
-      :units-api:publishToMavenLocal
-      :yaml-api:publishToMavenLocal
-      :proxy:proxy-common:publishToMavenLocal
-      :rtp-api:publishToMavenLocal
-      :rtp-core:publishToMavenLocal
+  - ./gradlew --no-daemon -PexcludeJdk25 -PpublicSdkOnly publishAllToMavenLocal

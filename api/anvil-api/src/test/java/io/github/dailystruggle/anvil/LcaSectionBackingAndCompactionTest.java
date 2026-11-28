@@ -161,9 +161,6 @@ class LcaSectionBackingAndCompactionTest {
         // 50 and 500 unique edits scale sparsely (256 -> 1024 slots) without allocating int[4096]
         int added = 49;
         for (int p = 0; p < 4096 && added < 500; p++) {
-            int x = p & 15;
-            int z = (p >>> 4) & 15;
-            int y = (p >>> 8) & 15;
             if (backing.activeOverlay().getStateId(p) < 0) {
                 backing.recordDirtyVoxel(p, 0, (p % 250) + 1, 300L + added);
                 added++;
@@ -330,10 +327,9 @@ class LcaSectionBackingAndCompactionTest {
                             byte[] candidateBase = new byte[4096];
                             targetSnap.frozenOverlay().forEachEntry((p, s) -> candidateBase[p] = (byte) s);
 
-                            if (backing.completeCompaction(targetSnap.epoch(), candidateBase, 0)) {
-                                if (snap2 != null && targetSnap == snap1) {
-                                    staleSectionCommits.incrementAndGet();
-                                }
+                            if (backing.completeCompaction(targetSnap.epoch(), candidateBase, 0)
+                                    && snap2 != null && targetSnap == snap1) {
+                                staleSectionCommits.incrementAndGet();
                             }
 
                             if (fence.tryCommitChunkEpoch(chunkIdx, targetSnap.epoch())) {

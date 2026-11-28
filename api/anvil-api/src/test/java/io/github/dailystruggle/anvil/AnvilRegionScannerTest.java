@@ -239,6 +239,22 @@ class AnvilRegionScannerTest {
     }
 
     @Test
+    @DisplayName("MC 26.1+ unified dimensions/minecraft/*/region/ layout is discovered for overworld and nether")
+    void unified26_1DimensionDirectoriesAreScanned() throws IOException {
+        Path world = Files.createDirectory(tmp.resolve("world_26_1"));
+        Path overworldRegion = Files.createDirectories(
+                world.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region"));
+        Path netherRegion = Files.createDirectories(
+                world.resolve("dimensions").resolve("minecraft").resolve("the_nether").resolve("region"));
+
+        writeSingleChunkRegionFile(overworldRegion.resolve("r.0.0.mca"), List.of("minecraft:cherry_grove"));
+        writeSingleChunkRegionFile(netherRegion.resolve("r.0.0.mca"), List.of("minecraft:crimson_forest"));
+
+        assertEquals(Set.of("minecraft:cherry_grove"), AnvilRegionScanner.scanBiomes(world, ""));
+        assertEquals(Set.of("minecraft:crimson_forest"), AnvilRegionScanner.scanBiomes(world, "DIM-1"));
+    }
+
+    @Test
     @DisplayName("scanBiomes null worldFolder and edge case resolution")
     void testScanBiomesNullWorld() {
         assertTrue(AnvilRegionScanner.scanBiomes(null, "").isEmpty());

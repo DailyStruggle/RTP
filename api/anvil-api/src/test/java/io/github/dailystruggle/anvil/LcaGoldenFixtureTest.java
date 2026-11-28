@@ -85,10 +85,6 @@ class LcaGoldenFixtureTest {
         if (optionalExportDir != null && !optionalExportDir.isBlank()) {
             LcaGoldenFixtureExporter.exportToDirectory(Paths.get(optionalExportDir));
         }
-        Path rustCrateDir = Paths.get("../../resource/LeafAnvil/rust/lca-format").normalize();
-        if (Files.isDirectory(rustCrateDir)) {
-            LcaGoldenFixtureExporter.exportToDirectory(rustCrateDir.resolve("target/lca-golden-fixtures"));
-        }
     }
     @Test
     @DisplayName("REQ-RTP-S-004 / REQ-RTP-S-005: Cross-path FNV-1a64 voxel, biome, and light parity across Mode A, Mode B, Section jump, and NBT tail")

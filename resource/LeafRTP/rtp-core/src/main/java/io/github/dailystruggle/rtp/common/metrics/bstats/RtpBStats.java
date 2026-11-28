@@ -105,8 +105,8 @@ public final class RtpBStats {
             URL classUrl = anchor.getResource(anchor.getSimpleName() + ".class");
             if (classUrl != null) {
                 URLConnection conn = classUrl.openConnection();
-                if (conn instanceof JarURLConnection) {
-                    String val = readDistributionFromManifest(((JarURLConnection) conn).getManifest());
+                if (conn instanceof JarURLConnection jarConn) {
+                    String val = readDistributionFromManifest(jarConn.getManifest());
                     if (val != null) return val;
                 }
                 String spec = classUrl.toString();

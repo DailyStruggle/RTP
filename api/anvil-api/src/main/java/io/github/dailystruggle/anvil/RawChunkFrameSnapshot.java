@@ -377,6 +377,7 @@ public record RawChunkFrameSnapshot(
      * and returns {@code null} (fail-closed, {@code S-004}) if a non-uniform section slice is
      * malformed, truncated, or contains an unmapped/negative runtime state ID.</p>
      */
+    @SuppressWarnings("java:S1168")
     public byte[] sliceBlockOnlySectionFrameWithRuntimePalette(
             int sectionIndex,
             java.util.function.Function<String, Integer> fallbackRuntimeLookup
@@ -396,6 +397,7 @@ public record RawChunkFrameSnapshot(
         return rewriteBlockOnlySectionFramePaletteHeaderBytes(rawSlice, palMap);
     }
 
+    @SuppressWarnings("java:S1168")
     static byte[] rewriteBlockOnlySectionFramePaletteHeaderBytes(
             byte[] sectionFrame,
             int[] paletteIdxToRuntimeId
@@ -481,6 +483,7 @@ public record RawChunkFrameSnapshot(
         }
     }
 
+    @SuppressWarnings("java:S1168")
     private int[] buildEffectivePaletteToRuntimeIdMap(
             java.util.function.Function<String, Integer> fallbackRuntimeLookup
     ) {

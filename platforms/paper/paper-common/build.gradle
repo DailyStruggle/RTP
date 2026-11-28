@@ -2,6 +2,8 @@ plugins {
     id 'java-library'
 }
 
+version = '1.0.0'
+
 def hasRtpCore = findProject(':rtp-api') != null && findProject(':rtp-core') != null
 
 if (!hasRtpCore) {

@@ -826,7 +826,7 @@ public final class StructureTemplateNbtLoader {
                     LcaStructureStamp.TerrainProjection.RIGID, true, List.of(), List.of());
             case "jungle_temple" -> buildStoneBrickRoomTemplate(
                     normId, 12, 10, 15, "minecraft:chests/jungle_temple",
-                    LcaStructureStamp.TerrainProjection.RIGID, List.of());
+                    LcaStructureStamp.TerrainProjection.RIGID);
             case "pillager_outpost" -> buildRoomTemplate(
                     normId, 15, 18, 15, "minecraft:dark_oak_planks", "minecraft:cobblestone",
                     "minecraft:chest[facing=east]", "minecraft:chests/pillager_outpost",
@@ -839,7 +839,7 @@ public final class StructureTemplateNbtLoader {
                     LcaStructureStamp.TerrainProjection.RIGID, false, List.of(), List.of());
             case "ocean_ruin_cold", "ocean_ruin_warm" -> buildStoneBrickRoomTemplate(
                     normId, 8, 6, 8, "minecraft:chests/underwater_ruin_small",
-                    LcaStructureStamp.TerrainProjection.RIGID, List.of());
+                    LcaStructureStamp.TerrainProjection.RIGID);
             case "ruined_portal", "ruined_portal_ocean", "ruined_portal_mountain", "ruined_portal_desert" ->
                     buildPortalTemplate(normId);
             case "mineshaft", "mineshaft_mesa" -> buildJigsawHallTemplate(
@@ -880,7 +880,7 @@ public final class StructureTemplateNbtLoader {
                     "minecraft:ancient_city/walkway", 4);
             case "ancient_city/walkway", "ancient_city/barracks" -> buildStoneBrickRoomTemplate(
                     normId, 13, 6, 9, "minecraft:chests/ancient_city",
-                    LcaStructureStamp.TerrainProjection.RIGID, List.of());
+                    LcaStructureStamp.TerrainProjection.RIGID);
             case "trail_ruins" -> buildRoomTemplate(
                     normId, 9, 6, 9, "minecraft:mud_bricks", "minecraft:terracotta",
                     "minecraft:suspicious_gravel", "minecraft:archaeology/trail_ruins_common",
@@ -889,7 +889,7 @@ public final class StructureTemplateNbtLoader {
                     List.of("minecraft:suspicious_gravel"));
             default -> buildStoneBrickRoomTemplate(
                     normId, 9, 6, 9, "minecraft:chests/simple_dungeon",
-                    LcaStructureStamp.TerrainProjection.RIGID, List.of());
+                    LcaStructureStamp.TerrainProjection.RIGID);
         };
     }
 
@@ -899,8 +899,7 @@ public final class StructureTemplateNbtLoader {
             int sy,
             int sz,
             String lootTable,
-            LcaStructureStamp.TerrainProjection proj,
-            List<LcaStructureStamp.JigsawConnector> unused) {
+            LcaStructureStamp.TerrainProjection proj) {
         List<LcaStructureStamp.StructureProcessorRule> rules = List.of(
                 new LcaStructureStamp.StructureProcessorRule(1, 4, 0.30f, 0x3055L, true),
                 new LcaStructureStamp.StructureProcessorRule(1, 5, 0.20f, 0xC2AC4L, true));
@@ -936,7 +935,15 @@ public final class StructureTemplateNbtLoader {
                 for (int x = 0; x < sx; x++) {
                     if (y == 0) {
                         boolean corner = (x == 0 || x == sx - 1) && (z == 0 || z == sz - 1);
-                        blocks.add(new RawBlockEntry(x, y, z, corner ? 0 : ((x + z) % 2 == 0 ? 1 : 2), null));
+                        int floorStateIdx;
+                        if (corner) {
+                            floorStateIdx = 0;
+                        } else if ((x + z) % 2 == 0) {
+                            floorStateIdx = 1;
+                        } else {
+                            floorStateIdx = 2;
+                        }
+                        blocks.add(new RawBlockEntry(x, y, z, floorStateIdx, null));
                     } else if (z == 3 && x >= 2 && x <= 4 && y <= 5) {
                         boolean frame = (x == 2 || x == 4 || y == 1 || y == 5);
                         if (frame && !(x == 4 && y == 5)) {

@@ -4,14 +4,14 @@ Platform-neutral runtime cartography and diagnostics rendering SPI (`io.github.d
 
 ## Coordinates
 
-- **Maven Central:** `io.github.dailystruggle:maps-api:<version>`
-- **JitPack:** `com.github.DailyStruggle.RTP:maps-api:<tag>`
+- **Maven Central:** `io.github.leafcraftdev:maps-api:<version>`
+- **JitPack:** `com.github.LeafCraftDev.LeafSDK:maps-api:<tag>`
 
 ```gradle
 dependencies {
-    implementation 'io.github.dailystruggle:maps-api:3.3.1'
+    implementation 'io.github.leafcraftdev:maps-api:1.0.0'
     // or via JitPack:
-    // implementation 'com.github.DailyStruggle.RTP:maps-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:maps-api:1.0.0'
 }
 ```
 

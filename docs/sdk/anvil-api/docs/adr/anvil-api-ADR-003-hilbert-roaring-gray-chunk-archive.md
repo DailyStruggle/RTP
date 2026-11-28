@@ -338,9 +338,27 @@ Following `anvil-api-ADR-002`, `LcaRegionReader` implements `BuiltInTestable`:
 4. **Tier 4 - Copy-on-Write (`CoW`) Prior-Generation Pointer Rollback (`rollbackCorruptChunkToPriorCoW`):**
    - Because live saves rotate to fresh `256B` CoW slabs before swapping the directory pointer, `LcaLiveArchive` retains `prevChunkPointers[1024]`, allowing $O(1)$ rollback to the previous verified generation if an interrupted write is detected.
 
+#### 7.3 Minecraft `26.4+` `16×16×16` Per-Block Biomes & Lowercase `status` Inside `LCA_FORMAT_VERSION_V3` (`0x0003`)
+Minecraft `26.4` (`DataVersion = 5131`) increases per-section biome granularity from `4×4×4` (`64` cells) to `16×16×16` (`4,096` cells) and renames the root NBT chunk status key from `"Status"` to `"status"`. Because `LCA_FORMAT_VERSION_V3` (`0x0003`) remained pre-release, both changes are encoded natively inside `V3` without introducing a `V4` superblock version:
+
+- **Dual-Resolution `BiomePaletteSection` (`4` or `16` cells per axis):**
+  - Preserves the 3-component record signature `(int sectionY, List<String> palette, long[] data)`.
+  - Single-entry palettes (`palette.size() == 1`, `data == null`) are resolution-invariant and require zero wire change (`bLen == 0` chunk-default elision or `bLen == 1` + `dictId`).
+  - For `palette.size() >= 2`, Mojang's non-spanning packed `long[]` lengths for `64` cells (`1..7` longs) and `4,096` cells (`64..820` longs) are strictly disjoint; `BiomePaletteSection.isPerBlockGrid(paletteSize, data)` dispatches unambiguously, and `hasMalformedData()` / `biomeIdAt()` fail closed (`null`) on lengths strictly between the `64`-cell and `4,096`-cell requirements (`S-004`).
+- **Inline `4,096`-Biome Wire Framing (`BIOME_4096_MARKER = 65`):**
+  - Legacy `4×4×4` inline biome blocks encode `bLen ∈ [0..64]`, while chunk biome template references occupy `0x80..0xBF` (bit `7 == 1`). Escaping multi-biome `16×16×16` sections with `varInt(65)` (`0x41`, `> 64` and bit `7 == 0`) has zero wire collision with `4×4×4` sections or template references and fails closed (`CBIT T7`) on legacy decoders.
+  - Payload layout: `varInt(65)` + `varInt(actualBLen)` (`2..4096`) + `actualBLen × varInt(dictId)` + `modeByte`:
+    - `modeByte = 0x00` (`BIOME_4096_MODE_RLE`): `CURVE_XZY` extended RLE (`varInt(runCount)`). When `actualBLen <= 8`, each run is encoded in 1 byte `(pIdx << 5) | lenCode` where `lenCode < 31` yields `len = lenCode + 1` and `lenCode == 31` yields `len = 32 + varInt(ext)`. When `actualBLen > 8`, each run is `varInt(pIdx) + varInt(len - 1)`.
+    - `modeByte = 0x01` (`BIOME_4096_MODE_RAW_PACKED`): Raw big-endian Mojang-packed `long[requiredLongs(actualBLen, 4096)]`, automatically selected whenever `rleTotalBytes >= rawTotalBytes` so adversarial high-entropy biome patterns never expand past the vanilla packed ceiling.
+  - Vertical `BiomeTemplate` deduplication (`0x80 | tmplIdx`) remains unchanged and caches `4,096`-cell templates seamlessly.
+  - **Memory Hygiene & `CBIT` Bounds:** `ScratchArena` allocates `biomeCells4096` lazily via `ensureBiome4096Cells()` so `64`-biome worlds incur zero extra heap overhead. Decoders enforce `actualBLen ∈ [2..4096]` (`T7`), `dictId < dictBiomes.size()` (`T7`), `modeByte ∈ {0x00, 0x01}` (`T5`), exact RLE cursor completion `== 4,096` (`T6`), and raw packed palette index `< actualBLen` (`T7`).
+- **Verbatim Lowercase `"status"` Preservation:**
+  - When a chunk root carries lowercase `"status"` (and no `"Status"`), `"minecraft:full"` / `"full"` records `statusOrdinal = 0xFE` (`STATUS_ORDINAL_ABSENT`) while retaining `"status"` verbatim in the residual NBT tail; non-full proto-chunk statuses (`"minecraft:terrain"`, `"minecraft:noise_biomes"`, `"minecraft:structure_starts"`, etc.) record `statusOrdinal = 0xFD` (`STATUS_ORDINAL_RESIDUAL`) while retaining `"status"` verbatim in the residual NBT tail.
+  - Direct view/probe paths (`readChunkView`, `readColumnProbe`, `readTerrainProbe`) continue returning `null` for `0xFD` proto-chunks and decoding `0xFE` full chunks, while `readChunk`, `readChunkNbtBytes`, and `transcodeToMca` preserve exact `"Status"` vs `"status"` key casing without synthesizing duplicate keys.
+
 ## Benchmarks (`1_21_R1` & `overworld_mountain_r.0.0.mca`, `LcaRegionCodecTest`)
 
-Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and light round-trip parity across `.mca` fixtures (`1.20.4`, `1.21.4`, `26.1`, `26.3`) and random/sequential whole-region sweeps on the 64-chunk `1_21_R1` (`532,480 B` `.mca`) and `overworld_mountain_r.0.0.mca` (`495,616 B` `.mca`) benchmarks:
+Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and light round-trip parity across `.mca` fixtures (`1.20.4`, `1.21.4`, `26.1`, `26.3`, `26.4`) and random/sequential whole-region sweeps on the 64-chunk `1_21_R1` (`532,480 B` `.mca`) and `overworld_mountain_r.0.0.mca` (`495,616 B` `.mca`) benchmarks:
 
 ### 1. `1_21_R1` 64-Chunk Benchmark (`532,480 B` Vanilla `.mca`, `299,918 B` `.linear`)
 
@@ -395,4 +413,5 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 - [leafrtp-ADR-065](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-065-layered-spiral-hilbert-rle-index.md) - Layered Spiral-Hilbert RLE Index
 - [leafrtp-ADR-072](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-072-hybrid-bit-packed-and-16-bit-run-container-hazard-table.md) - Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
 - [leafconfig-ADR-001](../../../../resource/LeafConfig/docs/adr/leafconfig-ADR-001-universal-server-config-atlas-and-web-ide.md) - Universal Server Config Atlas & 3D World Map Workspace
-- `io.github.dailystruggle.anvil.LcaRegionReader`, `io.github.dailystruggle.anvil.LcaRegionWriter`, `io.github.dailystruggle.anvil.LcaSectionCodec`, and `io.github.dailystruggle.anvil.LcaRegionCodecTest` (`api/anvil-api`)
+- `io.github.dailystruggle.anvil.LcaRegionReader`, `io.github.dailystruggle.anvil.LcaRegionWriter`, `io.github.dailystruggle.anvil.LcaSectionCodec`, `io.github.dailystruggle.anvil.LcaRegionCodecTest`, and `io.github.dailystruggle.anvil.Mc264BiomeLcaParityTest` (`api/anvil-api`)
+

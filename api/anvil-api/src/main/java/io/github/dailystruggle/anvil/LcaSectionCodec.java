@@ -2,12 +2,14 @@ package io.github.dailystruggle.anvil;
 
 import java.io.IOException;
 import java.lang.ref.SoftReference;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Package-private {@code .lca} (LeafCraft Anvil) $16 \times 16 \times 16$ section
@@ -15,10 +17,11 @@ import java.util.List;
  * 1-pass directional gradient predictor, single-pass $O(4096)$ adaptive Delta-Roaring minority
  * state container builder, `leafrtp-ADR-072` flat bit-packed ceiling, 4-bitplane reflected binary
  * Gray-code light codec, and thread-local {@link ScratchArena} (`anvil-api-ADR-003` Sections 4-5,
- * Rule D-008).
+ * `anvil-api-ADR-007`, Rule D-008).
  *
  * @governedBy anvil-api-ADR-003
  * @governedBy anvil-api-ADR-002
+ * @governedBy anvil-api-ADR-007
  * @governedBy ADR-115
  * @trace REQ-RTP-S-004
  * @trace REQ-RTP-S-005
@@ -27,6 +30,11 @@ final class LcaSectionCodec {
 
     static final int SECTION_VOXELS = 4096;
     static final int BIOME_CELLS = 64;
+    static final int BIOME_4096_CELLS = SECTION_VOXELS;
+    /** V3 (0x0003) marker for MC 26.4+ 16x16x16 per-block biome payloads (bit 7 == 0, never collides with 0x80..0xBF template refs or 0..64 legacy lengths). */
+    static final int BIOME_4096_MARKER = 65;
+    static final int BIOME_4096_MODE_RLE = 0;
+    static final int BIOME_4096_MODE_RAW_PACKED = 1;
 
     /** Curve 00: Y -> Z -> X horizontal strata scanline. */
     static final int CURVE_YZX = 0;
@@ -105,6 +113,10 @@ final class LcaSectionCodec {
         final byte[] blkLightNibbles = new byte[SECTION_VOXELS];
         int[] grayCurve;
         final int[] biomeCells = new int[BIOME_CELLS];
+        int[] biome4096Cells;
+        int[] biome4096PaletteDictIds;
+        int lastDecodedBiomePaletteLen;
+        int lastDecodedBiomeCellCount;
         final byte[] byteStaging = new byte[16384];
         byte[] byteStagingAlt;
         byte[] sectionStaging;
@@ -128,6 +140,57 @@ final class LcaSectionCodec {
         byte[] lcdOffBuf;
         byte[] lcdHuffScratch;
         byte[] nbtOutBuf = new byte[16384];
+        // Scratch fields for zero-allocation direct-buffer tail & light channel binding.
+        int tailBpFlags;
+        int tailPpCount;
+        int tailSlVer;
+        int tailLowBoundaryFlags;
+        int tailHighBoundaryFlags;
+        int tailMbnlStart;
+        int tailMbnlLen;
+        int tailSecHmCount;
+        int tailSecHmPos;
+        int tailSecHmLimit;
+        int tailBlockTicksStart;
+        int tailBlockTicksLen;
+        int tailFluidTicksStart;
+        int tailFluidTicksLen;
+        int tailBlockEntitiesStart;
+        int tailBlockEntitiesLen;
+        int tailSparsePpStart;
+        int tailSparsePpLen;
+        int tailDictStructStart;
+        int tailDictStructLen;
+        byte[] tailBufRef;
+        byte[] tailNbtSliceBuf;
+        int tailNbtSliceOff;
+        int tailNbtSliceLen;
+        byte lightOutKind;
+        byte[] lightOutBytes;
+        int lightOutState;
+
+        int[] ensureBiome4096Cells() {
+            if (biome4096Cells == null) {
+                biome4096Cells = new int[BIOME_4096_CELLS];
+            }
+            return biome4096Cells;
+        }
+
+        int[] ensureBiome4096PaletteDictIds(int minLen) {
+            if (biome4096PaletteDictIds == null || biome4096PaletteDictIds.length < minLen) {
+                biome4096PaletteDictIds = new int[Math.max(minLen, 64)];
+            }
+            return biome4096PaletteDictIds;
+        }
+
+        byte[] ensureSectionStagingCap(int required) {
+            if (sectionStaging == null) {
+                sectionStaging = new byte[Math.max(16384, required)];
+            } else if (required > sectionStaging.length) {
+                sectionStaging = Arrays.copyOf(sectionStaging, Math.max(required, sectionStaging.length << 1));
+            }
+            return sectionStaging;
+        }
 
         void ensureSectionEncodeBuffers() {
             if (runStaging == null) {
@@ -199,6 +262,8 @@ final class LcaSectionCodec {
 
         byte[] chunkFrameStaging = new byte[65536];
         int[] worldgenGlobalToLocal = new int[256];
+        int[] biomeGlobalToLocal = new int[64];
+        final GatherFrameBuilder gatherFrameBuilder = new GatherFrameBuilder();
 
         byte[] ensureChunkFrameCap(int required) {
             if (required <= chunkFrameStaging.length) {
@@ -215,6 +280,14 @@ final class LcaSectionCodec {
             }
             Arrays.fill(worldgenGlobalToLocal, 0, size, -1);
             return worldgenGlobalToLocal;
+        }
+
+        int[] resetBiomeGlobalToLocal(int size) {
+            if (size > biomeGlobalToLocal.length) {
+                biomeGlobalToLocal = new int[Math.max(size, biomeGlobalToLocal.length << 1)];
+            }
+            Arrays.fill(biomeGlobalToLocal, 0, size, -1);
+            return biomeGlobalToLocal;
         }
     }
 
@@ -241,6 +314,7 @@ final class LcaSectionCodec {
 
     private static final byte[] MINECRAFT_COLON_UTF8 = "minecraft:".getBytes(StandardCharsets.UTF_8);
     private static final byte[] LCA_BOUNDARY_MARKER_UTF8 = "_lca_boundary_".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] LCA_SECTION_EXTRAS_MARKER_UTF8 = "_lca_section_extras".getBytes(StandardCharsets.UTF_8);
     private static final byte[] STATUS_KEY_UTF8 = "Status".getBytes(StandardCharsets.UTF_8);
 
     private static final byte[] EMPTY_BLOCK_ENTITIES_NBT = buildEmptyCompoundListTag("block_entities");
@@ -919,7 +993,6 @@ final class LcaSectionCodec {
                     }
                     int sav = mLen - 2 - (mLen >= 10 ? 1 : 0);
                     if (sav > bestSavings) {
-                        bestSavings = sav;
                         bestMode = 2;
                         bestLen = mLen;
                         bestOff = dCand;
@@ -1136,7 +1209,9 @@ final class LcaSectionCodec {
                             mLen++;
                         }
                         int mode = dist4 <= 256 ? 0 : 1;
-                        int cost = (mode == 0 ? 1 : 2) + (mLen >= (mode == 0 ? 10 : 11) ? 1 : 0);
+                        int baseCost = mode == 0 ? 1 : 2;
+                        int lenThreshold = mode == 0 ? 10 : 11;
+                        int cost = baseCost + (mLen >= lenThreshold ? 1 : 0);
                         int sav = mLen - cost;
                         if (sav > bestSavings) {
                             bestSavings = sav;
@@ -1561,7 +1636,6 @@ final class LcaSectionCodec {
             offBuf = arena.lcdOffBuf;
             decodeHuffmanStream12(src, pos, compOffLen, meta.ensureOffHuffDecTable(), offBuf, offTotal);
             offPos = 0;
-            pos += compOffLen;
         } else {
             if (pos + offTotal > limit) {
                 throw new CorruptRegionEntryException("CBIT T5: Truncated LCD2 offset stream");
@@ -1773,11 +1847,11 @@ final class LcaSectionCodec {
      * header against bit rot, and compressing the body `[headerLen .. chunkFrame.length)` via the
      * continuous atomic Layer 2 region dictionary (`LCD2`).
      */
-    static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen) throws IOException {
+    static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen) {
         return encodeModeBChunkFrameWithAtomicDict(chunkFrame, headerLen, null, false, 1);
     }
 
-    static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen, int lcd2Level) throws IOException {
+    static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen, int lcd2Level) {
         return encodeModeBChunkFrameWithAtomicDict(chunkFrame, headerLen, null, false, lcd2Level);
     }
 
@@ -3146,12 +3220,11 @@ final class LcaSectionCodec {
                     bestActiveVoxels = populateCompactedCurvePaletteIdx(
                             remapYzxToSorted(yzxIdx, oldToNew, v3sc.unpackedYzx),
                             curveId, octreeMask64, curvePaletteIdx);
-                    curveSyncedForV3 = true;
                 }
                 byte[] grayBuf = v3sc.grayStaging;
                 int grayLen = LcaV3Codec.tryEncodeAdjacencyGrayBitplanes(
                         curvePaletteIdx, bestActiveVoxels, activePaletteSize,
-                        sortedGlobalIds, v3sc.grayRemappedGlobalIds, arena, grayBuf);
+                        sortedGlobalIds, v3sc.grayRemappedGlobalIds, grayBuf);
                 if (grayLen > 0) {
                     int currentOverhead = (secExtFlags != 0) ? 2 : 0;
                     int grayOverhead = 2 + varIntLen(grayLen);
@@ -3176,9 +3249,10 @@ final class LcaSectionCodec {
 
             int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(activePaletteSize - 1));
             int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
+            int nonGrayOverhead = secExtFlags != 0 ? 2 : 0;
             int secExtOverhead = (secExtFlags == LcaV3Codec.SEC_EXT_GRAY_BITPLANES)
                     ? (2 + varIntLen(roaringLen))
-                    : (secExtFlags != 0 ? 2 : 0);
+                    : nonGrayOverhead;
             int effectiveRoaringBytes = roaringLen + secExtOverhead;
             if (effectiveRoaringBytes <= flatByteCount) {
                 blockEncodingMode = BLOCK_MODE_DELTA_ROARING;
@@ -3196,7 +3270,11 @@ final class LcaSectionCodec {
         if (blockEncodingMode == BLOCK_MODE_DELTA_ROARING && octreeMask64 == -1L) {
             blockEncodingMode = BLOCK_MODE_DELTA_ROARING_FULL_MASK;
         }
-        byte[] secOut = arena.sectionStaging;
+        int worstBiomeBytes = ((sectionBiomeTemplateIdx & ~0x3F) == 0)
+                ? 1
+                : maxEncodedBiomeBytes(rawBiomeGlobalDictIds, rawBiomeDataLongs);
+        byte[] secOut = arena.ensureSectionStagingCap(
+                32 + (activePaletteSize * 5) + blockPayloadLen + worstBiomeBytes + 4224);
         int pos = 1; // reserve index 0 for sectionHeader
         if (blockEncodingMode == BLOCK_MODE_DELTA_ROARING || blockEncodingMode == BLOCK_MODE_FLAT_BITPACK) {
             writeLongBEToBuf(secOut, pos, octreeMask64);
@@ -3455,8 +3533,8 @@ final class LcaSectionCodec {
                 long[] packed = arena.packedBlockLongs;
                 Arrays.fill(packed, 0, numLongs, 0L);
                 int nextPos = decodeDeltaRoaringBlocks(
-                        buf, pos, limit, paletteLen, curveId, CURVE_TO_YZX[curveId], octreeMask64,
-                        packed, bits, entriesPerLong, LcaRegionReader.LCA_FORMAT_VERSION);
+                        buf, pos, limit, paletteLen, curveId, octreeMask64,
+                        packed, bits, LcaRegionReader.LCA_FORMAT_VERSION);
                 long mask = (1L << bits) - 1L;
                 int vox = 0;
                 for (int w = 0; w < numLongs && vox < SECTION_VOXELS; w++) {
@@ -3565,8 +3643,8 @@ final class LcaSectionCodec {
                             buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
                 } else {
                     pos = decodeDeltaRoaringBlocks(
-                            buf, pos, limit, paletteLen, curveId, CURVE_TO_YZX[curveId], octreeMask64,
-                            packed, bits, entriesPerLong, LcaRegionReader.LCA_FORMAT_VERSION);
+                            buf, pos, limit, paletteLen, curveId, octreeMask64,
+                            packed, bits, LcaRegionReader.LCA_FORMAT_VERSION);
                 }
                 long mask = (1L << bits) - 1L;
                 int vox = 0;
@@ -3607,7 +3685,7 @@ final class LcaSectionCodec {
             } else {
                 int bLen = readVarInt(buf, pos, limit);
                 pos += varIntLen(bLen);
-                if (bLen < 0 || bLen > BIOME_CELLS) {
+                if (bLen < 0 || (bLen > BIOME_CELLS && bLen != BIOME_4096_MARKER)) {
                     return EMPTY_INTS;
                 }
                 if (bLen > 0) {
@@ -3632,7 +3710,7 @@ final class LcaSectionCodec {
                 if (pos >= limit) {
                     return EMPTY_INTS;
                 }
-                int constNibbles = buf[pos++] & 0xFF;
+                int constNibbles = buf[pos] & 0xFF;
                 int skyC = (skyMode == LIGHT_MODE_CONST) ? (constNibbles & 0x0F) : 0;
                 int blkC = (blkMode == LIGHT_MODE_CONST) ? ((constNibbles >>> 4) & 0x0F) : 0;
                 packedLight = (skyC << 4) | blkC;
@@ -3794,16 +3872,16 @@ final class LcaSectionCodec {
         if (rCount == 2) {
             int packed0 = poolPacked[headNode];
             int pos0 = packed0 >>> 16;
-            int lm1_0 = packed0 & 0xFFFF;
+            int lenMinusOne0 = packed0 & 0xFFFF;
             int nextNode = poolNext[headNode];
             int packed1 = poolPacked[nextNode];
             int adjGap1 = packed1 >>> 16;
-            int lm1_1 = packed1 & 0xFFFF;
-            if (lm1_0 <= 15 && lm1_1 <= 15) {
+            int lenMinusOne1 = packed1 & 0xFFFF;
+            if (lenMinusOne0 <= 15 && lenMinusOne1 <= 15) {
                 int word16 = (TAG_SINGLETON << 14) | 0x3000 | (pos0 & 0x0FFF);
                 dst[pos++] = (byte) ((word16 >>> 8) & 0xFF);
                 dst[pos++] = (byte) (word16 & 0xFF);
-                dst[pos++] = (byte) ((lm1_0 << 4) | lm1_1);
+                dst[pos++] = (byte) ((lenMinusOne0 << 4) | lenMinusOne1);
                 return writeBoundedGap240(dst, pos, adjGap1);
             }
         }
@@ -4330,44 +4408,217 @@ final class LcaSectionCodec {
             System.arraycopy(rawPayload, 0, dst, pos, rawPayload.length);
             pos += rawPayload.length;
         } else {
-            curveId = CURVE_YZX;
-            blockEncodingMode = BLOCK_MODE_FLAT_BITPACK;
-            int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(palLen - 1));
-            int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
-            int maskPos = pos;
-            pos += 8;
-            pos = writeVarIntToBuf(dst, pos, palLen);
-            for (int i = 0; i < palLen; i++) {
-                pos = writeVarIntToBuf(dst, pos, blockDictIds[i]);
-            }
-            long octreeMask64;
-            if (preEncodedFlatBytes != null && preEncodedFlatBits > 0) {
-                int expectedSrcBytes = (SECTION_VOXELS * preEncodedFlatBits + 7) >>> 3;
-                if (preEncodedFlatBits == flatBits && preEncodedFlatBytes.length >= flatByteCount) {
-                    octreeMask64 = hasPrecomputedOctreeMask
-                            ? precomputedOctreeMask64
-                            : computeFlatBytesOctreeMask64(preEncodedFlatBytes, flatBits, palLen);
-                    System.arraycopy(preEncodedFlatBytes, 0, dst, pos, flatByteCount);
-                    pos += flatByteCount;
-                } else if (preEncodedFlatBytes.length >= expectedSrcBytes) {
-                    octreeMask64 = repackFlatBytesToFlat(
-                            preEncodedFlatBytes, preEncodedFlatBits, palLen, flatBits, flatByteCount, dst, pos);
-                    pos += flatByteCount;
+            boolean hasFlatSrc = preEncodedFlatBytes != null && preEncodedFlatBits > 0
+                    && preEncodedFlatBytes.length >= ((SECTION_VOXELS * preEncodedFlatBits + 7) >>> 3);
+            boolean hasRawSrc = rawBlockDataLongs != null && rawBlockDataLongs.length > 0;
+            if (hasFlatSrc || hasRawSrc) {
+                arena.ensureSectionEncodeBuffers();
+                int[] yzxIdx = arena.yzxPaletteIdx;
+                int[] freqs = arena.freqCounts.length >= palLen ? arena.freqCounts : new int[palLen];
+                Arrays.fill(freqs, 0, palLen, 0);
+                if (hasFlatSrc) {
+                    if (preEncodedFlatBits == 4) {
+                        for (int b = 0; b < 2048; b++) {
+                            int v = preEncodedFlatBytes[b] & 0xFF;
+                            int p0 = v & 0x0F;
+                            if (p0 >= palLen) p0 = 0;
+                            int p1 = v >>> 4;
+                            if (p1 >= palLen) p1 = 0;
+                            int idx = b << 1;
+                            yzxIdx[idx] = p0;
+                            freqs[p0]++;
+                            yzxIdx[idx | 1] = p1;
+                            freqs[p1]++;
+                        }
+                    } else if (preEncodedFlatBits == 2) {
+                        for (int b = 0; b < 1024; b++) {
+                            int v = preEncodedFlatBytes[b] & 0xFF;
+                            int idx = b << 2;
+                            for (int k = 0; k < 4; k++) {
+                                int p = (v >>> (k << 1)) & 3;
+                                if (p >= palLen) p = 0;
+                                yzxIdx[idx | k] = p;
+                                freqs[p]++;
+                            }
+                        }
+                    } else if (preEncodedFlatBits == 1) {
+                        for (int b = 0; b < 512; b++) {
+                            int v = preEncodedFlatBytes[b] & 0xFF;
+                            int idx = b << 3;
+                            for (int k = 0; k < 8; k++) {
+                                int p = (v >>> k) & 1;
+                                if (p >= palLen) p = 0;
+                                yzxIdx[idx | k] = p;
+                                freqs[p]++;
+                            }
+                        }
+                    } else {
+                        int srcMask = (1 << preEncodedFlatBits) - 1;
+                        long acc = 0L;
+                        int accBits = 0;
+                        int srcPos = 0;
+                        int srcLen = preEncodedFlatBytes.length;
+                        for (int v = 0; v < SECTION_VOXELS; v++) {
+                            while (accBits < preEncodedFlatBits && srcPos < srcLen) {
+                                acc |= (preEncodedFlatBytes[srcPos++] & 0xFFL) << accBits;
+                                accBits += 8;
+                            }
+                            int p = (int) (acc & srcMask);
+                            acc >>>= preEncodedFlatBits;
+                            accBits -= preEncodedFlatBits;
+                            if (p >= palLen) p = 0;
+                            yzxIdx[v] = p;
+                            freqs[p]++;
+                        }
+                    }
                 } else {
-                    octreeMask64 = 0L;
-                    Arrays.fill(dst, pos, pos + flatByteCount, (byte) 0);
-                    pos += flatByteCount;
+                    int storageBits = PackedPaletteDecoder.bitsPerEntry(palLen);
+                    if (storageBits == 4 && rawBlockDataLongs.length >= 256) {
+                        for (int w = 0; w < 256; w++) {
+                            long word = rawBlockDataLongs[w];
+                            int base = w << 4;
+                            for (int s = 0; s < 16; s++) {
+                                int p = (int) (word & 0xFL);
+                                if (p >= palLen) p = 0;
+                                yzxIdx[base | s] = p;
+                                freqs[p]++;
+                                word >>>= 4;
+                            }
+                        }
+                    } else {
+                        int entriesPerLong = 64 / storageBits;
+                        long srcMask = (1L << storageBits) - 1L;
+                        int voxel = 0;
+                        for (int w = 0; w < rawBlockDataLongs.length && voxel < SECTION_VOXELS; w++) {
+                            long word = rawBlockDataLongs[w];
+                            int limit = Math.min(entriesPerLong, SECTION_VOXELS - voxel);
+                            for (int s = 0; s < limit; s++) {
+                                int p = (int) (word & srcMask);
+                                if (p >= palLen) p = 0;
+                                yzxIdx[voxel++] = p;
+                                freqs[p]++;
+                                word >>>= storageBits;
+                            }
+                        }
+                        while (voxel < SECTION_VOXELS) {
+                            yzxIdx[voxel++] = 0;
+                            freqs[0]++;
+                        }
+                    }
                 }
-            } else if (rawBlockDataLongs != null && rawBlockDataLongs.length > 0) {
-                octreeMask64 = packSimpleBitStorageDirectToFlat(
-                        rawBlockDataLongs, palLen, flatBits, flatByteCount, dst, pos);
-                pos += flatByteCount;
+
+                int[] order = arena.paletteOrder.length >= palLen ? arena.paletteOrder : new int[palLen];
+                int activePalLen = 0;
+                for (int i = 0; i < palLen; i++) {
+                    if (freqs[i] > 0) {
+                        order[activePalLen++] = i;
+                    }
+                }
+                if (activePalLen <= 1) {
+                    int onlyIdx = activePalLen == 1 ? order[0] : 0;
+                    curveId = CURVE_YZX;
+                    blockEncodingMode = BLOCK_MODE_UNIFORM;
+                    pos = writeVarIntToBuf(dst, pos, 1);
+                    pos = writeVarIntToBuf(dst, pos, blockDictIds[onlyIdx]);
+                } else {
+                    for (int i = 1; i < activePalLen; i++) {
+                        int key = order[i];
+                        int keyFreq = freqs[key];
+                        int keyDict = blockDictIds[key];
+                        int j = i - 1;
+                        while (j >= 0 && (freqs[order[j]] < keyFreq
+                                || (freqs[order[j]] == keyFreq && blockDictIds[order[j]] > keyDict))) {
+                            order[j + 1] = order[j];
+                            j--;
+                        }
+                        order[j + 1] = key;
+                    }
+                    int[] sortedDictIds = arena.sortedGlobalIds.length >= activePalLen
+                            ? arena.sortedGlobalIds : new int[activePalLen];
+                    int[] oldToNew = arena.oldToSortedPalette.length >= palLen
+                            ? arena.oldToSortedPalette : new int[palLen];
+                    Arrays.fill(oldToNew, 0, palLen, 0);
+                    for (int i = 0; i < activePalLen; i++) {
+                        int old = order[i];
+                        sortedDictIds[i] = blockDictIds[old];
+                        oldToNew[old] = i;
+                    }
+                    long octreeMask64 = 0L;
+                    for (int v = 0; v < SECTION_VOXELS; v++) {
+                        int ord = oldToNew[yzxIdx[v]];
+                        yzxIdx[v] = ord;
+                        if (ord != 0) {
+                            octreeMask64 |= (1L << YZX_TO_OCTANT6[v]);
+                        }
+                    }
+                    int curve0 = selectOptimalCurve1Pass(yzxIdx, 0);
+                    int activeVoxels0 = populateCompactedCurvePaletteIdx(
+                            yzxIdx, curve0, octreeMask64, arena.curvePaletteIdx);
+                    byte[] blockStaging = arena.byteStaging;
+                    int roaringLen = encodeMinorityContainersSinglePass(
+                            arena.curvePaletteIdx, activeVoxels0, activePalLen, arena, blockStaging);
+                    curveId = curve0;
+                    if (curve0 != CURVE_H3 && octreeMask64 != -1L && Long.bitCount(octreeMask64) <= 28) {
+                        int activeH3 = populateCompactedCurvePaletteIdx(
+                                yzxIdx, CURVE_H3, octreeMask64, arena.curvePaletteIdx);
+                        byte[] altBuf = arena.byteStagingAlt;
+                        int len1 = encodeMinorityContainersSinglePass(
+                                arena.curvePaletteIdx, activeH3, activePalLen, arena, altBuf);
+                        if (len1 < roaringLen) {
+                            roaringLen = len1;
+                            curveId = CURVE_H3;
+                            blockStaging = altBuf;
+                        }
+                    }
+
+                    int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(activePalLen - 1));
+                    int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
+                    if (roaringLen <= flatByteCount) {
+                        blockEncodingMode = (octreeMask64 == -1L)
+                                ? BLOCK_MODE_DELTA_ROARING_FULL_MASK
+                                : BLOCK_MODE_DELTA_ROARING;
+                        if (blockEncodingMode == BLOCK_MODE_DELTA_ROARING) {
+                            writeLongBEToBuf(dst, pos, octreeMask64);
+                            pos += 8;
+                        }
+                        pos = writeVarIntToBuf(dst, pos, activePalLen);
+                        for (int i = 0; i < activePalLen; i++) {
+                            pos = writeVarIntToBuf(dst, pos, sortedDictIds[i]);
+                        }
+                        System.arraycopy(blockStaging, 0, dst, pos, roaringLen);
+                        pos += roaringLen;
+                    } else {
+                        curveId = CURVE_YZX;
+                        blockEncodingMode = BLOCK_MODE_FLAT_BITPACK;
+                        writeLongBEToBuf(dst, pos, octreeMask64);
+                        pos += 8;
+                        pos = writeVarIntToBuf(dst, pos, activePalLen);
+                        for (int i = 0; i < activePalLen; i++) {
+                            pos = writeVarIntToBuf(dst, pos, sortedDictIds[i]);
+                        }
+                        int[] identity = oldToNew.length >= activePalLen ? oldToNew : new int[activePalLen];
+                        for (int i = 0; i < activePalLen; i++) {
+                            identity[i] = i;
+                        }
+                        encodeFlatBitPackYzx(yzxIdx, identity, flatBits, flatByteCount, blockStaging);
+                        System.arraycopy(blockStaging, 0, dst, pos, flatByteCount);
+                        pos += flatByteCount;
+                    }
+                }
             } else {
-                octreeMask64 = 0L;
+                curveId = CURVE_YZX;
+                blockEncodingMode = BLOCK_MODE_FLAT_BITPACK;
+                int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(palLen - 1));
+                int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
+                writeLongBEToBuf(dst, pos, 0L);
+                pos += 8;
+                pos = writeVarIntToBuf(dst, pos, palLen);
+                for (int i = 0; i < palLen; i++) {
+                    pos = writeVarIntToBuf(dst, pos, blockDictIds[i]);
+                }
                 Arrays.fill(dst, pos, pos + flatByteCount, (byte) 0);
                 pos += flatByteCount;
             }
-            writeLongBEToBuf(dst, maskPos, octreeMask64);
         }
 
         if ((sectionBiomeTemplateIdx & ~0x3F) == 0) {
@@ -4390,9 +4641,16 @@ final class LcaSectionCodec {
         } else if (skyIsConst) {
             skyMode = LIGHT_MODE_CONST;
         } else {
-            skyMode = LIGHT_MODE_RAW;
-            System.arraycopy(skyLight2048, 0, dst, pos, 2048);
-            pos += 2048;
+            extractLightNibblesFast(skyLight2048, arena.skyLightNibbles, 0);
+            int grayEnd = encodeGrayLightPlanesToBuf(arena.skyLightNibbles, CURVE_TO_YZX[CURVE_Y_H2], arena, dst, pos);
+            if (grayEnd - pos < 2048) {
+                skyMode = LIGHT_MODE_GRAY_PLANES;
+                pos = grayEnd;
+            } else {
+                skyMode = LIGHT_MODE_RAW;
+                System.arraycopy(skyLight2048, 0, dst, pos, 2048);
+                pos += 2048;
+            }
         }
 
         int blkMode;
@@ -4401,13 +4659,315 @@ final class LcaSectionCodec {
         } else if (blkIsConst) {
             blkMode = LIGHT_MODE_CONST;
         } else {
-            blkMode = LIGHT_MODE_RAW;
-            System.arraycopy(blockLight2048, 0, dst, pos, 2048);
-            pos += 2048;
+            extractLightNibblesFast(blockLight2048, arena.blkLightNibbles, 0);
+            int grayEnd = encodeGrayLightPlanesToBuf(arena.blkLightNibbles, CURVE_TO_YZX[CURVE_H3], arena, dst, pos);
+            if (grayEnd - pos < 2048) {
+                blkMode = LIGHT_MODE_GRAY_PLANES;
+                pos = grayEnd;
+            } else {
+                blkMode = LIGHT_MODE_RAW;
+                System.arraycopy(blockLight2048, 0, dst, pos, 2048);
+                pos += 2048;
+            }
         }
 
         dst[dstStart] = (byte) ((curveId << 6) | (blockEncodingMode << 4) | (skyMode << 2) | blkMode);
         return pos - dstStart;
+    }
+
+    /**
+     * Accumulates small chunk/section framing bytes in a scratch {@code byte[]} while recording
+     * zero-copy external {@link ByteBuffer} slices (e.g. off-heap Mode A block payloads), emitting
+     * an ordered {@link ByteBuffer}[] for vectored {@code FileChannel.write(ByteBuffer[])}
+     * (`anvil-api-ADR-007`).
+     */
+    static final class GatherFrameBuilder {
+        private byte[] framingBuf;
+        private int framingPos;
+        private int totalByteLen;
+        private int externalCount;
+        private int segCount;
+        private int[] segOff = new int[48];
+        private int[] segLen = new int[48];
+        private ByteBuffer[] segExternal = new ByteBuffer[48];
+        private int openFramingStart;
+
+        void reset(byte[] scratchBuf, int initialFramingPos) {
+            this.framingBuf = scratchBuf;
+            this.framingPos = initialFramingPos;
+            this.totalByteLen = initialFramingPos;
+            this.externalCount = 0;
+            this.segCount = 0;
+            this.openFramingStart = 0;
+        }
+
+        byte[] framingBuf() {
+            return framingBuf;
+        }
+
+        int framingPos() {
+            return framingPos;
+        }
+
+        int totalByteLen() {
+            return totalByteLen;
+        }
+
+        boolean hasExternalBuffers() {
+            return externalCount > 0;
+        }
+
+        byte[] ensureFramingCap(int required, ScratchArena arena) {
+            if (required <= framingBuf.length) {
+                return framingBuf;
+            }
+            if (arena != null && framingBuf == arena.chunkFrameStaging) {
+                framingBuf = arena.ensureChunkFrameCap(required);
+                return framingBuf;
+            }
+            int newCap = Math.max(required, framingBuf.length << 1);
+            framingBuf = Arrays.copyOf(framingBuf, newCap);
+            return framingBuf;
+        }
+
+        void advanceFraming(int delta) {
+            this.framingPos += delta;
+            this.totalByteLen += delta;
+        }
+
+        void setFramingPos(int newPos) {
+            int delta = newPos - this.framingPos;
+            this.framingPos = newPos;
+            this.totalByteLen += delta;
+        }
+
+        void appendFramingBytes(byte[] src, int off, int len, ScratchArena arena) {
+            if (len <= 0) {
+                return;
+            }
+            ensureFramingCap(framingPos + len, arena);
+            System.arraycopy(src, off, framingBuf, framingPos, len);
+            framingPos += len;
+            totalByteLen += len;
+        }
+
+        void appendZeroPad(int count, ScratchArena arena) {
+            if (count <= 0) {
+                return;
+            }
+            ensureFramingCap(framingPos + count, arena);
+            Arrays.fill(framingBuf, framingPos, framingPos + count, (byte) 0);
+            framingPos += count;
+            totalByteLen += count;
+        }
+
+        void appendExternalSlice(ByteBuffer slice) {
+            if (slice == null || !slice.hasRemaining()) {
+                return;
+            }
+            if (framingPos > openFramingStart) {
+                addSegment(openFramingStart, framingPos - openFramingStart, null);
+            }
+            int len = slice.remaining();
+            addSegment(0, len, slice);
+            totalByteLen += len;
+            externalCount++;
+            openFramingStart = framingPos;
+        }
+
+        private void addSegment(int off, int len, ByteBuffer ext) {
+            if (segCount == segOff.length) {
+                int next = segOff.length << 1;
+                segOff = Arrays.copyOf(segOff, next);
+                segLen = Arrays.copyOf(segLen, next);
+                segExternal = Arrays.copyOf(segExternal, next);
+            }
+            segOff[segCount] = off;
+            segLen[segCount] = len;
+            segExternal[segCount] = ext;
+            segCount++;
+        }
+
+        ByteBuffer[] buildGatherBuffers() {
+            if (framingPos > openFramingStart) {
+                addSegment(openFramingStart, framingPos - openFramingStart, null);
+                openFramingStart = framingPos;
+            }
+            byte[] ownedFraming = Arrays.copyOf(framingBuf, framingPos);
+            ByteBuffer[] out = new ByteBuffer[segCount];
+            for (int i = 0; i < segCount; i++) {
+                ByteBuffer ext = segExternal[i];
+                out[i] = ext != null ? ext.duplicate() : ByteBuffer.wrap(ownedFraming, segOff[i], segLen[i]);
+            }
+            return out;
+        }
+
+        byte[] toContiguousBytes() {
+            if (externalCount == 0) {
+                return Arrays.copyOf(framingBuf, framingPos);
+            }
+            if (framingPos > openFramingStart) {
+                addSegment(openFramingStart, framingPos - openFramingStart, null);
+                openFramingStart = framingPos;
+            }
+            byte[] out = new byte[totalByteLen];
+            int cursor = 0;
+            for (int i = 0; i < segCount; i++) {
+                ByteBuffer ext = segExternal[i];
+                int len = segLen[i];
+                if (ext != null) {
+                    ByteBuffer dup = ext.duplicate();
+                    dup.get(out, cursor, len);
+                } else {
+                    System.arraycopy(framingBuf, segOff[i], out, cursor, len);
+                }
+                cursor += len;
+            }
+            return out;
+        }
+    }
+
+    /**
+     * Encodes a single Mode A section into {@code builder}, emitting clean off-heap
+     * {@link LcaModeABlockSection.DirectModeASectionRef} voxel payloads as zero-copy external
+     * {@link ByteBuffer} slices while keeping all ICD v3 section framing byte-identical to
+     * {@link #encodeSectionModeAPassthroughToBuf} (`anvil-api-ADR-007`).
+     */
+    static int encodeSectionModeAGather(
+            int[] blockDictIds,
+            LcaModeABlockSection.DirectModeASectionRef offHeapModeA,
+            LcaModeABlockSection preEncodedModeA,
+            byte[] preEncodedFlatBytes,
+            int preEncodedFlatBits,
+            boolean hasPrecomputedOctreeMask,
+            long precomputedOctreeMask64,
+            long[] rawBlockDataLongs,
+            int[] rawBiomeGlobalDictIds,
+            long[] rawBiomeDataLongs,
+            byte[] skyLight2048,
+            byte[] blockLight2048,
+            int chunkDefaultBiomeDictId,
+            int sectionBiomeTemplateIdx,
+            ScratchArena arena,
+            GatherFrameBuilder builder
+    ) {
+        int palLen = blockDictIds.length;
+        if (offHeapModeA == null || offHeapModeA.paletteLength() != palLen || palLen <= 1) {
+            int extraModeA = preEncodedModeA != null ? preEncodedModeA.payloadByteLength() : 0;
+            int biomeExtra = (rawBiomeGlobalDictIds != null && rawBiomeGlobalDictIds.length > 1)
+                    ? maxEncodedBiomeBytes(rawBiomeGlobalDictIds, rawBiomeDataLongs)
+                    : 64;
+            byte[] dst = builder.ensureFramingCap(
+                    builder.framingPos() + 10240 + extraModeA + biomeExtra + (palLen * 5), arena);
+            int res = encodeSectionModeAPassthroughToBuf(
+                    blockDictIds,
+                    preEncodedModeA,
+                    preEncodedFlatBytes,
+                    preEncodedFlatBits,
+                    hasPrecomputedOctreeMask,
+                    precomputedOctreeMask64,
+                    rawBlockDataLongs,
+                    rawBiomeGlobalDictIds,
+                    rawBiomeDataLongs,
+                    skyLight2048,
+                    blockLight2048,
+                    chunkDefaultBiomeDictId,
+                    sectionBiomeTemplateIdx,
+                    arena,
+                    dst,
+                    builder.framingPos()
+            );
+            if (res > 0) {
+                builder.advanceFraming(res);
+            }
+            return res;
+        }
+
+        int biomeWorst = ((sectionBiomeTemplateIdx & ~0x3F) == 0)
+                ? 2
+                : (rawBiomeGlobalDictIds != null
+                        ? Math.max(64, maxEncodedBiomeBytes(rawBiomeGlobalDictIds, rawBiomeDataLongs))
+                        : 64);
+        int framingHeadroom = 16 + (palLen * 5) + biomeWorst + 4224;
+        builder.ensureFramingCap(builder.framingPos() + framingHeadroom, arena);
+
+        int startTotal = builder.totalByteLen();
+        int hdrFramingPos = builder.framingPos();
+        byte[] dst = builder.framingBuf();
+        int pos = hdrFramingPos + 1;
+
+        int curveId = offHeapModeA.curveId();
+        int blockEncodingMode = offHeapModeA.blockMode();
+        if (blockEncodingMode == BLOCK_MODE_DELTA_ROARING || blockEncodingMode == BLOCK_MODE_FLAT_BITPACK) {
+            writeLongBEToBuf(dst, pos, offHeapModeA.octreeMask64());
+            pos += 8;
+        }
+        pos = writeVarIntToBuf(dst, pos, palLen);
+        for (int i = 0; i < palLen; i++) {
+            pos = writeVarIntToBuf(dst, pos, blockDictIds[i]);
+        }
+        builder.setFramingPos(pos);
+
+        // Zero-copy direct ByteBuffer slice of off-heap voxel payload (0 heap byte[] copies)
+        builder.appendExternalSlice(offHeapModeA.slicePayload());
+
+        pos = builder.framingPos();
+        dst = builder.framingBuf();
+        if ((sectionBiomeTemplateIdx & ~0x3F) == 0) {
+            dst[pos++] = (byte) (0x80 | sectionBiomeTemplateIdx);
+        } else {
+            pos = encodeBiomesToBuf(dst, pos, rawBiomeGlobalDictIds, rawBiomeDataLongs, chunkDefaultBiomeDictId, arena);
+        }
+
+        int skyConst = checkUniformLightNibbleFast(skyLight2048, 0);
+        int blkConst = checkUniformLightNibbleFast(blockLight2048, 0);
+        boolean skyIsConst = (skyLight2048 != null && skyConst >= 0);
+        boolean blkIsConst = (blockLight2048 != null && blkConst >= 0);
+        if (skyIsConst || blkIsConst) {
+            int sc = skyIsConst ? (skyConst & 0x0F) : 0;
+            int bc = blkIsConst ? (blkConst & 0x0F) : 0;
+            dst[pos++] = (byte) ((bc << 4) | sc);
+        }
+
+        int skyMode;
+        if (skyLight2048 == null) {
+            skyMode = LIGHT_MODE_ABSENT;
+        } else if (skyIsConst) {
+            skyMode = LIGHT_MODE_CONST;
+        } else {
+            extractLightNibblesFast(skyLight2048, arena.skyLightNibbles, 0);
+            int grayEnd = encodeGrayLightPlanesToBuf(arena.skyLightNibbles, CURVE_TO_YZX[CURVE_Y_H2], arena, dst, pos);
+            if (grayEnd - pos < 2048) {
+                skyMode = LIGHT_MODE_GRAY_PLANES;
+                pos = grayEnd;
+            } else {
+                skyMode = LIGHT_MODE_RAW;
+                System.arraycopy(skyLight2048, 0, dst, pos, 2048);
+                pos += 2048;
+            }
+        }
+
+        int blkMode;
+        if (blockLight2048 == null) {
+            blkMode = LIGHT_MODE_ABSENT;
+        } else if (blkIsConst) {
+            blkMode = LIGHT_MODE_CONST;
+        } else {
+            extractLightNibblesFast(blockLight2048, arena.blkLightNibbles, 0);
+            int grayEnd = encodeGrayLightPlanesToBuf(arena.blkLightNibbles, CURVE_TO_YZX[CURVE_H3], arena, dst, pos);
+            if (grayEnd - pos < 2048) {
+                blkMode = LIGHT_MODE_GRAY_PLANES;
+                pos = grayEnd;
+            } else {
+                blkMode = LIGHT_MODE_RAW;
+                System.arraycopy(blockLight2048, 0, dst, pos, 2048);
+                pos += 2048;
+            }
+        }
+
+        builder.setFramingPos(pos);
+        builder.framingBuf()[hdrFramingPos] = (byte) ((curveId << 6) | (blockEncodingMode << 4) | (skyMode << 2) | blkMode);
+        return builder.totalByteLen() - startTotal;
     }
 
     private static int encodeGrayLightPlanesToBuf(
@@ -4500,34 +5060,6 @@ final class LcaSectionCodec {
         return pos;
     }
 
-    private static int extractGrayPlaneRuns(
-            int[] grayCurve, int mask, int refMask, int invertTarget, int[] staging
-    ) {
-        int runCount = 0;
-        int cursor = 0;
-        int i = 0;
-        while (i < SECTION_VOXELS) {
-            int bit = (grayCurve[i] & mask) ^ invertTarget;
-            int ref = (refMask != 0 && (grayCurve[i] & refMask) != 0) ? mask : 0;
-            if ((bit ^ ref) == 0) {
-                i++;
-                continue;
-            }
-            int start = i++;
-            while (i < SECTION_VOXELS) {
-                int b2 = (grayCurve[i] & mask) ^ invertTarget;
-                int r2 = (refMask != 0 && (grayCurve[i] & refMask) != 0) ? mask : 0;
-                if ((b2 ^ r2) == 0) break;
-                i++;
-            }
-            int gap = start - cursor;
-            int len = i - start;
-            staging[runCount++] = (gap << 16) | ((len - 1) & 0xFFFF);
-            cursor = i;
-        }
-        return runCount;
-    }
-
     static int emitGraySubModeCandidate(
             int[] staging, int runCount, int refCode, boolean split62, byte[] dst, int startPos
     ) {
@@ -4554,6 +5086,23 @@ final class LcaSectionCodec {
         return pos - startPos;
     }
 
+    static int maxEncodedBiomeBytes(int[] rawBiomeGlobalDictIds, long[] rawBiomeDataLongs) {
+        if (rawBiomeGlobalDictIds == null || rawBiomeGlobalDictIds.length == 0) {
+            return 1;
+        }
+        int bLen = rawBiomeGlobalDictIds.length;
+        if (bLen == 1) {
+            return 10;
+        }
+        if (bLen > BIOME_CELLS || BiomePaletteSection.isPerBlockGrid(bLen, rawBiomeDataLongs)) {
+            int numLongs = BiomePaletteSection.requiredLongs(bLen, BIOME_4096_CELLS);
+            // Marker (1B) + actualBLen (<=5B) + palette dictIds (<=5B each) + mode (1B) + min(RLE, rawPacked)
+            return 32 + (bLen * 5) + (numLongs << 3);
+        }
+        // Legacy 4x4x4: bLen (<=5B) + palette dictIds + runCount + <=64 runs
+        return 32 + (bLen * 5) + (BIOME_CELLS * 6);
+    }
+
     static int encodeBiomesToBuf(
             byte[] dst,
             int pos,
@@ -4568,6 +5117,9 @@ final class LcaSectionCodec {
         int bLen = rawBiomeGlobalDictIds.length;
         if (bLen == 1 && rawBiomeGlobalDictIds[0] == chunkDefaultBiomeDictId && chunkDefaultBiomeDictId >= 0) {
             return writeVarIntToBuf(dst, pos, 0);
+        }
+        if (bLen > 1 && (bLen > BIOME_CELLS || BiomePaletteSection.isPerBlockGrid(bLen, rawBiomeDataLongs))) {
+            return encodeBiome4096ToBuf(dst, pos, rawBiomeGlobalDictIds, rawBiomeDataLongs, arena);
         }
         pos = writeVarIntToBuf(dst, pos, bLen);
         for (int id : rawBiomeGlobalDictIds) {
@@ -4627,6 +5179,122 @@ final class LcaSectionCodec {
             for (int r = 0; r < runCount; r++) {
                 pos = writeVarIntToBuf(dst, pos, staging[r] >>> 8);
                 dst[pos++] = (byte) (staging[r] & 0xFF);
+            }
+        }
+        return pos;
+    }
+
+    /**
+     * Encodes a MC 26.4+ 16x16x16 per-block biome section inside LCA V3 ({@code 0x0003}) using
+     * {@code BIOME_4096_MARKER = 65}, picking the smaller of {@code CURVE_XZY} extended RLE
+     * ({@code mode 0x00}) and raw big-endian MC-packed {@code long[]} ({@code mode 0x01}).
+     */
+    private static int encodeBiome4096ToBuf(
+            byte[] dst,
+            int pos,
+            int[] rawBiomeGlobalDictIds,
+            long[] rawBiomeDataLongs,
+            ScratchArena arena
+    ) {
+        int bLen = rawBiomeGlobalDictIds.length;
+        if (bLen > BIOME_4096_CELLS) {
+            throw new IllegalArgumentException("Biome palette exceeds 4096 entries: " + bLen);
+        }
+        int[] cells = arena.ensureBiome4096Cells();
+        int bits = BiomePaletteSection.biomeBitsPerEntry(bLen);
+        int entriesPerLong = 64 / bits;
+        int numLongs = (BIOME_4096_CELLS + entriesPerLong - 1) / entriesPerLong;
+        if (rawBiomeDataLongs == null || rawBiomeDataLongs.length == 0) {
+            Arrays.fill(cells, 0);
+        } else {
+            long mask = (1L << bits) - 1L;
+            int idx = 0;
+            for (int w = 0; w < rawBiomeDataLongs.length && idx < BIOME_4096_CELLS; w++) {
+                long word = rawBiomeDataLongs[w];
+                int lim = Math.min(entriesPerLong, BIOME_4096_CELLS - idx);
+                for (int s = 0; s < lim; s++) {
+                    int p = (int) (word & mask);
+                    if (p >= bLen) p = 0;
+                    cells[idx++] = p;
+                    word >>>= bits;
+                }
+            }
+            while (idx < BIOME_4096_CELLS) {
+                cells[idx++] = 0;
+            }
+        }
+
+        arena.ensureSectionEncodeBuffers();
+        int[] staging = arena.runStaging;
+        int[] curveToYzx = CURVE_TO_YZX[CURVE_XZY];
+        int runCount = 0;
+        int curVal = cells[curveToYzx[0]];
+        int curLen = 1;
+        int rleBodyBytes = 0;
+        boolean compact1B = (bLen <= 8);
+        for (int i = 1; i < BIOME_4096_CELLS; i++) {
+            int v = cells[curveToYzx[i]];
+            if (v == curVal) {
+                curLen++;
+            } else {
+                staging[runCount++] = (curVal << 12) | ((curLen - 1) & 0xFFF);
+                if (compact1B) {
+                    rleBodyBytes += (curLen <= 31) ? 1 : (1 + varIntLen(curLen - 32));
+                } else {
+                    rleBodyBytes += varIntLen(curVal) + varIntLen(curLen - 1);
+                }
+                curVal = v;
+                curLen = 1;
+            }
+        }
+        staging[runCount++] = (curVal << 12) | ((curLen - 1) & 0xFFF);
+        if (compact1B) {
+            rleBodyBytes += (curLen <= 31) ? 1 : (1 + varIntLen(curLen - 32));
+        } else {
+            rleBodyBytes += varIntLen(curVal) + varIntLen(curLen - 1);
+        }
+
+        int rleTotalBytes = varIntLen(runCount) + rleBodyBytes;
+        int rawTotalBytes = numLongs << 3;
+
+        pos = writeVarIntToBuf(dst, pos, BIOME_4096_MARKER);
+        pos = writeVarIntToBuf(dst, pos, bLen);
+        for (int id : rawBiomeGlobalDictIds) {
+            pos = writeVarIntToBuf(dst, pos, id);
+        }
+        if (rleTotalBytes < rawTotalBytes) {
+            dst[pos++] = (byte) BIOME_4096_MODE_RLE;
+            pos = writeVarIntToBuf(dst, pos, runCount);
+            if (compact1B) {
+                for (int r = 0; r < runCount; r++) {
+                    int entry = staging[r];
+                    int pIdx = (entry >>> 12) & 7;
+                    int len = (entry & 0xFFF) + 1;
+                    if (len <= 31) {
+                        dst[pos++] = (byte) ((pIdx << 5) | (len - 1));
+                    } else {
+                        dst[pos++] = (byte) ((pIdx << 5) | 31);
+                        pos = writeVarIntToBuf(dst, pos, len - 32);
+                    }
+                }
+            } else {
+                for (int r = 0; r < runCount; r++) {
+                    int entry = staging[r];
+                    pos = writeVarIntToBuf(dst, pos, entry >>> 12);
+                    pos = writeVarIntToBuf(dst, pos, entry & 0xFFF);
+                }
+            }
+        } else {
+            dst[pos++] = (byte) BIOME_4096_MODE_RAW_PACKED;
+            int cell = 0;
+            for (int w = 0; w < numLongs; w++) {
+                long word = 0L;
+                int lim = Math.min(entriesPerLong, BIOME_4096_CELLS - cell);
+                for (int s = 0; s < lim; s++) {
+                    word |= ((long) cells[cell++]) << (s * bits);
+                }
+                writeLongBEToBuf(dst, pos, word);
+                pos += 8;
             }
         }
         return pos;
@@ -4818,8 +5486,8 @@ final class LcaSectionCodec {
                         buf, pos, limit, paletteLen, curveId, octreeMask64, packedBlockLongs, bits);
             } else {
                 pos = decodeDeltaRoaringBlocks(
-                        buf, pos, limit, paletteLen, curveId, CURVE_TO_YZX[curveId], octreeMask64,
-                        packedBlockLongs, bits, entriesPerLong, formatVersion);
+                        buf, pos, limit, paletteLen, curveId, octreeMask64,
+                        packedBlockLongs, bits, formatVersion);
             }
         } else if (blockMode == BLOCK_MODE_FLAT_BITPACK) {
             arena = scratch();
@@ -4857,11 +5525,11 @@ final class LcaSectionCodec {
                 if (bLen > 0) {
                     if (arena == null) arena = scratch();
                     if (!skipBiomes) {
-                        biomePalette = new ArrayList<>(bLen);
+                        biomePalette = new ArrayList<>(bLen == BIOME_4096_MARKER ? 8 : bLen);
                     }
                     pos = decodeSectionBiomePayload(buf, pos, limit, bLen, dictBiomes, skipBiomes, biomePalette, arena);
-                    if (!skipBiomes && bLen > 1) {
-                        packedBiomeLongs = packBiomeLongs(arena.biomeCells, bLen);
+                    if (!skipBiomes && arena.lastDecodedBiomePaletteLen > 1) {
+                        packedBiomeLongs = packDecodedBiomesFromArena(arena);
                     }
                 }
             }
@@ -4888,62 +5556,15 @@ final class LcaSectionCodec {
                 canonicalPalette, baseNamePalette, packedBlockLongs, biomePalette, packedBiomeLongs, arena, formatVersion);
     }
 
-    private static void setPackedVoxel(long[] packed, int yzx, long p, int bits, int entriesPerLong) {
-        if (bits == 4) {
-            packed[yzx >>> 4] |= p << ((yzx & 15) << 2);
-        } else {
-            packed[yzx / entriesPerLong] |= p << ((yzx % entriesPerLong) * bits);
-        }
-    }
-
-    private static int decodeDeltaRoaringBlocks(
-            byte[] buf,
-            int pos,
-            int limit,
-            int paletteLen,
-            int[] curveToYzx,
-            long expectedOctreeMask64,
-            long[] packedBlockLongs,
-            int bits,
-            int entriesPerLong
-    ) throws CorruptRegionEntryException {
-        return decodeDeltaRoaringBlocks(
-                buf, pos, limit, paletteLen, curveToYzx, expectedOctreeMask64,
-                packedBlockLongs, bits, entriesPerLong, LcaRegionReader.LCA_FORMAT_VERSION);
-    }
-
-    private static int decodeDeltaRoaringBlocks(
-            byte[] buf,
-            int pos,
-            int limit,
-            int paletteLen,
-            int[] curveToYzx,
-            long expectedOctreeMask64,
-            long[] packedBlockLongs,
-            int bits,
-            int entriesPerLong,
-            int formatVersion
-    ) throws CorruptRegionEntryException {
-        int curveId = CURVE_YZX;
-        if (curveToYzx == CURVE_TO_YZX[CURVE_H3]) curveId = CURVE_H3;
-        else if (curveToYzx == CURVE_TO_YZX[CURVE_Y_H2]) curveId = CURVE_Y_H2;
-        else if (curveToYzx == CURVE_TO_YZX[CURVE_XZY]) curveId = CURVE_XZY;
-        return decodeDeltaRoaringBlocks(
-                buf, pos, limit, paletteLen, curveId, curveToYzx, expectedOctreeMask64,
-                packedBlockLongs, bits, entriesPerLong, formatVersion);
-    }
-
     private static int decodeDeltaRoaringBlocks(
             byte[] buf,
             int pos,
             int limit,
             int paletteLen,
             int curveId,
-            int[] curveToYzx,
             long expectedOctreeMask64,
             long[] packedBlockLongs,
             int bits,
-            int entriesPerLong,
             int formatVersion
     ) throws CorruptRegionEntryException {
         int[] curveToLoc = CURVE_BITS_TO_PACKED_LOC[curveId][bits];
@@ -5442,7 +6063,18 @@ final class LcaSectionCodec {
             List<String> biomePaletteOut,
             ScratchArena arena
     ) throws CorruptRegionEntryException {
-        if (bLen > BIOME_CELLS) {
+        if (bLen == BIOME_4096_MARKER) {
+            pos = decodeBiome4096PayloadToArenaDictIds(buf, pos, limit, dictBiomes.size(), skipBiomes, arena);
+            if (!skipBiomes) {
+                int actualBLen = arena.lastDecodedBiomePaletteLen;
+                int[] bIds = arena.biome4096PaletteDictIds;
+                for (int i = 0; i < actualBLen; i++) {
+                    biomePaletteOut.add(dictBiomes.get(bIds[i]));
+                }
+            }
+            return pos;
+        }
+        if (bLen <= 0 || bLen > BIOME_CELLS) {
             throw new CorruptRegionEntryException("CBIT T7: Invalid biome palette length " + bLen);
         }
         for (int i = 0; i < bLen; i++) {
@@ -5500,6 +6132,138 @@ final class LcaSectionCodec {
                 }
             }
         }
+        arena.lastDecodedBiomePaletteLen = bLen;
+        arena.lastDecodedBiomeCellCount = BIOME_CELLS;
+        return pos;
+    }
+
+    /**
+     * Decodes a V3 {@code BIOME_4096_MARKER} (65) 16x16x16 per-block biome payload into
+     * {@code arena.biome4096PaletteDictIds[0..actualBLen)} and {@code arena.biome4096Cells[0..4096)}
+     * (unless {@code skipCells} is true). Enforces strict CBIT T5/T6/T7 bounds.
+     */
+    private static int decodeBiome4096PayloadToArenaDictIds(
+            byte[] buf,
+            int pos,
+            int limit,
+            int dictLimit,
+            boolean skipCells,
+            ScratchArena arena
+    ) throws CorruptRegionEntryException {
+        int actualBLen = readVarInt(buf, pos, limit);
+        pos += varIntLen(actualBLen);
+        if (actualBLen < 2 || actualBLen > BIOME_4096_CELLS) {
+            throw new CorruptRegionEntryException("CBIT T7: Invalid 4096-biome palette length " + actualBLen);
+        }
+        int[] bIds = skipCells ? null : arena.ensureBiome4096PaletteDictIds(actualBLen);
+        for (int i = 0; i < actualBLen; i++) {
+            int bDictId = readVarInt(buf, pos, limit);
+            pos += varIntLen(bDictId);
+            if (bDictId < 0 || bDictId >= dictLimit) {
+                throw new CorruptRegionEntryException("CBIT T7: Biome dictId " + bDictId + " out of range");
+            }
+            if (bIds != null) {
+                bIds[i] = bDictId;
+            }
+        }
+        if (pos >= limit) {
+            throw new CorruptRegionEntryException("CBIT T5: Truncated 4096-biome encoding mode");
+        }
+        int mode = buf[pos++] & 0xFF;
+        if (mode == BIOME_4096_MODE_RLE) {
+            int runCount = readVarInt(buf, pos, limit);
+            pos += varIntLen(runCount);
+            if (runCount < 1 || runCount > BIOME_4096_CELLS) {
+                throw new CorruptRegionEntryException("CBIT T6: Invalid 4096-biome RLE runCount " + runCount);
+            }
+            int[] cells = skipCells ? null : arena.ensureBiome4096Cells();
+            int[] curveToYzx = CURVE_TO_YZX[CURVE_XZY];
+            int cursor = 0;
+            if (actualBLen <= 8) {
+                for (int r = 0; r < runCount; r++) {
+                    if (pos >= limit) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated 4096-biome 1B RLE");
+                    }
+                    int packed = buf[pos++] & 0xFF;
+                    int pIdx = (packed >>> 5) & 7;
+                    int lenCode = packed & 0x1F;
+                    int len;
+                    if (lenCode < 31) {
+                        len = lenCode + 1;
+                    } else {
+                        int ext = readVarInt(buf, pos, limit);
+                        pos += varIntLen(ext);
+                        if (ext < 0 || ext > BIOME_4096_CELLS - 32) {
+                            throw new CorruptRegionEntryException("CBIT T6: 4096-biome RLE ext length overflow");
+                        }
+                        len = 32 + ext;
+                    }
+                    if (pIdx >= actualBLen || cursor + len > BIOME_4096_CELLS) {
+                        throw new CorruptRegionEntryException("CBIT T6: 4096-biome RLE cursor overflow");
+                    }
+                    if (cells != null) {
+                        for (int k = 0; k < len; k++) {
+                            cells[curveToYzx[cursor++]] = pIdx;
+                        }
+                    } else {
+                        cursor += len;
+                    }
+                }
+            } else {
+                for (int r = 0; r < runCount; r++) {
+                    int pIdx = readVarInt(buf, pos, limit);
+                    pos += varIntLen(pIdx);
+                    int lenM1 = readVarInt(buf, pos, limit);
+                    pos += varIntLen(lenM1);
+                    if (pIdx < 0 || pIdx >= actualBLen || lenM1 < 0 || lenM1 >= BIOME_4096_CELLS
+                            || cursor + lenM1 + 1 > BIOME_4096_CELLS) {
+                        throw new CorruptRegionEntryException("CBIT T6: 4096-biome RLE cursor overflow");
+                    }
+                    int len = lenM1 + 1;
+                    if (cells != null) {
+                        for (int k = 0; k < len; k++) {
+                            cells[curveToYzx[cursor++]] = pIdx;
+                        }
+                    } else {
+                        cursor += len;
+                    }
+                }
+            }
+            if (cursor != BIOME_4096_CELLS) {
+                throw new CorruptRegionEntryException("CBIT T6: 4096-biome RLE underflow (" + cursor + " != 4096)");
+            }
+        } else if (mode == BIOME_4096_MODE_RAW_PACKED) {
+            int bits = BiomePaletteSection.biomeBitsPerEntry(actualBLen);
+            int entriesPerLong = 64 / bits;
+            int numLongs = (BIOME_4096_CELLS + entriesPerLong - 1) / entriesPerLong;
+            int byteLen = numLongs << 3;
+            if (pos + byteLen > limit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated raw 4096-biome long array");
+            }
+            if (!skipCells) {
+                int[] cells = arena.ensureBiome4096Cells();
+                long mask = (1L << bits) - 1L;
+                int idx = 0;
+                for (int w = 0; w < numLongs; w++) {
+                    long word = readLongBE(buf, pos + (w << 3));
+                    int lim = Math.min(entriesPerLong, BIOME_4096_CELLS - idx);
+                    for (int s = 0; s < lim; s++) {
+                        int pIdx = (int) (word & mask);
+                        if (pIdx >= actualBLen) {
+                            throw new CorruptRegionEntryException(
+                                    "CBIT T7: Raw 4096-biome palette index " + pIdx + " >= " + actualBLen);
+                        }
+                        cells[idx++] = pIdx;
+                        word >>>= bits;
+                    }
+                }
+            }
+            pos += byteLen;
+        } else {
+            throw new CorruptRegionEntryException("CBIT T5: Unsupported 4096-biome encoding mode " + mode);
+        }
+        arena.lastDecodedBiomePaletteLen = actualBLen;
+        arena.lastDecodedBiomeCellCount = BIOME_4096_CELLS;
         return pos;
     }
 
@@ -5547,7 +6311,7 @@ final class LcaSectionCodec {
                 pos = LcaV3Codec.decodeEikonalLightToNibbles(
                         buf, pos, limit, sentinelHdr, true, voxLightProps, arena.skyLightNibbles);
             } else {
-                pos = decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], arena, formatVersion);
+                pos = decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], arena);
             }
             sky2048 = packLightNibbles(arena.skyLightNibbles);
         } else {
@@ -5574,7 +6338,7 @@ final class LcaSectionCodec {
                 LcaV3Codec.decodeEikonalLightToNibbles(
                         buf, pos, limit, sentinelHdr, false, voxLightProps, arena.skyLightNibbles);
             } else {
-                decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], arena, formatVersion);
+                decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], arena);
             }
             blk2048 = packLightNibbles(arena.skyLightNibbles);
         } else {
@@ -5613,12 +6377,6 @@ final class LcaSectionCodec {
 
     private static int decodeGrayPlanes(
             byte[] buf, int pos, int limit, int[] curveToYzx, ScratchArena arena
-    ) throws CorruptRegionEntryException {
-        return decodeGrayPlanes(buf, pos, limit, curveToYzx, arena, LcaRegionReader.LCA_FORMAT_VERSION);
-    }
-
-    private static int decodeGrayPlanes(
-            byte[] buf, int pos, int limit, int[] curveToYzx, ScratchArena arena, int formatVersion
     ) throws CorruptRegionEntryException {
         if (pos >= limit) throw new CorruptRegionEntryException("CBIT: Truncated Gray light planeModes8 header");
         int planeModes8 = buf[pos++] & 0xFF;
@@ -5785,20 +6543,30 @@ final class LcaSectionCodec {
     }
 
     static long[] packBiomeLongs(int[] cells64, int paletteSize) {
+        return packBiomeLongs(cells64, paletteSize, BIOME_CELLS);
+    }
+
+    static long[] packBiomeLongs(int[] cells, int paletteSize, int cellCount) {
         int bits = BiomePaletteSection.biomeBitsPerEntry(paletteSize);
         int entriesPerLong = 64 / bits;
-        int numLongs = (BIOME_CELLS + entriesPerLong - 1) / entriesPerLong;
+        int numLongs = (cellCount + entriesPerLong - 1) / entriesPerLong;
         long[] longs = new long[numLongs];
         int cell = 0;
         for (int w = 0; w < numLongs; w++) {
             long word = 0L;
-            int limit = Math.min(entriesPerLong, BIOME_CELLS - cell);
+            int limit = Math.min(entriesPerLong, cellCount - cell);
             for (int s = 0; s < limit; s++) {
-                word |= ((long) cells64[cell++]) << (s * bits);
+                word |= ((long) cells[cell++]) << (s * bits);
             }
             longs[w] = word;
         }
         return longs;
+    }
+
+    static long[] packDecodedBiomesFromArena(ScratchArena arena) {
+        int cellCount = arena.lastDecodedBiomeCellCount;
+        int[] cells = (cellCount == BIOME_4096_CELLS) ? arena.biome4096Cells : arena.biomeCells;
+        return packBiomeLongs(cells, arena.lastDecodedBiomePaletteLen, cellCount);
     }
 
     static void writeLongBEToBuf(byte[] dst, int offset, long v) {
@@ -5929,7 +6697,8 @@ final class LcaSectionCodec {
             LinkedHashMap<String, Object> rootMap,
             List<Object> lowBoundarySections,
             List<Object> highBoundarySections,
-            boolean nonVoxelRoot
+            boolean nonVoxelRoot,
+            Map<Integer, Map<String, Object>> sectionExtrasByY
     ) {}
 
     @SuppressWarnings("java:S1199")
@@ -5956,7 +6725,12 @@ final class LcaSectionCodec {
         int pos = fOff + residualRelStart;
         int limit = fOff + residualRelEnd;
         if (pos + 2 > limit) {
-            return new ResidualTailDecoded(new LinkedHashMap<>(), Collections.emptyList(), Collections.emptyList(), false);
+            return new ResidualTailDecoded(
+                    new LinkedHashMap<>(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    false,
+                    Collections.emptyMap());
         }
         int bpFlags = readUint16BE(frame, pos);
         pos += 2;
@@ -5964,6 +6738,7 @@ final class LcaSectionCodec {
         LinkedHashMap<String, Object> root = new LinkedHashMap<>();
         List<Object> lowBoundarySections = Collections.emptyList();
         List<Object> highBoundarySections = Collections.emptyList();
+        Map<Integer, Map<String, Object>> sectionExtrasByY = Collections.emptyMap();
         boolean nonVoxelRoot = false;
         List<long[]> decodedHmByOrder = new ArrayList<>(6);
         LinkedHashMap<String, Object> hmOut = new LinkedHashMap<>();
@@ -6086,6 +6861,24 @@ final class LcaSectionCodec {
                     root.put("block_entities", LcaV3Codec.decodeColumnarBlockEntitiesToList(frame, pos, pos + beLen, chunkX, chunkZ));
                     pos += beLen;
                 }
+                if ((extFlags & LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING) != 0) {
+                    int ppLen = readVarInt(frame, pos, tailLimit);
+                    pos += varIntLen(ppLen);
+                    if (ppLen < 1 || pos + ppLen > tailLimit) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated v3 sparse PostProcessing");
+                    }
+                    root.put("PostProcessing", LcaV3Codec.decodeSparsePostProcessingToList(frame, pos, pos + ppLen));
+                    pos += ppLen;
+                }
+                if ((extFlags & LcaV3Codec.EXT_FLAG_DICT_STRUCTURES) != 0) {
+                    int stLen = readVarInt(frame, pos, tailLimit);
+                    pos += varIntLen(stLen);
+                    if (stLen < 1 || pos + stLen > tailLimit) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated v3 dict structures");
+                    }
+                    root.put("structures", LcaV3Codec.decodeDictStructuresToMap(frame, pos, pos + stLen, chunkX, chunkZ));
+                    pos += stLen;
+                }
             }
             if ((bpFlags & 1024) != 0 && pos < tailLimit) {
                 byte[] nbtSlice = Arrays.copyOfRange(frame, pos, tailLimit);
@@ -6102,6 +6895,27 @@ final class LcaSectionCodec {
                 if (parsedNbt.remove("_lca_boundary_high") instanceof Nbt.NbtList highFallback) {
                     highBoundarySections = highFallback.items;
                 }
+                if (parsedNbt.remove("_lca_section_extras") instanceof Nbt.NbtList extrasList
+                        && !extrasList.items.isEmpty()) {
+                    Map<Integer, Map<String, Object>> byY = new LinkedHashMap<>(extrasList.items.size());
+                    for (Object item : extrasList.items) {
+                        if (!(item instanceof Map<?, ?> rawMap)) continue;
+                        Object yObj = rawMap.get("Y");
+                        if (!(yObj instanceof Number yNum)) continue;
+                        LinkedHashMap<String, Object> extraFields = new LinkedHashMap<>(Math.max(2, rawMap.size()));
+                        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                            if (entry.getKey() instanceof String key && !"Y".equals(key)) {
+                                extraFields.put(key, entry.getValue());
+                            }
+                        }
+                        if (!extraFields.isEmpty()) {
+                            byY.put(yNum.intValue(), extraFields);
+                        }
+                    }
+                    if (!byY.isEmpty()) {
+                        sectionExtrasByY = byY;
+                    }
+                }
                 root.putAll(parsedNbt);
             }
             if ((bpFlags & 2048) != 0) {
@@ -6112,7 +6926,7 @@ final class LcaSectionCodec {
         if (!hmOut.isEmpty()) {
             root.put("Heightmaps", hmOut);
         }
-        return new ResidualTailDecoded(root, lowBoundarySections, highBoundarySections, nonVoxelRoot);
+        return new ResidualTailDecoded(root, lowBoundarySections, highBoundarySections, nonVoxelRoot, sectionExtrasByY);
     }
 
     private static LinkedHashMap<String, Object> reconstructCompactBoundarySection(
@@ -6244,7 +7058,7 @@ final class LcaSectionCodec {
         int fullWords = Math.min(numLongs, 36);
         int col = 0;
         for (int w = 0; w < fullWords; w++) {
-            out[w] = ((long) cols[col])
+            out[w] = cols[col]
                     | (((long) cols[col + 1]) << 9)
                     | (((long) cols[col + 2]) << 18)
                     | (((long) cols[col + 3]) << 27)
@@ -6676,7 +7490,13 @@ final class LcaSectionCodec {
             List<BiomeTemplate> biomeTemplates
     ) {
         ScratchArena arena = scratch();
-        byte[] buf = arena.byteStaging;
+        int tmplCount = biomeTemplates == null ? 0 : biomeTemplates.size();
+        int maxNeed = 24 + (localStateCount * 5) + (localBiomeCount * 5);
+        for (int t = 0; t < tmplCount; t++) {
+            BiomeTemplate tmpl = biomeTemplates.get(t);
+            maxNeed += maxEncodedBiomeBytes(tmpl.biomeIds, tmpl.rawBiomeDataLongs);
+        }
+        byte[] buf = maxNeed <= arena.byteStaging.length ? arena.byteStaging : new byte[maxNeed];
         int pos = writeVarIntToBuf(buf, 0, localStateCount);
         for (int i = 0; i < localStateCount; i++) {
             pos = writeVarIntToBuf(buf, pos, localStateGlobalIds[i]);
@@ -6685,7 +7505,6 @@ final class LcaSectionCodec {
         for (int i = 0; i < localBiomeCount; i++) {
             pos = writeVarIntToBuf(buf, pos, localBiomeGlobalIds[i]);
         }
-        int tmplCount = biomeTemplates == null ? 0 : biomeTemplates.size();
         pos = writeVarIntToBuf(buf, pos, tmplCount);
         for (int t = 0; t < tmplCount; t++) {
             BiomeTemplate tmpl = biomeTemplates.get(t);
@@ -6800,7 +7619,7 @@ final class LcaSectionCodec {
 
         int biomeCount = readVarInt(frame, pos, limit);
         pos += varIntLen(biomeCount);
-        if (biomeCount < 0 || biomeCount > 1024) {
+        if (biomeCount < 0 || biomeCount > SECTION_VOXELS) {
             throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
         }
         int regionBiomeCount = regionMeta.biomes.size();
@@ -6840,14 +7659,15 @@ final class LcaSectionCodec {
                     }
                     tmplArr[t] = new BiomeTemplate(new int[]{bLocalId}, null, singletonBiomeArr[bLocalId], null);
                 } else {
-                    List<String> tmplPal = new ArrayList<>(bLen);
+                    List<String> tmplPal = new ArrayList<>(bLen == BIOME_4096_MARKER ? 8 : bLen);
                     pos = decodeSectionBiomePayload(frame, pos, limit, bLen, biomes, false, tmplPal, arena);
-                    int[] tmplIds = new int[bLen];
-                    for (int j = 0; j < bLen; j++) {
+                    int actualBLen = arena.lastDecodedBiomePaletteLen;
+                    int[] tmplIds = new int[actualBLen];
+                    for (int j = 0; j < actualBLen; j++) {
                         int idx = biomes.indexOf(tmplPal.get(j));
                         tmplIds[j] = Math.max(0, idx);
                     }
-                    long[] packedLongs = bLen > 1 ? packBiomeLongs(arena.biomeCells, bLen) : null;
+                    long[] packedLongs = actualBLen > 1 ? packDecodedBiomesFromArena(arena) : null;
                     tmplArr[t] = new BiomeTemplate(tmplIds, packedLongs, tmplPal, packedLongs);
                 }
             }
@@ -7632,10 +8452,6 @@ final class LcaSectionCodec {
         return out;
     }
 
-    private static byte[] encodeBaseStateBytesFromFrame(byte[] frame, int pos, int utfLen, boolean mcPrefix) {
-        return encodeBaseStateBytesFromFrame(frame, pos, utfLen, mcPrefix, false);
-    }
-
     static byte[] encodeBaseStateBytesFromFrame(
             byte[] frame, int pos, int utfLen, boolean mcPrefix, boolean modernKeys) {
         int totalUtf = (mcPrefix ? 10 : 0) + utfLen;
@@ -7837,7 +8653,7 @@ final class LcaSectionCodec {
 
         int biomeCount = readVarInt(frame, pos, limit);
         pos += varIntLen(biomeCount);
-        if (biomeCount < 0 || biomeCount > 1024) {
+        if (biomeCount < 0 || biomeCount > SECTION_VOXELS) {
             throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
         }
         byte[][] regionBiomeStr = regionMeta.ensureBiomeStringNbtBytes();
@@ -7897,6 +8713,49 @@ final class LcaSectionCodec {
             byte[][] targetArray,
             int targetIdx
     ) throws CorruptRegionEntryException {
+        if (bLen == BIOME_4096_MARKER) {
+            pos = decodeBiome4096PayloadToArenaDictIds(buf, pos, limit, dictBiomeStrNbt.length, false, arena);
+            int actualBLen = arena.lastDecodedBiomePaletteLen;
+            int[] bIds = arena.biome4096PaletteDictIds;
+            int totalStrBytes = 0;
+            for (int i = 0; i < actualBLen; i++) {
+                totalStrBytes += dictBiomeStrNbt[bIds[i]].length;
+            }
+            int bits = BiomePaletteSection.biomeBitsPerEntry(actualBLen);
+            int entriesPerLong = 64 / bits;
+            int numLongs = (BIOME_4096_CELLS + entriesPerLong - 1) / entriesPerLong;
+            int pLen = BIOMES_PALETTE_PREFIX_NBT.length;
+            int dLen = DATA_LONG_ARRAY_PREFIX_NBT.length;
+            byte[] comp = new byte[pLen + 4 + totalStrBytes + dLen + 4 + (numLongs << 3) + 1];
+            int cp = 0;
+            System.arraycopy(BIOMES_PALETTE_PREFIX_NBT, 0, comp, cp, pLen);
+            cp += pLen;
+            writeIntBEToBuf(comp, cp, actualBLen);
+            cp += 4;
+            for (int i = 0; i < actualBLen; i++) {
+                byte[] sb = dictBiomeStrNbt[bIds[i]];
+                System.arraycopy(sb, 0, comp, cp, sb.length);
+                cp += sb.length;
+            }
+            System.arraycopy(DATA_LONG_ARRAY_PREFIX_NBT, 0, comp, cp, dLen);
+            cp += dLen;
+            writeIntBEToBuf(comp, cp, numLongs);
+            cp += 4;
+            int[] cells = arena.biome4096Cells;
+            int cell = 0;
+            for (int w = 0; w < numLongs; w++) {
+                long word = 0L;
+                int lim = Math.min(entriesPerLong, BIOME_4096_CELLS - cell);
+                for (int s = 0; s < lim; s++) {
+                    word |= ((long) cells[cell++]) << (s * bits);
+                }
+                writeLongBEToBuf(comp, cp, word);
+                cp += 8;
+            }
+            comp[cp] = Nbt.TAG_END;
+            targetArray[targetIdx] = comp;
+            return pos;
+        }
         if (bLen <= 0 || bLen > BIOME_CELLS) {
             throw new CorruptRegionEntryException("CBIT T7: Invalid biome palette length " + bLen);
         }
@@ -8115,6 +8974,10 @@ final class LcaSectionCodec {
         int extFluidTicksLen = 0;
         int extBlockEntitiesStart = 0;
         int extBlockEntitiesLen = 0;
+        int extSparsePpStart = 0;
+        int extSparsePpLen = 0;
+        int extDictStructStart = 0;
+        int extDictStructLen = 0;
 
         int residualRelEnd = findResidualRelEnd(sectionRelStarts, sectionCount, residualRelStart, frameLen);
         if (hasResidualNbt) {
@@ -8204,6 +9067,26 @@ final class LcaSectionCodec {
                             extBlockEntitiesLen = beLen;
                             pos += beLen;
                         }
+                        if ((extFlags & LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING) != 0) {
+                            int ppLen = readVarInt(frame, pos, tailLimit);
+                            pos += varIntLen(ppLen);
+                            if (ppLen < 1 || pos + ppLen > tailLimit) {
+                                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 sparse PostProcessing");
+                            }
+                            extSparsePpStart = pos;
+                            extSparsePpLen = ppLen;
+                            pos += ppLen;
+                        }
+                        if ((extFlags & LcaV3Codec.EXT_FLAG_DICT_STRUCTURES) != 0) {
+                            int stLen = readVarInt(frame, pos, tailLimit);
+                            pos += varIntLen(stLen);
+                            if (stLen < 1 || pos + stLen > tailLimit) {
+                                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 dict structures");
+                            }
+                            extDictStructStart = pos;
+                            extDictStructLen = stLen;
+                            pos += stLen;
+                        }
                     }
                     if ((bpFlags & 1024) != 0 && pos < tailLimit) {
                         if ((bpFlags & 4096) != 0) {
@@ -8226,7 +9109,9 @@ final class LcaSectionCodec {
                                 || nbtSliceBuf[nbtSliceOff + nbtSliceLen - 1] != Nbt.TAG_END) {
                             return null;
                         }
-                        if (containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_BOUNDARY_MARKER_UTF8)) {
+                        if (containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_BOUNDARY_MARKER_UTF8)
+                                || containsSubArray(
+                                        nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_SECTION_EXTRAS_MARKER_UTF8)) {
                             return null;
                         }
                     }
@@ -8252,7 +9137,8 @@ final class LcaSectionCodec {
                 System.arraycopy(nbtSliceBuf, nbtSliceOff + 3, out, outPos, bodyLen);
                 outPos += bodyLen;
             }
-            if (statusOrdinal != 0xFE
+            if (statusOrdinal != STATUS_ORDINAL_ABSENT
+                    && statusOrdinal != STATUS_ORDINAL_RESIDUAL
                     && (nbtSliceBuf == null
                             || !containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, STATUS_KEY_UTF8))) {
                 outPos = writeStringTagToBuf(out, outPos, "Status", decodeStatusOrdinal(statusOrdinal));
@@ -8291,10 +9177,10 @@ final class LcaSectionCodec {
         outPos = writeIntTagWithPrefix(out, outPos, X_POS_PREFIX_NBT, (meta.regionX << 5) + rx);
         outPos = writeIntTagWithPrefix(out, outPos, Z_POS_PREFIX_NBT, (meta.regionZ << 5) + rz);
         outPos = writeIntTagWithPrefix(out, outPos, Y_POS_PREFIX_NBT, meta.minSectionY);
-        if (statusOrdinal == 0xFF) {
+        if (statusOrdinal == STATUS_ORDINAL_FULL) {
             System.arraycopy(STATUS_FULL_TAG_NBT, 0, out, outPos, STATUS_FULL_TAG_NBT.length);
             outPos += STATUS_FULL_TAG_NBT.length;
-        } else if (statusOrdinal != 0xFE) {
+        } else if (statusOrdinal != STATUS_ORDINAL_ABSENT && statusOrdinal != STATUS_ORDINAL_RESIDUAL) {
             outPos = writeStringTagToBuf(out, outPos, "Status", decodeStatusOrdinal(statusOrdinal));
         }
         outPos = writeLongTagWithPrefix(out, outPos, LAST_UPDATE_PREFIX_NBT, lastUpdateTick);
@@ -8356,6 +9242,17 @@ final class LcaSectionCodec {
         if (extBlockEntitiesLen > 0) {
             outPos = LcaV3Codec.decodeColumnarBlockEntitiesToNbt(
                     frame, extBlockEntitiesStart, extBlockEntitiesStart + extBlockEntitiesLen,
+                    (meta.regionX << 5) + rx, (meta.regionZ << 5) + rz, arena, outPos);
+            out = arena.nbtOutBuf;
+        }
+        if (extSparsePpLen > 0) {
+            outPos = LcaV3Codec.decodeSparsePostProcessingToNbt(
+                    frame, extSparsePpStart, extSparsePpStart + extSparsePpLen, arena, outPos);
+            out = arena.nbtOutBuf;
+        }
+        if (extDictStructLen > 0) {
+            outPos = LcaV3Codec.decodeDictStructuresToNbt(
+                    frame, extDictStructStart, extDictStructStart + extDictStructLen,
                     (meta.regionX << 5) + rx, (meta.regionZ << 5) + rz, arena, outPos);
             out = arena.nbtOutBuf;
         }
@@ -8486,6 +9383,7 @@ final class LcaSectionCodec {
                     int biomeTmplIdx = (entry16 >>> 11) & 3;
                     if (biomeTmplIdx < activeBiomeTemplateNbt.length) {
                         byte[] bmBytes = activeBiomeTemplateNbt[biomeTmplIdx];
+                        out = arena.ensureNbtCap(outPos + bmBytes.length + 4224);
                         System.arraycopy(bmBytes, 0, out, outPos, bmBytes.length);
                         outPos += bmBytes.length;
                     }
@@ -8533,7 +9431,7 @@ final class LcaSectionCodec {
                         activeStateNbt, activeBiomeStrNbt, activeSingleBiomeCompoundNbt,
                         activeBiomeTemplateNbt, defaultBiomeCompoundBytes, activeStateLightV1,
                         meta.airStateNbtBytes(modernKeys),
-                        arena, outPos, meta.formatVersion, (bpFlags & 64) != 0, modernKeys, omitBlockStates);
+                        arena, outPos, meta.formatVersion, (bpFlags & 64) != 0, omitBlockStates);
                 out = arena.nbtOutBuf;
             }
         }
@@ -8607,7 +9505,6 @@ final class LcaSectionCodec {
             int outPos,
             int formatVersion,
             boolean hasStarlightVersion,
-            boolean modernKeys,
             boolean omitBlockStates
     ) throws CorruptRegionEntryException {
         if (offset + 2 > limit) {
@@ -8711,8 +9608,8 @@ final class LcaSectionCodec {
                         buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
             } else {
                 pos = decodeDeltaRoaringBlocks(
-                        buf, pos, limit, paletteLen, CURVE_TO_YZX[curveId], octreeMask64,
-                        packed, bits, entriesPerLong, formatVersion);
+                        buf, pos, limit, paletteLen, curveId, octreeMask64,
+                        packed, bits, formatVersion);
             }
             System.arraycopy(DATA_LONG_ARRAY_PREFIX_NBT, 0, out, outPos, DATA_LONG_ARRAY_PREFIX_NBT.length);
             outPos += DATA_LONG_ARRAY_PREFIX_NBT.length;
@@ -8759,6 +9656,7 @@ final class LcaSectionCodec {
                     throw new CorruptRegionEntryException("CBIT T7: Biome template index " + tmplIdx + " out of bounds");
                 }
                 byte[] bmBytes = chunkBiomeTemplateNbt[tmplIdx];
+                out = arena.ensureNbtCap(outPos + bmBytes.length + 4224);
                 System.arraycopy(bmBytes, 0, out, outPos, bmBytes.length);
                 outPos += bmBytes.length;
             } else {
@@ -8767,13 +9665,16 @@ final class LcaSectionCodec {
                 if (bLen > 0) {
                     outPos = decodeAndWriteSectionBiomePayloadToBuf(
                             buf, pos, limit, bLen, dictBiomeStrNbt, dictSingleBiomeCompoundNbt, arena, out, outPos);
+                    out = arena.nbtOutBuf;
                     pos = arena.biomePaletteDictIds[0];
                 } else if (defaultBiomeCompoundBytes != null) {
+                    out = arena.ensureNbtCap(outPos + defaultBiomeCompoundBytes.length + 4224);
                     System.arraycopy(defaultBiomeCompoundBytes, 0, out, outPos, defaultBiomeCompoundBytes.length);
                     outPos += defaultBiomeCompoundBytes.length;
                 }
             }
         } else if (defaultBiomeCompoundBytes != null) {
+            out = arena.ensureNbtCap(outPos + defaultBiomeCompoundBytes.length + 4224);
             System.arraycopy(defaultBiomeCompoundBytes, 0, out, outPos, defaultBiomeCompoundBytes.length);
             outPos += defaultBiomeCompoundBytes.length;
         }
@@ -8828,7 +9729,7 @@ final class LcaSectionCodec {
                         buf, pos, limit, sentinelHdr, true, voxProps, arena.skyLightNibbles);
                 packLightNibblesIntoBuf(arena.skyLightNibbles, out, outPos);
             } else {
-                pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], out, outPos, formatVersion);
+                pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], out, outPos);
             }
             outPos += 2048;
             if (hasStarlightVersion) {
@@ -8879,7 +9780,6 @@ final class LcaSectionCodec {
                     decodeSectionBlockPayloadForLight(
                             buf, blockPayloadStart, limit, blockMode, secExtFlags, paletteLen,
                             curveId, octreeMask64, formatVersion, arena);
-                    blocksDecodedForLight = true;
                 }
                 byte[] voxProps = buildNbtSectionVoxLightProps(
                         blockMode, paletteLen, secPalIds, dictStateLightV1, arena);
@@ -8887,7 +9787,7 @@ final class LcaSectionCodec {
                         buf, pos, limit, sentinelHdr, false, voxProps, arena.skyLightNibbles);
                 packLightNibblesIntoBuf(arena.skyLightNibbles, out, outPos);
             } else {
-                decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], out, outPos, formatVersion);
+                decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], out, outPos);
             }
             outPos += 2048;
             if (hasStarlightVersion) {
@@ -8952,6 +9852,48 @@ final class LcaSectionCodec {
             byte[] out,
             int outPos
     ) throws CorruptRegionEntryException {
+        if (bLen == BIOME_4096_MARKER) {
+            pos = decodeBiome4096PayloadToArenaDictIds(buf, pos, limit, dictBiomeStrNbt.length, false, arena);
+            int actualBLen = arena.lastDecodedBiomePaletteLen;
+            int[] bIds = arena.biome4096PaletteDictIds;
+            int totalStrBytes = 0;
+            for (int i = 0; i < actualBLen; i++) {
+                totalStrBytes += dictBiomeStrNbt[bIds[i]].length;
+            }
+            int bits = BiomePaletteSection.biomeBitsPerEntry(actualBLen);
+            int entriesPerLong = 64 / bits;
+            int numLongs = (BIOME_4096_CELLS + entriesPerLong - 1) / entriesPerLong;
+            int needed = BIOMES_PALETTE_PREFIX_NBT.length + 4 + totalStrBytes
+                    + DATA_LONG_ARRAY_PREFIX_NBT.length + 4 + (numLongs << 3) + 1;
+            out = arena.ensureNbtCap(outPos + needed + 4224);
+            System.arraycopy(BIOMES_PALETTE_PREFIX_NBT, 0, out, outPos, BIOMES_PALETTE_PREFIX_NBT.length);
+            outPos += BIOMES_PALETTE_PREFIX_NBT.length;
+            writeIntBEToBuf(out, outPos, actualBLen);
+            outPos += 4;
+            for (int i = 0; i < actualBLen; i++) {
+                byte[] sb = dictBiomeStrNbt[bIds[i]];
+                System.arraycopy(sb, 0, out, outPos, sb.length);
+                outPos += sb.length;
+            }
+            System.arraycopy(DATA_LONG_ARRAY_PREFIX_NBT, 0, out, outPos, DATA_LONG_ARRAY_PREFIX_NBT.length);
+            outPos += DATA_LONG_ARRAY_PREFIX_NBT.length;
+            writeIntBEToBuf(out, outPos, numLongs);
+            outPos += 4;
+            int[] cells = arena.biome4096Cells;
+            int cell = 0;
+            for (int w = 0; w < numLongs; w++) {
+                long word = 0L;
+                int lim = Math.min(entriesPerLong, BIOME_4096_CELLS - cell);
+                for (int s = 0; s < lim; s++) {
+                    word |= ((long) cells[cell++]) << (s * bits);
+                }
+                writeLongBEToBuf(out, outPos, word);
+                outPos += 8;
+            }
+            out[outPos++] = Nbt.TAG_END;
+            arena.biomePaletteDictIds[0] = pos;
+            return outPos;
+        }
         if (bLen > BIOME_CELLS) {
             throw new CorruptRegionEntryException("CBIT T7: Invalid biome palette length " + bLen);
         }
@@ -9041,7 +9983,7 @@ final class LcaSectionCodec {
         return outPos;
     }
     private static int decodeGrayPlanesDirectToPacked2048(
-            byte[] buf, int pos, int limit, int[] curveToYzx, byte[] dst, int dstOffset, int formatVersion
+            byte[] buf, int pos, int limit, int[] curveToYzx, byte[] dst, int dstOffset
     ) throws CorruptRegionEntryException {
         if (pos >= limit) throw new CorruptRegionEntryException("CBIT: Truncated Gray light planeModes8 header");
         int planeModes8 = buf[pos++] & 0xFF;
@@ -9049,10 +9991,16 @@ final class LcaSectionCodec {
             Arrays.fill(dst, dstOffset, dstOffset + 2048, (byte) 0);
             return pos;
         }
-        int[] yzxToCurve = (curveToYzx == CURVE_TO_YZX[CURVE_Y_H2]) ? YZX_TO_CURVE[CURVE_Y_H2]
-                : (curveToYzx == CURVE_TO_YZX[CURVE_H3]) ? YZX_TO_CURVE[CURVE_H3]
-                : (curveToYzx == CURVE_TO_YZX[CURVE_YZX]) ? YZX_TO_CURVE[CURVE_YZX]
-                : YZX_TO_CURVE[CURVE_XZY];
+        int[] yzxToCurve;
+        if (curveToYzx == CURVE_TO_YZX[CURVE_Y_H2]) {
+            yzxToCurve = YZX_TO_CURVE[CURVE_Y_H2];
+        } else if (curveToYzx == CURVE_TO_YZX[CURVE_H3]) {
+            yzxToCurve = YZX_TO_CURVE[CURVE_H3];
+        } else if (curveToYzx == CURVE_TO_YZX[CURVE_YZX]) {
+            yzxToCurve = YZX_TO_CURVE[CURVE_YZX];
+        } else {
+            yzxToCurve = YZX_TO_CURVE[CURVE_XZY];
+        }
         byte[] curveVals = scratch().skyLightNibbles;
         boolean curveInit = false;
         int uniformXorNib = 0;
@@ -9287,8 +10235,8 @@ final class LcaSectionCodec {
                         buf, blockPayloadStart, limit, paletteLen, curveId, octreeMask64, packed, bits);
             } else {
                 decodeDeltaRoaringBlocks(
-                        buf, blockPayloadStart, limit, paletteLen, CURVE_TO_YZX[curveId], octreeMask64,
-                        packed, bits, entriesPerLong, formatVersion);
+                        buf, blockPayloadStart, limit, paletteLen, curveId, octreeMask64,
+                        packed, bits, formatVersion);
             }
         } else if (blockMode == BLOCK_MODE_FLAT_BITPACK) {
             decodeFlatBitPackBlocks(buf, blockPayloadStart, limit, paletteLen, octreeMask64, arena.yzxPaletteIdx);
@@ -9381,7 +10329,7 @@ final class LcaSectionCodec {
         }
         int biomeCount = readVarInt(frame, pos, limit);
         pos += varIntLen(biomeCount);
-        if (biomeCount < 0 || biomeCount > 1024) {
+        if (biomeCount < 0 || biomeCount > SECTION_VOXELS) {
             throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
         }
         int regionBiomeCount = regionMeta.biomes.size();
@@ -9420,10 +10368,23 @@ final class LcaSectionCodec {
             ScratchArena arena,
             DirectBiomeData[] outBox
     ) throws CorruptRegionEntryException {
+        int biomeLimit = localToGlobalBiome != null ? localToGlobalBiome.length : regionBiomeCount;
+        if (bLen == BIOME_4096_MARKER) {
+            pos = decodeBiome4096PayloadToArenaDictIds(buf, pos, limit, biomeLimit, false, arena);
+            int actualBLen = arena.lastDecodedBiomePaletteLen;
+            int[] bIds = arena.biome4096PaletteDictIds;
+            int[] globalIds = new int[actualBLen];
+            for (int i = 0; i < actualBLen; i++) {
+                int bDictId = bIds[i];
+                globalIds[i] = localToGlobalBiome != null ? localToGlobalBiome[bDictId] : bDictId;
+            }
+            long[] packedLongs = packBiomeLongs(arena.biome4096Cells, actualBLen, BIOME_4096_CELLS);
+            outBox[0] = new DirectBiomeData(globalIds, packedLongs);
+            return pos;
+        }
         if (bLen <= 0 || bLen > BIOME_CELLS) {
             throw new CorruptRegionEntryException("CBIT T7: Invalid biome palette length " + bLen);
         }
-        int biomeLimit = localToGlobalBiome != null ? localToGlobalBiome.length : regionBiomeCount;
         if (bLen == 1) {
             int bDictId = readVarInt(buf, pos, limit);
             pos += varIntLen(bDictId);
@@ -9593,6 +10554,10 @@ final class LcaSectionCodec {
         int extFluidTicksLen = 0;
         int extBlockEntitiesStart = 0;
         int extBlockEntitiesLen = 0;
+        int extSparsePpStart = 0;
+        int extSparsePpLen = 0;
+        int extDictStructStart = 0;
+        int extDictStructLen = 0;
 
         int residualRelEnd = findResidualRelEnd(sectionRelStarts, sectionCount, residualRelStart, frameLen);
         if (hasResidualNbt) {
@@ -9689,6 +10654,26 @@ final class LcaSectionCodec {
                         extBlockEntitiesLen = beLen;
                         pos += beLen;
                     }
+                    if ((extFlags & LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING) != 0) {
+                        int ppLen = readVarInt(frame, pos, tailLimit);
+                        pos += varIntLen(ppLen);
+                        if (ppLen < 1 || (long) pos + ppLen > tailLimit) {
+                            throw new CorruptRegionEntryException("CBIT T5: Truncated v3 sparse PostProcessing");
+                        }
+                        extSparsePpStart = pos;
+                        extSparsePpLen = ppLen;
+                        pos += ppLen;
+                    }
+                    if ((extFlags & LcaV3Codec.EXT_FLAG_DICT_STRUCTURES) != 0) {
+                        int stLen = readVarInt(frame, pos, tailLimit);
+                        pos += varIntLen(stLen);
+                        if (stLen < 1 || (long) pos + stLen > tailLimit) {
+                            throw new CorruptRegionEntryException("CBIT T5: Truncated v3 dict structures");
+                        }
+                        extDictStructStart = pos;
+                        extDictStructLen = stLen;
+                        pos += stLen;
+                    }
                 }
                 if ((bpFlags & 1024) != 0 && pos < tailLimit) {
                     if ((bpFlags & 4096) != 0) {
@@ -9711,7 +10696,9 @@ final class LcaSectionCodec {
                             || nbtSliceBuf[nbtSliceOff + nbtSliceLen - 1] != Nbt.TAG_END) {
                         return null;
                     }
-                    if (containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_BOUNDARY_MARKER_UTF8)) {
+                    if (containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_BOUNDARY_MARKER_UTF8)
+                            || containsSubArray(
+                                    nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_SECTION_EXTRAS_MARKER_UTF8)) {
                         return null;
                     }
                 }
@@ -9721,12 +10708,18 @@ final class LcaSectionCodec {
         ScratchArena arena = scratch();
         int chunkX = (meta.regionX << 5) + rx;
         int chunkZ = (meta.regionZ << 5) + rz;
-        String statusName = statusOrdinal == 0xFF
-                ? "minecraft:full"
-                : (statusOrdinal != 0xFE ? decodeStatusOrdinal(statusOrdinal) : "");
+        String statusName;
+        if (statusOrdinal == 0xFF) {
+            statusName = "minecraft:full";
+        } else if (statusOrdinal != 0xFE) {
+            statusName = decodeStatusOrdinal(statusOrdinal);
+        } else {
+            statusName = "";
+        }
 
         byte[] residualNbtBytes = null;
-        if (nbtSliceLen > 4 || extBlockTicksLen > 0 || extFluidTicksLen > 0 || extBlockEntitiesLen > 0) {
+        if (nbtSliceLen > 4 || extBlockTicksLen > 0 || extFluidTicksLen > 0
+                || extBlockEntitiesLen > 0 || extSparsePpLen > 0 || extDictStructLen > 0) {
             byte[] out = arena.ensureNbtCap((nbtSliceLen > 4 ? nbtSliceLen : 0) + 4096);
             int outPos = 0;
             out[outPos++] = Nbt.TAG_COMPOUND;
@@ -9747,6 +10740,17 @@ final class LcaSectionCodec {
             if (extBlockEntitiesLen > 0) {
                 outPos = LcaV3Codec.decodeColumnarBlockEntitiesToNbt(
                         frame, extBlockEntitiesStart, extBlockEntitiesStart + extBlockEntitiesLen,
+                        chunkX, chunkZ, arena, outPos);
+                out = arena.nbtOutBuf;
+            }
+            if (extSparsePpLen > 0) {
+                outPos = LcaV3Codec.decodeSparsePostProcessingToNbt(
+                        frame, extSparsePpStart, extSparsePpStart + extSparsePpLen, arena, outPos);
+                out = arena.nbtOutBuf;
+            }
+            if (extDictStructLen > 0) {
+                outPos = LcaV3Codec.decodeDictStructuresToNbt(
+                        frame, extDictStructStart, extDictStructStart + extDictStructLen,
                         chunkX, chunkZ, arena, outPos);
                 out = arena.nbtOutBuf;
             }
@@ -10079,11 +11083,11 @@ final class LcaSectionCodec {
                         buf, pos, limit, sentinelHdr, true, voxProps, arena.skyLightNibbles);
                 packLightNibblesIntoBuf(arena.skyLightNibbles, skyBytes, 0);
             } else {
-                pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], skyBytes, 0, formatVersion);
+                pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_Y_H2], skyBytes, 0);
             }
             skyState = hasStarlightVersion ? 2 : -1;
         } else {
-            if ((long) pos + 2048L > limit) {
+            if (pos + 2048L > limit) {
                 throw new CorruptRegionEntryException("CBIT: Truncated raw SkyLight");
             }
             skyKind = LcaDecodedChunkMeta.LIGHT_ARRAY;
@@ -10125,24 +11129,22 @@ final class LcaSectionCodec {
                     decodeSectionBlockPayloadForLight(
                             buf, blockPayloadStart, limit, blockMode, secExtFlags, paletteLen,
                             curveId, octreeMask64, formatVersion, arena);
-                    blocksDecodedForLight = true;
                 }
                 byte[] voxProps = buildNbtSectionVoxLightProps(
                         blockMode, paletteLen, secPalIds, activeStateLightV1, arena);
-                pos = LcaV3Codec.decodeEikonalLightToNibbles(
+                LcaV3Codec.decodeEikonalLightToNibbles(
                         buf, pos, limit, sentinelHdr, false, voxProps, arena.blkLightNibbles);
                 packLightNibblesIntoBuf(arena.blkLightNibbles, blkBytes, 0);
             } else {
-                pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], blkBytes, 0, formatVersion);
+                decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], blkBytes, 0);
             }
             blkState = hasStarlightVersion ? 2 : -1;
         } else {
-            if ((long) pos + 2048L > limit) {
+            if (pos + 2048L > limit) {
                 throw new CorruptRegionEntryException("CBIT: Truncated raw BlockLight");
             }
             blkKind = LcaDecodedChunkMeta.LIGHT_ARRAY;
             blkBytes = Arrays.copyOfRange(buf, pos, pos + 2048);
-            pos += 2048;
             blkState = hasStarlightVersion ? 2 : -1;
         }
 
@@ -10153,5 +11155,962 @@ final class LcaSectionCodec {
                 skyKind, skyBytes, skyState,
                 blkKind, blkBytes, blkState
         );
+    }
+
+    static int readUint16BEBuffer(ByteBuffer buf, int off) {
+        return ((buf.get(off) & 0xFF) << 8) | (buf.get(off + 1) & 0xFF);
+    }
+
+    static int readIntBEBuffer(ByteBuffer buf, int off) {
+        return ((buf.get(off) & 0xFF) << 24)
+                | ((buf.get(off + 1) & 0xFF) << 16)
+                | ((buf.get(off + 2) & 0xFF) << 8)
+                | (buf.get(off + 3) & 0xFF);
+    }
+
+    static long readLongBEBuffer(ByteBuffer buf, int off) {
+        long hi = readIntBEBuffer(buf, off) & 0xFFFFFFFFL;
+        long lo = readIntBEBuffer(buf, off + 4) & 0xFFFFFFFFL;
+        return (hi << 32) | lo;
+    }
+
+    static int readVarIntBuffer(ByteBuffer buf, int pos, int limit) throws CorruptRegionEntryException {
+        int val = 0;
+        int shift = 0;
+        int p = pos;
+        while (p < limit) {
+            int b = buf.get(p++) & 0xFF;
+            val |= (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) {
+                return val;
+            }
+            shift += 7;
+            if (shift >= 35) {
+                throw new CorruptRegionEntryException("CBIT T5: Malformed VarInt (> 5 bytes) in off-heap buffer");
+            }
+        }
+        throw new CorruptRegionEntryException("CBIT T5: Truncated VarInt in off-heap buffer");
+    }
+
+    private static DirectMicroPalette decodePureIdMicroPaletteDirectFromBuffer(
+            ByteBuffer frame,
+            int fOff,
+            int startRel,
+            int limitRel,
+            ParsedHeaderAndDict regionMeta,
+            ScratchArena arena
+    ) throws CorruptRegionEntryException {
+        int pos = fOff + startRel;
+        int limit = fOff + limitRel;
+        int stateCount = readVarIntBuffer(frame, pos, limit);
+        pos += varIntLen(stateCount);
+        if (stateCount < 0 || stateCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette stateCount " + stateCount);
+        }
+        int regionStateCount = regionMeta.canonicalStates.size();
+        int[] localToGlobalState = new int[stateCount];
+        byte[] regionLightV1 = regionMeta.getOrBuildStatePackedLightV1();
+        byte[] stateLightV1 = new byte[stateCount];
+        for (int i = 0; i < stateCount; i++) {
+            int gid = readVarIntBuffer(frame, pos, limit);
+            pos += varIntLen(gid);
+            if (gid < 0 || gid >= regionStateCount) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette stateId " + gid + " out of range");
+            }
+            localToGlobalState[i] = gid;
+            stateLightV1[i] = regionLightV1[gid];
+        }
+        int biomeCount = readVarIntBuffer(frame, pos, limit);
+        pos += varIntLen(biomeCount);
+        if (biomeCount < 0 || biomeCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
+        }
+        int regionBiomeCount = regionMeta.biomes.size();
+        int[] localToGlobalBiome = new int[biomeCount];
+        for (int i = 0; i < biomeCount; i++) {
+            int bgid = readVarIntBuffer(frame, pos, limit);
+            pos += varIntLen(bgid);
+            if (bgid < 0 || bgid >= regionBiomeCount) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette biomeId " + bgid + " out of range");
+            }
+            localToGlobalBiome[i] = bgid;
+        }
+        int tmplCount = readVarIntBuffer(frame, pos, limit);
+        pos += varIntLen(tmplCount);
+        if (tmplCount < 0 || tmplCount > 64) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID biome template count " + tmplCount);
+        }
+        DirectBiomeData[] templates = tmplCount > 0 ? new DirectBiomeData[tmplCount] : new DirectBiomeData[0];
+        DirectBiomeData[] box = new DirectBiomeData[1];
+        for (int t = 0; t < tmplCount; t++) {
+            int bLen = readVarIntBuffer(frame, pos, limit);
+            pos += varIntLen(bLen);
+            pos = decodeDirectBiomePayloadFromBuffer(
+                    frame, pos, limit, bLen, localToGlobalBiome, regionBiomeCount, arena, box);
+            templates[t] = box[0];
+        }
+        return new DirectMicroPalette(localToGlobalState, localToGlobalBiome, templates, stateLightV1);
+    }
+
+    private static int decodeDirectBiomePayloadFromBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int bLen,
+            int[] localToGlobalBiome,
+            int regionBiomeCount,
+            ScratchArena arena,
+            DirectBiomeData[] outBox
+    ) throws CorruptRegionEntryException {
+        int biomeLimit = localToGlobalBiome != null ? localToGlobalBiome.length : regionBiomeCount;
+        if (bLen == BIOME_4096_MARKER) {
+            int rem = limit - pos;
+            if (rem <= 0) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated 4096-cell biome payload");
+            }
+            byte[] tmp = arena.ensureSectionStagingCap(rem);
+            buf.get(pos, tmp, 0, rem);
+            int consumed = decodeBiome4096PayloadToArenaDictIds(tmp, 0, rem, biomeLimit, false, arena);
+            int actualBLen = arena.lastDecodedBiomePaletteLen;
+            int[] bIds = arena.biome4096PaletteDictIds;
+            int[] globalIds = new int[actualBLen];
+            for (int i = 0; i < actualBLen; i++) {
+                int bDictId = bIds[i];
+                globalIds[i] = localToGlobalBiome != null ? localToGlobalBiome[bDictId] : bDictId;
+            }
+            long[] packedLongs = packBiomeLongs(arena.biome4096Cells, actualBLen, BIOME_4096_CELLS);
+            outBox[0] = new DirectBiomeData(globalIds, packedLongs);
+            return pos + consumed;
+        }
+        if (bLen <= 0 || bLen > BIOME_CELLS) {
+            throw new CorruptRegionEntryException("CBIT T7: Invalid biome palette length " + bLen);
+        }
+        if (bLen == 1) {
+            int bDictId = readVarIntBuffer(buf, pos, limit);
+            pos += varIntLen(bDictId);
+            if (bDictId < 0 || bDictId >= biomeLimit) {
+                throw new CorruptRegionEntryException("CBIT T7: Biome dictId " + bDictId + " out of range");
+            }
+            int globalBiomeId = localToGlobalBiome != null ? localToGlobalBiome[bDictId] : bDictId;
+            outBox[0] = new DirectBiomeData(new int[] { globalBiomeId }, null);
+            return pos;
+        }
+        int[] globalIds = new int[bLen];
+        for (int i = 0; i < bLen; i++) {
+            int bDictId = readVarIntBuffer(buf, pos, limit);
+            pos += varIntLen(bDictId);
+            if (bDictId < 0 || bDictId >= biomeLimit) {
+                throw new CorruptRegionEntryException("CBIT T7: Biome dictId " + bDictId + " out of range");
+            }
+            globalIds[i] = localToGlobalBiome != null ? localToGlobalBiome[bDictId] : bDictId;
+        }
+        int runCount = readVarIntBuffer(buf, pos, limit);
+        pos += varIntLen(runCount);
+        int[] cells = arena.biomeCells;
+        int cursor = 0;
+        if (bLen <= 8) {
+            for (int r = 0; r < runCount; r++) {
+                if (pos >= limit) {
+                    throw new CorruptRegionEntryException("CBIT: Truncated 1B biome RLE");
+                }
+                int packed = buf.get(pos++) & 0xFF;
+                int pIdx = (packed >>> 5) & 7;
+                int len = (packed & 0x1F) + 1;
+                if (pIdx >= bLen || cursor + len > BIOME_CELLS) {
+                    throw new CorruptRegionEntryException("CBIT: Biome RLE cursor overflow");
+                }
+                for (int k = 0; k < len; k++) {
+                    int yzx = ((cursor & 3) << 4) | (cursor & 0x0C) | ((cursor >>> 4) & 3);
+                    cells[yzx] = pIdx;
+                    cursor++;
+                }
+            }
+        } else {
+            for (int r = 0; r < runCount; r++) {
+                int pIdx = readVarIntBuffer(buf, pos, limit);
+                pos += varIntLen(pIdx);
+                if (pos >= limit) {
+                    throw new CorruptRegionEntryException("CBIT: Truncated biome RLE");
+                }
+                int len = (buf.get(pos++) & 0xFF) + 1;
+                if (pIdx < 0 || pIdx >= bLen || cursor + len > BIOME_CELLS) {
+                    throw new CorruptRegionEntryException("CBIT: Biome RLE cursor overflow");
+                }
+                for (int k = 0; k < len; k++) {
+                    int yzx = ((cursor & 3) << 4) | (cursor & 0x0C) | ((cursor >>> 4) & 3);
+                    cells[yzx] = pIdx;
+                    cursor++;
+                }
+            }
+        }
+        long[] packedLongs = packBiomeLongs(cells, bLen, BIOME_CELLS);
+        outBox[0] = new DirectBiomeData(globalIds, packedLongs);
+        return pos;
+    }
+
+    /**
+     * Binds a `.lca` Mode A {@code ChunkFrame} directly over an off-heap {@link ByteBuffer} in a
+     * single sequential L1-cache-resident pass with zero heap chunk staging copy
+     * ({@code anvil-api-ADR-007}). Simultaneously verifies inline {@code CBIT T5/T6/T6b/T7},
+     * computes single-pass {@code paletteVoxelCounts}, populates {@code slicesOut[i]} with
+     * zero-copy {@link LcaModeABlockSection.OffHeapModeASlice} views, and resolves
+     * {@code effectivePalMapOut[0]} in one pass.
+     *
+     * <p>Returns {@code null} on non-voxel chunks, patch-tail chunks, legacy v2 local palettes,
+     * v3 escape sections, or Eikonal-compressed light sections so callers fail closed cleanly
+     * ({@code S-004}).
+     */
+    @SuppressWarnings({"java:S1168", "java:S1199"})
+    static LcaDecodedChunkMeta bindChunkMetadataDirectFromBuffer(
+            ParsedHeaderAndDict meta,
+            ByteBuffer slabBuf,
+            int fOff,
+            int frameLen,
+            int chunkDataVersion,
+            long lastUpdateTick,
+            long inhabitedTimeTicks,
+            int statusOrdinal,
+            int chunkFlags,
+            int residualRelStart,
+            int rx,
+            int rz,
+            int[] sectionEntries,
+            int[] sectionRelStarts,
+            int[] dictIdToRuntimeId,
+            LcaModeABlockSection.OffHeapModeASlice[] slicesOut,
+            int[] nonInlineUniformRuntimeIdsOut,
+            int[][] effectivePalMapOut
+    ) throws IOException {
+        if (statusOrdinal == STATUS_ORDINAL_RESIDUAL) {
+            return null;
+        }
+        boolean hasResidualNbt = (chunkFlags & 1) != 0;
+        boolean hasSlabLocalPalette = (chunkFlags & 2) != 0;
+        if (hasSlabLocalPalette && meta.formatVersion < LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            return null;
+        }
+        int defaultBiomeCode = (chunkFlags >>> 3) & 0x1F;
+        int defaultBiomeDictId = defaultBiomeCode > 0 ? (defaultBiomeCode - 1) : -1;
+        int sectionCount = meta.sectionCount;
+        int sectionDirEnd = 24 + (sectionCount << 1);
+
+        ScratchArena arena = scratch();
+        int residualRelEnd = findResidualRelEnd(sectionRelStarts, sectionCount, residualRelStart, frameLen);
+        if (!parseDirectTailIntoArena(
+                slabBuf, fOff, hasResidualNbt, residualRelStart, residualRelEnd, meta.formatVersion, arena)) {
+            return null;
+        }
+
+        int chunkX = (meta.regionX << 5) + rx;
+        int chunkZ = (meta.regionZ << 5) + rz;
+        String statusName;
+        if (statusOrdinal == 0xFF) {
+            statusName = "minecraft:full";
+        } else if (statusOrdinal != 0xFE) {
+            statusName = decodeStatusOrdinal(statusOrdinal);
+        } else {
+            statusName = "";
+        }
+
+        byte[] tailBuf = arena.tailBufRef;
+        LcaDecodedChunkMeta.ColumnarTicks blockTicks = arena.tailBlockTicksLen > 0
+                ? LcaV3Codec.decodeColumnarTicksDirect(
+                        tailBuf, arena.tailBlockTicksStart,
+                        arena.tailBlockTicksStart + arena.tailBlockTicksLen, chunkX, chunkZ)
+                : null;
+        LcaDecodedChunkMeta.ColumnarTicks fluidTicks = arena.tailFluidTicksLen > 0
+                ? LcaV3Codec.decodeColumnarTicksDirect(
+                        tailBuf, arena.tailFluidTicksStart,
+                        arena.tailFluidTicksStart + arena.tailFluidTicksLen, chunkX, chunkZ)
+                : null;
+        short[][] sparsePostProcessing = arena.tailSparsePpLen > 0
+                ? LcaV3Codec.decodeSparsePostProcessingDirect(
+                        tailBuf, arena.tailSparsePpStart,
+                        arena.tailSparsePpStart + arena.tailSparsePpLen)
+                : null;
+        byte[] dictStructuresPayload = arena.tailDictStructLen > 0
+                ? Arrays.copyOfRange(
+                        tailBuf, arena.tailDictStructStart,
+                        arena.tailDictStructStart + arena.tailDictStructLen)
+                : null;
+        byte[] columnarBlockEntitiesPayload = arena.tailBlockEntitiesLen > 0
+                ? Arrays.copyOfRange(
+                        tailBuf, arena.tailBlockEntitiesStart,
+                        arena.tailBlockEntitiesStart + arena.tailBlockEntitiesLen)
+                : null;
+        byte[] residualNbtBytes = arena.tailNbtSliceLen > 4
+                ? Arrays.copyOfRange(
+                        arena.tailNbtSliceBuf, arena.tailNbtSliceOff,
+                        arena.tailNbtSliceOff + arena.tailNbtSliceLen)
+                : null;
+
+        int totalHm = (arena.tailMbnlLen > 0 ? 1 : 0) + arena.tailSecHmCount;
+        int[] hmCodes = totalHm > 0 ? new int[totalHm] : new int[0];
+        String[] customHmNames = totalHm > 0 ? new String[totalHm] : new String[0];
+        long[][] hmLongs = totalHm > 0 ? new long[totalHm][] : new long[0][];
+        if (totalHm > 0) {
+            decodeDirectHeightmapsFromTail(
+                    tailBuf, arena.tailMbnlStart, arena.tailMbnlLen,
+                    arena.tailSecHmCount, arena.tailSecHmPos, arena.tailSecHmLimit,
+                    hmCodes, customHmNames, hmLongs);
+        }
+
+        int bpFlags = arena.tailBpFlags;
+        int ppCount = arena.tailPpCount;
+        int slVer = arena.tailSlVer;
+        int lowBoundaryFlags = arena.tailLowBoundaryFlags;
+        int highBoundaryFlags = arena.tailHighBoundaryFlags;
+
+        int[] localToGlobalState = null;
+        int[] localToGlobalBiome = null;
+        DirectBiomeData[] biomeTemplates = null;
+        int[] effectivePalMap;
+        if (hasSlabLocalPalette) {
+            int paletteLimitRel = findFirstSectionRelStart(sectionRelStarts, sectionCount, residualRelStart);
+            DirectMicroPalette micro = decodePureIdMicroPaletteDirectFromBuffer(
+                    slabBuf, fOff, sectionDirEnd, paletteLimitRel, meta, arena);
+            localToGlobalState = micro.localToGlobalStateId;
+            localToGlobalBiome = micro.localToGlobalBiomeId;
+            biomeTemplates = micro.biomeTemplates;
+            effectivePalMap = new int[localToGlobalState.length];
+            for (int i = 0; i < localToGlobalState.length; i++) {
+                int gid = localToGlobalState[i];
+                effectivePalMap[i] = (dictIdToRuntimeId != null && gid >= 0 && gid < dictIdToRuntimeId.length)
+                        ? dictIdToRuntimeId[gid]
+                        : gid;
+            }
+        } else {
+            effectivePalMap = dictIdToRuntimeId;
+        }
+        if (effectivePalMapOut != null && effectivePalMapOut.length > 0) {
+            effectivePalMapOut[0] = effectivePalMap;
+        }
+
+        int totalEmittedSections = (lowBoundaryFlags >= 0 ? 1 : 0) + (highBoundaryFlags >= 0 ? 1 : 0);
+        for (int i = 0; i < sectionCount; i++) {
+            if (sectionEntries[i] != 0) {
+                totalEmittedSections++;
+            }
+        }
+        LcaDecodedChunkMeta.DecodedSectionMeta[] sections =
+                new LcaDecodedChunkMeta.DecodedSectionMeta[totalEmittedSections];
+        int secOutIdx = 0;
+        boolean hasStarlightVersion = (bpFlags & 64) != 0;
+
+        if (lowBoundaryFlags >= 0) {
+            sections[secOutIdx++] = decodeDirectBoundarySection(meta.minSectionY - 1, lowBoundaryFlags, hasStarlightVersion);
+        }
+
+        int regionBiomeCount = meta.biomes.size();
+        int regionStateCount = meta.canonicalStates.size();
+        DirectBiomeData defaultBiomeData = (defaultBiomeDictId >= 0 && defaultBiomeDictId < regionBiomeCount)
+                ? new DirectBiomeData(new int[] { defaultBiomeDictId }, null)
+                : null;
+        DirectBiomeData[] biomeBox = new DirectBiomeData[1];
+        int[] endPosOut = new int[1];
+
+        for (int i = 0; i < sectionCount; i++) {
+            int entry16 = sectionEntries[i];
+            if (entry16 == 0) {
+                continue;
+            }
+            int sectionY = meta.minSectionY + i;
+            if ((entry16 & 0x8000) != 0) {
+                sections[secOutIdx++] = buildDirectInlineSectionMeta(
+                        entry16, sectionY, hasSlabLocalPalette, localToGlobalState, regionStateCount,
+                        meta.airStateId, biomeTemplates, defaultBiomeData, hasStarlightVersion);
+            } else {
+                int relStart = sectionRelStarts[i];
+                int relEnd = findSectionRelEnd(sectionRelStarts, i, sectionCount, residualRelStart, frameLen);
+                LcaDecodedChunkMeta.DecodedSectionMeta secMeta = bindDirectSectionMetaFromBuffer(
+                        slabBuf, fOff + relStart, fOff + relEnd, sectionY,
+                        localToGlobalState, regionStateCount, meta.airStateId, effectivePalMap,
+                        localToGlobalBiome, regionBiomeCount, biomeTemplates, defaultBiomeData,
+                        arena, meta.formatVersion, hasStarlightVersion, biomeBox, endPosOut,
+                        slicesOut, nonInlineUniformRuntimeIdsOut, i);
+                if (secMeta == null) {
+                    return null;
+                }
+                sections[secOutIdx++] = secMeta;
+            }
+        }
+
+        if (highBoundaryFlags >= 0) {
+            sections[secOutIdx++] = decodeDirectBoundarySection(
+                    meta.minSectionY + sectionCount, highBoundaryFlags, hasStarlightVersion);
+        }
+
+        return new LcaDecodedChunkMeta(
+                chunkDataVersion,
+                chunkX,
+                chunkZ,
+                meta.minSectionY,
+                statusName,
+                lastUpdateTick,
+                inhabitedTimeTicks,
+                bpFlags,
+                ppCount,
+                slVer,
+                meta.biomes,
+                hmCodes,
+                customHmNames,
+                hmLongs,
+                sections,
+                residualNbtBytes,
+                blockTicks,
+                fluidTicks,
+                sparsePostProcessing,
+                dictStructuresPayload,
+                columnarBlockEntitiesPayload
+        );
+    }
+
+    private static boolean parseDirectTailIntoArena(
+            ByteBuffer slabBuf,
+            int fOff,
+            boolean hasResidualNbt,
+            int residualRelStart,
+            int residualRelEnd,
+            int formatVersion,
+            ScratchArena arena
+    ) throws IOException {
+        arena.tailBpFlags = 0;
+        arena.tailPpCount = 0;
+        arena.tailSlVer = 0;
+        arena.tailLowBoundaryFlags = -1;
+        arena.tailHighBoundaryFlags = -1;
+        arena.tailMbnlStart = 0;
+        arena.tailMbnlLen = 0;
+        arena.tailSecHmCount = 0;
+        arena.tailSecHmPos = 0;
+        arena.tailSecHmLimit = 0;
+        arena.tailBlockTicksStart = 0;
+        arena.tailBlockTicksLen = 0;
+        arena.tailFluidTicksStart = 0;
+        arena.tailFluidTicksLen = 0;
+        arena.tailBlockEntitiesStart = 0;
+        arena.tailBlockEntitiesLen = 0;
+        arena.tailSparsePpStart = 0;
+        arena.tailSparsePpLen = 0;
+        arena.tailDictStructStart = 0;
+        arena.tailDictStructLen = 0;
+        arena.tailBufRef = null;
+        arena.tailNbtSliceBuf = null;
+        arena.tailNbtSliceOff = 0;
+        arena.tailNbtSliceLen = 0;
+
+        if (!hasResidualNbt) {
+            return true;
+        }
+        int tailLen = residualRelEnd - residualRelStart;
+        if (tailLen < 2) {
+            return true;
+        }
+        byte[] tailBuf = arena.ensureSectionStagingCap(tailLen);
+        slabBuf.get(fOff + residualRelStart, tailBuf, 0, tailLen);
+        arena.tailBufRef = tailBuf;
+
+        int pos = 0;
+        int bpFlags = readUint16BE(tailBuf, pos);
+        if ((bpFlags & BP_FLAG_HAS_CHUNK_PATCH_TAIL) != 0 || (bpFlags & 2048) != 0) {
+            return false;
+        }
+        arena.tailBpFlags = bpFlags;
+        pos += 2;
+
+        if ((bpFlags & 8192) != 0) {
+            int mbnlLen = readVarInt(tailBuf, pos, tailLen);
+            pos += varIntLen(mbnlLen);
+            if (mbnlLen < 0 || (long) pos + mbnlLen > tailLen) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated MOTION_BLOCKING_NO_LEAVES prefix");
+            }
+            arena.tailMbnlStart = pos;
+            arena.tailMbnlLen = mbnlLen;
+            pos += mbnlLen;
+        }
+        if ((bpFlags & 32) != 0 && pos < tailLen) {
+            arena.tailPpCount = tailBuf[pos++] & 0xFF;
+        }
+        if ((bpFlags & 64) != 0 && pos < tailLen) {
+            int slVer = readVarInt(tailBuf, pos, tailLen);
+            pos += varIntLen(slVer);
+            arena.tailSlVer = slVer;
+        }
+        if ((bpFlags & 128) != 0 && pos < tailLen) {
+            arena.tailLowBoundaryFlags = tailBuf[pos++] & 0xFF;
+        }
+        if ((bpFlags & 256) != 0 && pos < tailLen) {
+            arena.tailHighBoundaryFlags = tailBuf[pos++] & 0xFF;
+        }
+        if ((bpFlags & 512) != 0 && pos < tailLen) {
+            pos = skipSecondaryHeightmaps(tailBuf, pos, tailLen, arena);
+        }
+        if ((bpFlags & LcaV3Codec.BP_FLAG_HAS_EXTENDED_FLAGS) != 0) {
+            pos = parseDirectExtendedFlagsIntoArena(tailBuf, pos, tailLen, bpFlags, formatVersion, arena);
+        }
+        if ((bpFlags & 1024) != 0 && pos < tailLen) {
+            return parseDirectResidualNbtSliceIntoArena(tailBuf, pos, tailLen, bpFlags, arena);
+        }
+        return true;
+    }
+
+    private static int skipSecondaryHeightmaps(byte[] tailBuf, int pos, int tailLimit, ScratchArena arena)
+            throws CorruptRegionEntryException {
+        int secHmCount = tailBuf[pos++] & 0xFF;
+        arena.tailSecHmCount = secHmCount;
+        arena.tailSecHmPos = pos;
+        arena.tailSecHmLimit = tailLimit;
+        for (int h = 0; h < secHmCount; h++) {
+            if (pos >= tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated secondary heightmap header");
+            }
+            int code = tailBuf[pos++] & 0xFF;
+            if (code >= STANDARD_HEIGHTMAP_NAMES.length) {
+                int kLen = readVarInt(tailBuf, pos, tailLimit);
+                int kVarLen = varIntLen(kLen);
+                if (kLen < 0 || (long) pos + kVarLen + kLen > tailLimit) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated secondary heightmap key");
+                }
+                pos += kVarLen + kLen;
+            }
+            int payLen = readVarInt(tailBuf, pos, tailLimit);
+            int pVarLen = varIntLen(payLen);
+            if (payLen < 0 || (long) pos + pVarLen + payLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated secondary heightmap payload");
+            }
+            pos += pVarLen + payLen;
+        }
+        return pos;
+    }
+
+    private static int parseDirectExtendedFlagsIntoArena(
+            byte[] tailBuf, int pos, int tailLimit, int bpFlags, int formatVersion, ScratchArena arena
+    ) throws CorruptRegionEntryException {
+        if (pos >= tailLimit) {
+            throw new CorruptRegionEntryException("CBIT T5: Truncated v3 extended flags");
+        }
+        int extFlags = readVarInt(tailBuf, pos, tailLimit);
+        pos += varIntLen(extFlags);
+        LcaV3Codec.validateExtFlags(bpFlags, extFlags, formatVersion);
+        if ((extFlags & LcaV3Codec.EXT_FLAG_COLUMNAR_BLOCK_TICKS) != 0) {
+            int bLen = readVarInt(tailBuf, pos, tailLimit);
+            pos += varIntLen(bLen);
+            if (bLen < 1 || (long) pos + bLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 columnar block_ticks");
+            }
+            arena.tailBlockTicksStart = pos;
+            arena.tailBlockTicksLen = bLen;
+            pos += bLen;
+        }
+        if ((extFlags & LcaV3Codec.EXT_FLAG_COLUMNAR_FLUID_TICKS) != 0) {
+            int fLen = readVarInt(tailBuf, pos, tailLimit);
+            pos += varIntLen(fLen);
+            if (fLen < 1 || (long) pos + fLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 columnar fluid_ticks");
+            }
+            arena.tailFluidTicksStart = pos;
+            arena.tailFluidTicksLen = fLen;
+            pos += fLen;
+        }
+        if ((extFlags & LcaV3Codec.EXT_FLAG_COLUMNAR_BLOCK_ENTITIES) != 0) {
+            int beLen = readVarInt(tailBuf, pos, tailLimit);
+            pos += varIntLen(beLen);
+            if (beLen < 1 || (long) pos + beLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 columnar block_entities");
+            }
+            arena.tailBlockEntitiesStart = pos;
+            arena.tailBlockEntitiesLen = beLen;
+            pos += beLen;
+        }
+        if ((extFlags & LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING) != 0) {
+            int ppLen = readVarInt(tailBuf, pos, tailLimit);
+            pos += varIntLen(ppLen);
+            if (ppLen < 1 || (long) pos + ppLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 sparse PostProcessing");
+            }
+            arena.tailSparsePpStart = pos;
+            arena.tailSparsePpLen = ppLen;
+            pos += ppLen;
+        }
+        if ((extFlags & LcaV3Codec.EXT_FLAG_DICT_STRUCTURES) != 0) {
+            int stLen = readVarInt(tailBuf, pos, tailLimit);
+            pos += varIntLen(stLen);
+            if (stLen < 1 || (long) pos + stLen > tailLimit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated v3 dict structures");
+            }
+            arena.tailDictStructStart = pos;
+            arena.tailDictStructLen = stLen;
+            pos += stLen;
+        }
+        return pos;
+    }
+
+    private static boolean parseDirectResidualNbtSliceIntoArena(
+            byte[] tailBuf, int pos, int tailLimit, int bpFlags, ScratchArena arena
+    ) throws IOException {
+        byte[] nbtSliceBuf;
+        int nbtSliceOff;
+        int nbtSliceLen;
+        if ((bpFlags & 4096) != 0) {
+            try (java.util.zip.InflaterInputStream iis =
+                    new java.util.zip.InflaterInputStream(
+                            new java.io.ByteArrayInputStream(tailBuf, pos, tailLimit - pos))) {
+                nbtSliceBuf = iis.readAllBytes();
+                nbtSliceOff = 0;
+                nbtSliceLen = nbtSliceBuf.length;
+            }
+        } else {
+            nbtSliceBuf = tailBuf;
+            nbtSliceOff = pos;
+            nbtSliceLen = tailLimit - pos;
+        }
+        if (nbtSliceLen < 4
+                || nbtSliceBuf[nbtSliceOff] != Nbt.TAG_COMPOUND
+                || nbtSliceBuf[nbtSliceOff + 1] != 0
+                || nbtSliceBuf[nbtSliceOff + 2] != 0
+                || nbtSliceBuf[nbtSliceOff + nbtSliceLen - 1] != Nbt.TAG_END) {
+            return false;
+        }
+        if (containsSubArray(nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_BOUNDARY_MARKER_UTF8)
+                || containsSubArray(
+                        nbtSliceBuf, nbtSliceOff + 3, nbtSliceLen - 4, LCA_SECTION_EXTRAS_MARKER_UTF8)) {
+            return false;
+        }
+        arena.tailNbtSliceBuf = nbtSliceBuf;
+        arena.tailNbtSliceOff = nbtSliceOff;
+        arena.tailNbtSliceLen = nbtSliceLen;
+        return true;
+    }
+
+    private static void decodeDirectHeightmapsFromTail(
+            byte[] tailBuf,
+            int mbnlStart,
+            int mbnlLen,
+            int secHmCount,
+            int secHmPos,
+            int secHmLimit,
+            int[] hmCodes,
+            String[] customHmNames,
+            long[][] hmLongs
+    ) throws CorruptRegionEntryException {
+        int hmIdx = 0;
+        if (mbnlLen > 0) {
+            hmCodes[hmIdx] = 5;
+            hmLongs[hmIdx] = decodeDeltaHeightmapLongs(tailBuf, mbnlStart, mbnlLen);
+            hmIdx++;
+        }
+        if (secHmCount > 0) {
+            int pos = secHmPos;
+            for (int h = 0; h < secHmCount; h++) {
+                int code = tailBuf[pos++] & 0xFF;
+                hmCodes[hmIdx] = code;
+                if (code >= STANDARD_HEIGHTMAP_NAMES.length) {
+                    int kLen = readVarInt(tailBuf, pos, secHmLimit);
+                    pos += varIntLen(kLen);
+                    customHmNames[hmIdx] = new String(tailBuf, pos, kLen, StandardCharsets.UTF_8);
+                    pos += kLen;
+                }
+                int payLen = readVarInt(tailBuf, pos, secHmLimit);
+                pos += varIntLen(payLen);
+                long[] longs;
+                if (payLen == 2 && (tailBuf[pos] & 0xFF) == 0xFE && hmIdx > 0) {
+                    int refIdx = Math.min(tailBuf[pos + 1] & 0xFF, hmIdx - 1);
+                    longs = hmLongs[refIdx];
+                } else if (payLen >= 3 && (tailBuf[pos] & 0xFF) == 0xFD && hmIdx > 0) {
+                    int refIdx = Math.min(tailBuf[pos + 1] & 0xFF, hmIdx - 1);
+                    longs = decodeCrossDeltaHeightmapLongs(hmLongs[refIdx], tailBuf, pos + 2, payLen - 2);
+                } else {
+                    longs = decodeDeltaHeightmapLongs(tailBuf, pos, payLen);
+                }
+                pos += payLen;
+                hmLongs[hmIdx] = longs;
+                hmIdx++;
+            }
+        }
+    }
+
+    private static LcaDecodedChunkMeta.DecodedSectionMeta buildDirectInlineSectionMeta(
+            int entry16,
+            int sectionY,
+            boolean hasSlabLocalPalette,
+            int[] localToGlobalState,
+            int regionStateCount,
+            int airStateId,
+            DirectBiomeData[] biomeTemplates,
+            DirectBiomeData defaultBiomeData,
+            boolean hasStarlightVersion
+    ) throws CorruptRegionEntryException {
+        int skyLight2 = (entry16 >>> 13) & 3;
+        int localOrGlobalId = hasSlabLocalPalette ? (entry16 & 0x07FF) : (entry16 & 0x1FFF);
+        int stateLimit = localToGlobalState != null ? localToGlobalState.length : regionStateCount;
+        if (localOrGlobalId < 0 || localOrGlobalId >= stateLimit) {
+            throw new CorruptRegionEntryException("CBIT T7: Inline globalDictId " + localOrGlobalId
+                    + " >= stateCount " + stateLimit);
+        }
+        int globalStateId = localToGlobalState != null ? localToGlobalState[localOrGlobalId] : localOrGlobalId;
+        DirectBiomeData bm = null;
+        if (hasSlabLocalPalette && biomeTemplates != null && biomeTemplates.length > 0) {
+            int biomeTmplIdx = (entry16 >>> 11) & 3;
+            if (biomeTmplIdx < biomeTemplates.length) {
+                bm = biomeTemplates[biomeTmplIdx];
+            }
+        } else {
+            bm = defaultBiomeData;
+        }
+        boolean starlightZeroEligible = hasStarlightVersion && globalStateId != airStateId;
+        byte skyKind = LcaDecodedChunkMeta.LIGHT_ABSENT;
+        int skyState = -1;
+        if (skyLight2 == 0b01 || skyLight2 == 0b10) {
+            skyKind = LcaDecodedChunkMeta.LIGHT_FULL_15;
+            skyState = hasStarlightVersion ? 2 : -1;
+        } else if (starlightZeroEligible) {
+            skyKind = LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO;
+            skyState = 1;
+        }
+        byte blkKind = LcaDecodedChunkMeta.LIGHT_ABSENT;
+        int blkState = -1;
+        if (skyLight2 == 0b10 || skyLight2 == 0b11) {
+            blkKind = LcaDecodedChunkMeta.LIGHT_FULL_15;
+            blkState = hasStarlightVersion ? 2 : -1;
+        } else if (starlightZeroEligible) {
+            blkKind = LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO;
+            blkState = 1;
+        }
+        return new LcaDecodedChunkMeta.DecodedSectionMeta(
+                sectionY,
+                bm != null ? bm.globalDictIds : null,
+                bm != null ? bm.packedLongs : null,
+                skyKind, null, skyState,
+                blkKind, null, blkState
+        );
+    }
+
+    @SuppressWarnings("java:S1168")
+    private static LcaDecodedChunkMeta.DecodedSectionMeta bindDirectSectionMetaFromBuffer(
+            ByteBuffer buf,
+            int offset,
+            int limit,
+            int sectionY,
+            int[] localToGlobalState,
+            int regionStateCount,
+            int airStateId,
+            int[] effectivePalMap,
+            int[] localToGlobalBiome,
+            int regionBiomeCount,
+            DirectBiomeData[] biomeTemplates,
+            DirectBiomeData defaultBiomeData,
+            ScratchArena arena,
+            int formatVersion,
+            boolean hasStarlightVersion,
+            DirectBiomeData[] biomeBox,
+            int[] endPosOut,
+            LcaModeABlockSection.OffHeapModeASlice[] slicesOut,
+            int[] nonInlineUniformRuntimeIdsOut,
+            int sectionIndex
+    ) throws CorruptRegionEntryException {
+        if (offset + 2 > limit) {
+            throw new CorruptRegionEntryException("CBIT T5: SectionFrame truncated at offset " + offset);
+        }
+        int pos = offset;
+        int sectionHeader = buf.get(pos++) & 0xFF;
+        int curveId = (sectionHeader >>> 6) & 3;
+        int blockMode = (sectionHeader >>> 4) & 3;
+        int skyMode = (sectionHeader >>> 2) & 3;
+        int blkMode = sectionHeader & 3;
+
+        long octreeMask64;
+        if (blockMode == BLOCK_MODE_UNIFORM) {
+            octreeMask64 = 0L;
+        } else if (blockMode == BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+            octreeMask64 = -1L;
+        } else {
+            if (pos + 8 > limit) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T5: SectionFrame truncated reading octreeOccupancyMask64 at " + offset);
+            }
+            octreeMask64 = readLongBEBuffer(buf, pos);
+            pos += 8;
+        }
+
+        int paletteLen = readVarIntBuffer(buf, pos, limit);
+        pos += varIntLen(paletteLen);
+        if (paletteLen == 0) {
+            // v3 secExtFlags escape (e.g. SEC_EXT_GRAY_BITPLANES) fails closed to full decode path.
+            return null;
+        }
+        if (paletteLen < 1 || paletteLen > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T7: Invalid section paletteLen " + paletteLen);
+        }
+
+        int stateLimit = localToGlobalState != null ? localToGlobalState.length : regionStateCount;
+        int firstDiskId = -1;
+        int[] mappedIds = (blockMode != BLOCK_MODE_UNIFORM && paletteLen >= 2 && effectivePalMap != null)
+                ? new int[paletteLen]
+                : null;
+        for (int i = 0; i < paletteLen; i++) {
+            int diskId = readVarIntBuffer(buf, pos, limit);
+            pos += varIntLen(diskId);
+            if (diskId < 0 || diskId >= stateLimit) {
+                throw new CorruptRegionEntryException("CBIT T7: Section dictId " + diskId + " >= " + stateLimit);
+            }
+            if (i == 0) {
+                firstDiskId = diskId;
+            }
+            if (mappedIds != null) {
+                if (diskId >= effectivePalMap.length) {
+                    throw new CorruptRegionEntryException(
+                            "CBIT T7: Section diskId " + diskId + " >= " + effectivePalMap.length);
+                }
+                int runtimeId = effectivePalMap[diskId];
+                if (runtimeId < 0 || runtimeId > LcaSectionBacking.MAX_STATE_ID_19) {
+                    throw new CorruptRegionEntryException("CBIT T7: Invalid mapped runtimeId " + runtimeId);
+                }
+                mappedIds[i] = runtimeId;
+            }
+        }
+
+        if (blockMode != BLOCK_MODE_UNIFORM && paletteLen >= 2) {
+            if (mappedIds == null) {
+                return null;
+            }
+            LcaModeABlockSection.OffHeapModeASlice slice = LcaModeABlockSection.validateAndSlicePayloadFromBuffer(
+                    buf, pos, limit, curveId, blockMode, octreeMask64, mappedIds, endPosOut);
+            if (slicesOut != null) {
+                slicesOut[sectionIndex] = slice;
+            }
+            pos = endPosOut[0];
+        } else if (nonInlineUniformRuntimeIdsOut != null && firstDiskId >= 0) {
+            int uniformRuntimeId = (effectivePalMap != null && firstDiskId < effectivePalMap.length)
+                    ? effectivePalMap[firstDiskId]
+                    : firstDiskId;
+            nonInlineUniformRuntimeIdsOut[sectionIndex] = uniformRuntimeId;
+        }
+
+        DirectBiomeData bm = defaultBiomeData;
+        if (pos < limit) {
+            int firstByte = buf.get(pos) & 0xFF;
+            if ((firstByte & 0x80) != 0) {
+                pos++;
+                int tmplIdx = firstByte & 0x7F;
+                if (biomeTemplates == null || tmplIdx >= biomeTemplates.length) {
+                    throw new CorruptRegionEntryException("CBIT T7: Biome template index " + tmplIdx + " out of bounds");
+                }
+                bm = biomeTemplates[tmplIdx];
+            } else {
+                int bLen = readVarIntBuffer(buf, pos, limit);
+                pos += varIntLen(bLen);
+                if (bLen > 0) {
+                    pos = decodeDirectBiomePayloadFromBuffer(
+                            buf, pos, limit, bLen, localToGlobalBiome, regionBiomeCount, arena, biomeBox);
+                    bm = biomeBox[0];
+                }
+            }
+        }
+
+        int constNibbles = 0;
+        if (skyMode == LIGHT_MODE_CONST || blkMode == LIGHT_MODE_CONST) {
+            if (pos >= limit) {
+                throw new CorruptRegionEntryException("CBIT: Truncated const light byte in SectionFrame");
+            }
+            constNibbles = buf.get(pos++) & 0xFF;
+        }
+        int firstGlobalStateId = localToGlobalState != null ? localToGlobalState[firstDiskId] : firstDiskId;
+        boolean sectionOnlyAir = paletteLen == 1 && firstGlobalStateId == airStateId;
+
+        int nextPos = decodeDirectLightChannelFromBuffer(
+                buf, pos, limit, skyMode, constNibbles & 0x0F, formatVersion,
+                hasStarlightVersion, sectionOnlyAir, CURVE_TO_YZX[CURVE_Y_H2], arena);
+        if (nextPos < 0) {
+            return null;
+        }
+        pos = nextPos;
+        byte skyKind = arena.lightOutKind;
+        byte[] skyBytes = arena.lightOutBytes;
+        int skyState = arena.lightOutState;
+
+        if (decodeDirectLightChannelFromBuffer(
+                buf, pos, limit, blkMode, (constNibbles >>> 4) & 0x0F, formatVersion,
+                hasStarlightVersion, sectionOnlyAir, CURVE_TO_YZX[CURVE_H3], arena) < 0) {
+            return null;
+        }
+        byte blkKind = arena.lightOutKind;
+        byte[] blkBytes = arena.lightOutBytes;
+        int blkState = arena.lightOutState;
+
+        return new LcaDecodedChunkMeta.DecodedSectionMeta(
+                sectionY,
+                bm != null ? bm.globalDictIds : null,
+                bm != null ? bm.packedLongs : null,
+                skyKind, skyBytes, skyState,
+                blkKind, blkBytes, blkState
+        );
+    }
+
+    private static int decodeDirectLightChannelFromBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int lightMode,
+            int constVal,
+            int formatVersion,
+            boolean hasStarlightVersion,
+            boolean sectionOnlyAir,
+            int[] grayCurveToYzx,
+            ScratchArena arena
+    ) throws CorruptRegionEntryException {
+        arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_ABSENT;
+        arena.lightOutBytes = null;
+        arena.lightOutState = -1;
+        if (lightMode == LIGHT_MODE_ABSENT) {
+            if (hasStarlightVersion && !sectionOnlyAir) {
+                arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO;
+                arena.lightOutState = 1;
+            }
+            return pos;
+        }
+        if (lightMode == LIGHT_MODE_CONST) {
+            if (constVal == 0 && hasStarlightVersion) {
+                arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO;
+                arena.lightOutState = 1;
+            } else if (constVal == 15) {
+                arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_FULL_15;
+                arena.lightOutState = hasStarlightVersion ? 2 : -1;
+            } else {
+                arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_ARRAY;
+                byte[] out = new byte[2048];
+                Arrays.fill(out, (byte) ((constVal << 4) | constVal));
+                arena.lightOutBytes = out;
+                arena.lightOutState = hasStarlightVersion ? 2 : -1;
+            }
+            return pos;
+        }
+        if (lightMode == LIGHT_MODE_GRAY_PLANES) {
+            if (formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3
+                    && pos < limit
+                    && (buf.get(pos) & LcaV3Codec.SENTINEL_MODE_MASK) == LcaV3Codec.SENTINEL_MODE_EIKONAL) {
+                return -1;
+            }
+            int rem = limit - pos;
+            if (rem <= 0) {
+                throw new CorruptRegionEntryException("CBIT: Truncated Gray-plane light channel");
+            }
+            byte[] lightTmp = arena.ensureSectionStagingCap(rem);
+            buf.get(pos, lightTmp, 0, rem);
+            byte[] out = new byte[2048];
+            int consumed = decodeGrayPlanesDirectToPacked2048(lightTmp, 0, rem, grayCurveToYzx, out, 0);
+            arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_ARRAY;
+            arena.lightOutBytes = out;
+            arena.lightOutState = hasStarlightVersion ? 2 : -1;
+            return pos + consumed;
+        }
+        if (pos + 2048L > limit) {
+            throw new CorruptRegionEntryException("CBIT: Truncated raw light channel");
+        }
+        byte[] out = new byte[2048];
+        buf.get(pos, out, 0, 2048);
+        arena.lightOutKind = LcaDecodedChunkMeta.LIGHT_ARRAY;
+        arena.lightOutBytes = out;
+        arena.lightOutState = hasStarlightVersion ? 2 : -1;
+        return pos + 2048;
     }
 }

@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @governedBy anvil-api-ADR-003
  * @governedBy anvil-api-ADR-002
+ * @governedBy anvil-api-ADR-007
  * @governedBy leafanvil-ADR-005
  * @governedBy leafanvil-ADR-006
  * @governedBy ADR-115
@@ -156,7 +157,12 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     public static final double DEFAULT_COMPACT_FRAGMENTATION_THRESHOLD = 0.35;
 
     /** Maximum number of read-only regions whose sequential read-ahead snapshots are tracked concurrently. */
-    private static final int MAX_READ_AHEAD_REGIONS = 2;
+    private static final int MAX_READ_AHEAD_REGIONS =
+            Math.max(4, Integer.getInteger("leafanvil.io.readAheadMaxRegions", 32));
+
+    /** Maximum aggregate off-heap bytes retained across direct read-ahead region slabs (`64 MiB` default). */
+    private static final long MAX_READ_AHEAD_TOTAL_BYTES =
+            Math.max(8L * 1024L * 1024L, Long.getLong("leafanvil.io.readAheadMaxTotalBytes", 64L * 1024L * 1024L));
 
     private static boolean isDefaultBufferedIoEnabled() {
         String prop = System.getProperty("leafanvil.io.buffered");
@@ -197,8 +203,14 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private final ConcurrentHashMap<Long, AtomicInteger> readChannelColdMisses =
             new ConcurrentHashMap<>(64);
     private final ConcurrentHashMap<Long, SoftReference<byte[]>> readAheadRegionBytes =
-            new ConcurrentHashMap<>(16);
+            new ConcurrentHashMap<>(32);
     private final ConcurrentLinkedQueue<Long> readAheadEvictionQueue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentHashMap<Long, SoftReference<ByteBuffer>> readAheadRegionDirectBufs =
+            new ConcurrentHashMap<>(32);
+    private final ConcurrentHashMap<Long, Integer> readAheadRegionDirectSizes =
+            new ConcurrentHashMap<>(32);
+    private final ConcurrentLinkedQueue<Long> readAheadDirectEvictionQueue = new ConcurrentLinkedQueue<>();
+    private final AtomicLong readAheadDirectTotalBytes = new AtomicLong();
     private final AtomicLong readOnlySequentialReadAheadCount = new AtomicLong();
     private final ConcurrentHashMap<Long, CompletableFuture<LcaRegionWriter.LcaLiveArchive>> openingRegions =
             new ConcurrentHashMap<>();
@@ -316,6 +328,10 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         if (!readAheadEnabled) {
             readAheadRegionBytes.clear();
             readAheadEvictionQueue.clear();
+            readAheadRegionDirectBufs.clear();
+            readAheadRegionDirectSizes.clear();
+            readAheadDirectEvictionQueue.clear();
+            readAheadDirectTotalBytes.set(0L);
             readChannelColdMisses.clear();
         }
         for (LcaRegionWriter.LcaLiveArchive archive : regionCache.values()) {
@@ -326,6 +342,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
     private volatile boolean directFlatBitPack;
     private volatile String[] worldgenBlockDictionary;
+    private volatile String[] prioritizedBiomeDictionary;
 
     /**
      * Registers a world-level canonical block-state palette (matching the GPU worldgen palette)
@@ -342,6 +359,29 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 archive.bindWorldgenBlockDictionary(copy);
             }
         }
+    }
+
+    /**
+     * Registers frequency-prioritized canonical block-state and biome dictionaries across this
+     * storage folder and all open/future archives (`anvil-api-ADR-007`). Novel states or biomes
+     * outside these arrays dynamically append to region {@code dictSegments}.
+     */
+    public void bindPrioritizedDictionary(String[] canonicalBlockStates, String[] canonicalBiomes) {
+        setWorldgenBlockDictionary(canonicalBlockStates);
+        String[] biomeCopy = (canonicalBiomes != null && canonicalBiomes.length > 0)
+                ? canonicalBiomes.clone()
+                : null;
+        this.prioritizedBiomeDictionary = biomeCopy;
+        if (biomeCopy != null && storageKind == LcaRegionReader.STORAGE_KIND_REGION_VOXEL) {
+            for (LcaRegionWriter.LcaLiveArchive archive : regionCache.values()) {
+                archive.bindPrioritizedBiomeDictionary(biomeCopy);
+            }
+        }
+    }
+
+    public String[] prioritizedBiomeDictionary() {
+        String[] dict = this.prioritizedBiomeDictionary;
+        return dict != null ? dict.clone() : null;
     }
 
     public String[] worldgenBlockDictionary() {
@@ -498,12 +538,102 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         recentReadChannelKeys.remove(key);
         readChannelColdMisses.remove(key);
         readAheadRegionBytes.remove(key);
+        removeDirectReadAheadEntry(key);
         FileChannel ch = readChannelCache.remove(key);
         if (ch != null) {
             ch.close();
         }
     }
 
+    private void removeDirectReadAheadEntry(long key) {
+        readAheadRegionDirectBufs.remove(key);
+        Integer prevSize = readAheadRegionDirectSizes.remove(key);
+        if (prevSize != null) {
+            readAheadDirectTotalBytes.addAndGet(-prevSize.longValue());
+        }
+    }
+
+    @SuppressWarnings("java:S1168")
+    private ByteBuffer getOrPromoteReadAheadDirectBuffer(
+            long key, FileChannel ch, boolean immediate
+    ) throws IOException {
+        if (!sequentialReadAheadEnabled || ch == null || !ch.isOpen()) {
+            return null;
+        }
+        SoftReference<ByteBuffer> ref = readAheadRegionDirectBufs.get(key);
+        if (ref != null) {
+            ByteBuffer cached = ref.get();
+            if (cached != null) {
+                return cached;
+            }
+            if (readAheadRegionDirectBufs.remove(key, ref)) {
+                Integer prevSize = readAheadRegionDirectSizes.remove(key);
+                if (prevSize != null) {
+                    readAheadDirectTotalBytes.addAndGet(-prevSize.longValue());
+                }
+            }
+        }
+        AtomicInteger misses = readChannelColdMisses.computeIfAbsent(key, k -> new AtomicInteger());
+        if (!immediate && misses.incrementAndGet() < readAheadTriggerReads) {
+            return null;
+        }
+        synchronized (regionLock(key)) {
+            if (regionCache.containsKey(key) || !ch.isOpen()) {
+                return null;
+            }
+            SoftReference<ByteBuffer> recheck = readAheadRegionDirectBufs.get(key);
+            if (recheck != null) {
+                ByteBuffer cached = recheck.get();
+                if (cached != null) {
+                    return cached;
+                }
+            }
+            long fileSize = ch.size();
+            if (fileSize <= 0L || fileSize > readAheadMaxBytes || fileSize > MAX_READ_AHEAD_TOTAL_BYTES) {
+                misses.set(0);
+                return null;
+            }
+            int len = (int) fileSize;
+            ByteBuffer directBuf = ByteBuffer.allocateDirect(len);
+            long pos = 0L;
+            while (directBuf.hasRemaining()) {
+                int n = ch.read(directBuf, pos);
+                if (n < 0) {
+                    break;
+                }
+                pos += n;
+            }
+            if (pos < fileSize) {
+                return null;
+            }
+            directBuf.flip();
+            removeDirectReadAheadEntry(key);
+            readAheadRegionDirectBufs.put(key, new SoftReference<>(directBuf));
+            readAheadRegionDirectSizes.put(key, len);
+            readAheadDirectTotalBytes.addAndGet(len);
+            readAheadDirectEvictionQueue.offer(key);
+            int maxEvictScans = (MAX_READ_AHEAD_REGIONS << 2) + 8;
+            int scans = 0;
+            while ((readAheadRegionDirectBufs.size() > MAX_READ_AHEAD_REGIONS
+                    || readAheadDirectTotalBytes.get() > MAX_READ_AHEAD_TOTAL_BYTES)
+                    && scans++ < maxEvictScans) {
+                Long eldest = readAheadDirectEvictionQueue.poll();
+                if (eldest == null) {
+                    break;
+                }
+                if (eldest.longValue() == key) {
+                    readAheadDirectEvictionQueue.offer(eldest);
+                    break;
+                }
+                removeDirectReadAheadEntry(eldest);
+            }
+            misses.set(0);
+            readOnlySequentialReadAheadCount.incrementAndGet();
+            return directBuf;
+        }
+    }
+
+    @SuppressWarnings("java:S1168")
     private byte[] getOrPromoteReadAheadRegionBytes(long key, FileChannel ch) throws IOException {
         if (!sequentialReadAheadEnabled || ch == null || !ch.isOpen()) {
             return null;
@@ -655,6 +785,11 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                         }
                         try {
                             FileChannel ch = getOrOpenReadChannel(regionX, regionZ, lcaFile);
+                            SoftReference<ByteBuffer> directRef = readAheadRegionDirectBufs.get(key);
+                            ByteBuffer cachedDirect = directRef != null ? directRef.get() : null;
+                            if (cachedDirect != null) {
+                                return LcaRegionReader.readChunkNbtBytesFromDirectBuffer(header, ch, cachedDirect, rx, rz);
+                            }
                             byte[] prefetched = getOrPromoteReadAheadRegionBytes(key, ch);
                             if (prefetched != null) {
                                 return LcaRegionReader.INSTANCE.readChunkNbtBytes(prefetched, rx, rz);
@@ -691,6 +826,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
      * Closing the returned {@link DataOutputStream} parses the written Mojang binary NBT compound and
      * commits it to the backing `.lca` region file via Copy-on-Write (`CoW`) `256B` slab rotation.
      */
+    @SuppressWarnings("java:S1130") // Preserves Mojang RegionFile#getChunkDataOutputStream throws IOException contract
     public DataOutputStream getChunkDataOutputStream(int chunkX, int chunkZ) throws IOException {
         java.io.OutputStream commitOut = new java.io.OutputStream() {
             private byte[] buf = new byte[65536];
@@ -1017,6 +1153,68 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             return null;
         }
         return archive.readDeferredChunkSlab(rx, rz, runtimeStateLookup);
+    }
+
+    /**
+     * Zero-copy off-heap Mode A read path (`anvil-api-ADR-007`, `REQ-RTP-S-005`).
+     *
+     * <p>Promotes read-only `.lca` regions into a bounded direct off-heap {@link ByteBuffer}
+     * read-ahead cache (`MAX_READ_AHEAD_REGIONS = 32`, `64 MiB` total cap) via a single sequential
+     * {@code FileChannel.read(directBuf, 0)} and returns an $O(1)$ {@link LcaRegionReader.DirectOffHeapChunkView}
+     * without copying chunk bytes onto the Java heap. Returns {@code null} when the chunk is absent,
+     * stored in Mode B (`codec1 != 0`), or the region is currently write-open in {@code regionCache}
+     * (caller fails closed to {@link #readDeferredChunkSlab}).</p>
+     */
+    @SuppressWarnings("java:S1168")
+    public LcaRegionReader.DirectOffHeapChunkView readDirectOffHeapChunkView(
+            int chunkX,
+            int chunkZ,
+            java.util.function.Function<String, Integer> runtimeStateLookup
+    ) throws IOException {
+        int regionX = chunkX >> 5;
+        int regionZ = chunkZ >> 5;
+        long key = packRegionKey(regionX, regionZ);
+        if (knownMissingRegions.contains(key)) {
+            return null;
+        }
+        LcaRegionWriter.LcaLiveArchive openArchive = getOpenRegionIfCached(regionX, regionZ);
+        if (openArchive != null) {
+            return openArchive.readDirectOffHeapChunkView(chunkX & 31, chunkZ & 31, runtimeStateLookup);
+        }
+        int rx = chunkX & 31;
+        int rz = chunkZ & 31;
+        Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
+        LcaRegionReader.CachedFileHeader header = resolveReadHeader(regionX, regionZ, lcaFile);
+        if (header == null || !header.isOccupied(rx, rz)) {
+            return null;
+        }
+        try {
+            FileChannel ch = getOrOpenReadChannel(regionX, regionZ, lcaFile);
+            if (ch == null) {
+                return null;
+            }
+            ByteBuffer directRegionBuf = getOrPromoteReadAheadDirectBuffer(key, ch, true);
+            if (directRegionBuf != null) {
+                return LcaRegionReader.readDirectOffHeapChunkViewFromDirectBuffer(
+                        header, ch, directRegionBuf, rx, rz, runtimeStateLookup);
+            }
+            return LcaRegionReader.readDirectOffHeapChunkViewFromChannel(
+                    lcaFile, ch, rx, rz, runtimeStateLookup);
+        } catch (CorruptRegionEntryException | java.nio.channels.ClosedChannelException race) {
+            synchronized (regionLock(key)) {
+                if (getOpenRegionIfCached(regionX, regionZ) != null) {
+                    return null;
+                }
+                LcaRegionReader.invalidateFileCache(lcaFile);
+                closeReadChannel(key);
+                FileChannel fresh = getOrOpenReadChannel(regionX, regionZ, lcaFile);
+                if (fresh == null) {
+                    return null;
+                }
+                return LcaRegionReader.readDirectOffHeapChunkViewFromChannel(
+                        lcaFile, fresh, rx, rz, runtimeStateLookup);
+            }
+        }
     }
 
     /**
@@ -1353,6 +1551,78 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     }
 
     /**
+     * Zero-copy off-heap Mode A fresh chunk write path (`anvil-api-ADR-007`, `REQ-RTP-S-002`,
+     * `REQ-RTP-S-004`, `REQ-RTP-S-005`). Guarantees {@code onFlushComplete} executes once even
+     * if opening the region throws an exception.
+     */
+    public int writeFreshChunkDirectOffHeapModeA(
+            int chunkX,
+            int chunkZ,
+            int dataVersion,
+            long lastUpdate,
+            long inhabitedTime,
+            String statusName,
+            String[][] sectionBlockPalettes,
+            LcaModeABlockSection.DirectModeASectionRef[] sectionOffHeapModeA,
+            LcaModeABlockSection[] sectionPreEncodedModeA,
+            byte[][] sectionPreEncodedFlatBytes,
+            int[] sectionPreEncodedFlatBits,
+            int[][] sectionPreResolvedDictIds,
+            long[] sectionPrecomputedOctreeMasks,
+            boolean[] sectionHasPrecomputedOctreeMask,
+            long[][] sectionBlockData,
+            String[][] sectionBiomePalettes,
+            int[][] sectionPreResolvedBiomeDictIds,
+            long[][] sectionBiomeData,
+            byte[][] sectionSkyLight,
+            byte[][] sectionBlockLight,
+            byte[] residualMetadataTailBytes,
+            Runnable onFlushComplete
+    ) throws IOException {
+        int regionX = chunkX >> 5;
+        int regionZ = chunkZ >> 5;
+        long key = packRegionKey(regionX, regionZ);
+        int written;
+        boolean delegated = false;
+        try {
+            synchronized (regionLock(key)) {
+                LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, true);
+                delegated = true;
+                written = archive.saveFreshChunkDirectOffHeapModeA(
+                        chunkX & 31,
+                        chunkZ & 31,
+                        dataVersion,
+                        lastUpdate,
+                        inhabitedTime,
+                        statusName,
+                        sectionBlockPalettes,
+                        sectionOffHeapModeA,
+                        sectionPreEncodedModeA,
+                        sectionPreEncodedFlatBytes,
+                        sectionPreEncodedFlatBits,
+                        sectionPreResolvedDictIds,
+                        sectionPrecomputedOctreeMasks,
+                        sectionHasPrecomputedOctreeMask,
+                        sectionBlockData,
+                        sectionBiomePalettes,
+                        sectionPreResolvedBiomeDictIds,
+                        sectionBiomeData,
+                        sectionSkyLight,
+                        sectionBlockLight,
+                        residualMetadataTailBytes,
+                        onFlushComplete
+                );
+            }
+        } finally {
+            if (!delegated && onFlushComplete != null) {
+                onFlushComplete.run();
+            }
+        }
+        evictExcessRegions(key);
+        return written;
+    }
+
+    /**
      * Pre-registers a palette of canonical block-state strings in the target region's Layer 2
      * dictionary and returns their deterministic global dictionary IDs for GPU/DMA LUT binding.
      */
@@ -1651,6 +1921,10 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         if (wgDict != null && storageKind == LcaRegionReader.STORAGE_KIND_REGION_VOXEL) {
             result.bindWorldgenBlockDictionary(wgDict);
         }
+        String[] bioDict = this.prioritizedBiomeDictionary;
+        if (bioDict != null && storageKind == LcaRegionReader.STORAGE_KIND_REGION_VOXEL) {
+            result.bindPrioritizedBiomeDictionary(bioDict);
+        }
         regionCache.put(key, result);
         // Close any read channel opened concurrently while openLiveArchive was running
         closeReadChannel(key);
@@ -1771,8 +2045,8 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         } catch (IOException closeEx) {
             java.util.logging.Logger.getLogger(LcaRegionFileStorage.class.getName()).log(
                     java.util.logging.Level.FINE,
-                    "Failed to close cached read channel during region invalidation (" + regionX + "," + regionZ + ")",
-                    closeEx);
+                    closeEx,
+                    () -> "Failed to close cached read channel during region invalidation (" + regionX + "," + regionZ + ")");
         }
     }
 
@@ -1855,6 +2129,10 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         readChannelColdMisses.clear();
         readAheadRegionBytes.clear();
         readAheadEvictionQueue.clear();
+        readAheadRegionDirectBufs.clear();
+        readAheadRegionDirectSizes.clear();
+        readAheadDirectEvictionQueue.clear();
+        readAheadDirectTotalBytes.set(0L);
         IOException firstEx = null;
         for (FileChannel ch : readChannels) {
             if (ch != null) {

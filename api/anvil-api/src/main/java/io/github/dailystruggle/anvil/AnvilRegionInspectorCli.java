@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 public final class AnvilRegionInspectorCli {
 
     private static final Pattern REGION_FILE_PATTERN =
-            Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.([A-Za-z0-9_]+)");
+            Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.(\\w+)");
 
     private AnvilRegionInspectorCli() {}
 
@@ -275,6 +275,7 @@ public final class AnvilRegionInspectorCli {
      *
      * @param args {@code <path> [--block-filter a,b] [--biome-filter c,d] [--max-samples N]}
      */
+    @SuppressWarnings("java:S106") // CLI contract writes machine-readable JSON to stdout and usage to stderr
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
             System.err.println("Usage: AnvilRegionInspectorCli <path> [--block-filter a,b] [--biome-filter c,d] [--max-samples N]");
@@ -285,30 +286,35 @@ public final class AnvilRegionInspectorCli {
         List<String> biomeFilters = new ArrayList<>();
         int maxSamples = 12;
 
-        for (int i = 1; i < args.length; i++) {
+        int i = 1;
+        while (i < args.length) {
             switch (args[i]) {
                 case "--block-filter" -> {
                     if (i + 1 < args.length) {
-                        for (String p : args[++i].split(",")) {
+                        i++;
+                        for (String p : args[i].split(",")) {
                             if (!p.isBlank()) blockFilters.add(p.trim());
                         }
                     }
                 }
                 case "--biome-filter" -> {
                     if (i + 1 < args.length) {
-                        for (String p : args[++i].split(",")) {
+                        i++;
+                        for (String p : args[i].split(",")) {
                             if (!p.isBlank()) biomeFilters.add(p.trim());
                         }
                     }
                 }
                 case "--max-samples" -> {
                     if (i + 1 < args.length) {
-                        maxSamples = Integer.parseInt(args[++i]);
+                        i++;
+                        maxSamples = Integer.parseInt(args[i]);
                     }
                 }
                 default -> {
                 }
             }
+            i++;
         }
 
         List<RegionSummary> regions = inspectPath(target, blockFilters, biomeFilters, maxSamples);

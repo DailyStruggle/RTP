@@ -4447,8 +4447,8 @@ class LcaLayeredPropertyEntropyProofTest {
         // =====================================================================
         long e2eMcaSectorBytes = 0;
         long e2eMcaExactZlibBytes = 0;
-        long e2eCurModeAExact = 0, e2eCurModeASlab256 = 0;
-        long e2eRevModeAExact = 0, e2eRevModeASlab256 = 0;
+        long e2eCurModeASlab256 = 0;
+        long e2eRevModeASlab256 = 0;
         long e2eCurModeBExact = 0, e2eCurModeBSlab256 = 0;
         long e2eRevModeBExact = 0, e2eRevModeBSlab256 = 0;
         int e2eRegions = 0;
@@ -4619,9 +4619,7 @@ class LcaLayeredPropertyEntropyProofTest {
                         byte[] revCf = revCfOut.toByteArray();
 
                         // Mode A accounting
-                        e2eCurModeAExact += curModeACf.length;
                         e2eCurModeASlab256 += ((curModeACf.length + 255) & ~255);
-                        e2eRevModeAExact += revCf.length;
                         e2eRevModeASlab256 += ((revCf.length + 255) & ~255);
 
                         // Mode B (Per-Chunk LCD2 + Shared Region AtomicDictState + 256B Slab Alignment)
@@ -4781,7 +4779,6 @@ class LcaLayeredPropertyEntropyProofTest {
             gray[h2] = l ^ (l >>> 1);
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream(64);
-        byte[] vBuf = new byte[5];
         for (int plane = 0; plane < 4; plane++) {
             int mask = 1 << plane;
             int ones = 0;

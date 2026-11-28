@@ -480,8 +480,8 @@ public final class WeightedParityEvaluator {
             } catch (IOException | RuntimeException ex) {
                 LOGGER.log(
                         Level.WARNING,
-                        "Skipping unreadable structure .nbt template '" + rawTemplateId + "': " + ex.getMessage(),
-                        ex);
+                        ex,
+                        () -> "Skipping unreadable structure .nbt template '" + rawTemplateId + "': " + ex.getMessage());
                 return false;
             }
         }
@@ -748,7 +748,7 @@ public final class WeightedParityEvaluator {
                         obstructedDoorwayCount++;
                     }
                 } else if (!refPathSurfaceByXz.isEmpty()
-                        && hasAdjacentPath(refLowerDoors, refLowerDoorSet, refPathSurfaceByXz, door)
+                        && hasAdjacentPath(refLowerDoorSet, refPathSurfaceByXz, door)
                         && !hasNearbyPathColumn(candPathSurfaceByXz, door.x, door.z, door.y - 1, 2, 1)) {
                     pathDiscontinuityCount++;
                     recordTripwire(
@@ -791,11 +791,11 @@ public final class WeightedParityEvaluator {
                 boolean matchesRefIsomorphism = refExactSigs.contains(computeCanonicalSignature(ct.relVoxels, true))
                         || refNormSigs.contains(computeCanonicalSignature(ct.relVoxels, false));
 
-                if (ct.groundedOnSoil && ct.allLeavesConnected && (matchesLibrary || matchesRefIsomorphism)) {
-                    templateMatchedFeatureCount++;
-                    templateMatchedShiftedTreeVoxels += ct.relVoxels.size();
-                } else if (ct.groundedOnSoil && ct.hasTrunk && ct.hasCanopy && ct.allLeavesConnected
-                        && library.loadedTemplateCount() == 0 && refTrees.isEmpty()) {
+                boolean matchedTree = ct.groundedOnSoil && ct.allLeavesConnected
+                        && ((matchesLibrary || matchesRefIsomorphism)
+                                || (ct.hasTrunk && ct.hasCanopy
+                                        && library.loadedTemplateCount() == 0 && refTrees.isEmpty()));
+                if (matchedTree) {
                     templateMatchedFeatureCount++;
                     templateMatchedShiftedTreeVoxels += ct.relVoxels.size();
                 } else {
@@ -1420,7 +1420,7 @@ public final class WeightedParityEvaluator {
                     continue;
                 }
                 int baseY = run.relSectionY() << 4;
-                String role = isLogOrStemBlock(baseId) ? "TRUNK" : (isCanopyLeafBlock(baseId) ? "CANOPY" : baseId);
+                String role = classifyTreeVoxelRole(baseId);
                 for (int h = run.startH3(), end = run.startH3() + run.runLength(); h < end; h++) {
                     int yzx = LcaDecoratorStamp.h3ToYzx(h);
                     int lx = yzx & 15;
@@ -1449,7 +1449,7 @@ public final class WeightedParityEvaluator {
                     continue;
                 }
                 int baseY = run.relSectionY() << 4;
-                String role = isLogOrStemBlock(baseId) ? "TRUNK" : (isCanopyLeafBlock(baseId) ? "CANOPY" : baseId);
+                String role = classifyTreeVoxelRole(baseId);
                 for (int h = run.startH3(), end = run.startH3() + run.runLength(); h < end; h++) {
                     int yzx = LcaDecoratorStamp.h3ToYzx(h);
                     int lx = yzx & 15;
@@ -1460,6 +1460,13 @@ public final class WeightedParityEvaluator {
             }
         }
         return normalizeToBoundingOrigin(raw);
+    }
+
+    private static String classifyTreeVoxelRole(String baseId) {
+        if (isLogOrStemBlock(baseId)) {
+            return "TRUNK";
+        }
+        return isCanopyLeafBlock(baseId) ? "CANOPY" : baseId;
     }
 
     private static void registerEightSymmetries(
@@ -1609,7 +1616,6 @@ public final class WeightedParityEvaluator {
     }
 
     private static boolean hasAdjacentPath(
-            List<BlockPos> refDoors,
             Set<BlockPos> refDoorSet,
             Map<Long, Integer> refPathByXz,
             BlockPos candDoor) {

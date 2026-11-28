@@ -38,28 +38,29 @@ Pick only the SDK modules that match your plugin's requirements. Full module cat
 | EWMA cost estimation, AIMD throttling, max-min water-filling, Folia share allocation, unit-interval shaping curves, distribution samplers & polar spirals | `predict-api` | `EwmaEstimator`, `AimdLimiter`, `BudgetPacer`, `ComparativeCostGovernor`, `WaterFillingAllocator`, `WorkAttributionLedger`, `ProbedShareAllocator`, `UnitCurve`, `DistributionSampler`, `PolarCurve` |
 | In-game 2D map canvases, spatial heatmaps, sparklines & Mermaid chart rendering | `maps-api` | `MapBinding`, `MapCanvas`, `HeatmapRenderer`, `DualSparklineRenderer`, `ChartRenderer` |
 
-### All 16 `api/*` Maven Coordinates
+### All 17 `api/*` Maven Coordinates
 
-Every published `io.github.dailystruggle:<module>` artifact includes `-sources.jar`, `-javadoc.jar`, and embedded Markdown documentation under `META-INF/leaf-sdk/<module>/` (projected to `docs/sdk/<module>/` in downstream repositories).
+Every published `io.github.leafcraftdev:<module>` artifact includes `-sources.jar`, `-javadoc.jar`, and embedded Markdown documentation under `META-INF/leaf-sdk/<module>/` (projected to `docs/sdk/<module>/` in downstream repositories).
 
 | Module | Maven Central Coordinate | Inter-Module Dependencies |
 |---|---|---|
-| `server-api` | `io.github.dailystruggle:server-api:3.3.1` | *(none)* |
-| `units-api` | `io.github.dailystruggle:units-api:3.3.1` | *(none)* |
-| `tags-api` | `io.github.dailystruggle:tags-api:3.3.1` | *(none)* |
-| `yaml-api` | `io.github.dailystruggle:yaml-api:3.3.1` | *(none)* |
-| `bit-api` | `io.github.dailystruggle:bit-api:3.3.1` | *(none)* |
-| `config-bit-api` | `io.github.dailystruggle:config-bit-api:3.3.1` | `yaml-api`, `bit-api`, `units-api` |
-| `commands-api` | `io.github.dailystruggle:commands-api:3.3.1` | *(none)* |
-| `menu-api` | `io.github.dailystruggle:menu-api:3.3.1` | `server-api`, `commands-api` |
-| `effects-api` | `io.github.dailystruggle:effects-api:3.3.1` | `server-api` |
-| `maps-api` | `io.github.dailystruggle:maps-api:3.3.1` | *(none)* |
-| `metrics-api` | `io.github.dailystruggle:metrics-api:3.3.1` | *(none)* |
-| `bstats-api` | `io.github.dailystruggle:bstats-api:3.3.1` | *(none)* |
-| `predict-api` | `io.github.dailystruggle:predict-api:3.3.1` | *(none)* |
-| `database-api` | `io.github.dailystruggle:database-api:3.3.1` | *(none)* |
-| `anvil-api` | `io.github.dailystruggle:anvil-api:3.3.1` | `bit-api` |
-| `schematics-api` | `io.github.dailystruggle:schematics-api:3.3.1` | `tags-api`, `server-api` |
+| `server-api` | `io.github.leafcraftdev:server-api:1.0.0` | *(none)* |
+| `units-api` | `io.github.leafcraftdev:units-api:1.0.0` | *(none)* |
+| `tags-api` | `io.github.leafcraftdev:tags-api:1.0.0` | *(none)* |
+| `yaml-api` | `io.github.leafcraftdev:yaml-api:1.0.0` | *(none)* |
+| `bit-api` | `io.github.leafcraftdev:bit-api:1.0.0` | *(none)* |
+| `config-bit-api` | `io.github.leafcraftdev:config-bit-api:1.0.0` | `yaml-api`, `bit-api`, `units-api` |
+| `bytecode-api` | `io.github.leafcraftdev:bytecode-api:1.0.0` | `yaml-api`, `server-api`, `config-bit-api` |
+| `commands-api` | `io.github.leafcraftdev:commands-api:1.0.0` | *(none)* |
+| `menu-api` | `io.github.leafcraftdev:menu-api:1.0.0` | `server-api`, `commands-api` |
+| `effects-api` | `io.github.leafcraftdev:effects-api:1.0.0` | `server-api` |
+| `maps-api` | `io.github.leafcraftdev:maps-api:1.0.0` | *(none)* |
+| `metrics-api` | `io.github.leafcraftdev:metrics-api:1.0.0` | *(none)* |
+| `bstats-api` | `io.github.leafcraftdev:bstats-api:1.0.0` | *(none)* |
+| `predict-api` | `io.github.leafcraftdev:predict-api:1.0.0` | *(none)* |
+| `database-api` | `io.github.leafcraftdev:database-api:1.0.0` | *(none)* |
+| `anvil-api` | `io.github.leafcraftdev:anvil-api:1.0.0` | `bit-api` |
+| `schematics-api` | `io.github.leafcraftdev:schematics-api:1.0.0` | `tags-api`, `server-api` |
 
 ---
 
@@ -89,17 +90,17 @@ repositories {
 }
 
 ext {
-    leafSdkVersion = '3.3.1'
+    leafSdkVersion = '1.0.0'
 }
 
 dependencies {
-    api "io.github.dailystruggle:server-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:yaml-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:units-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:bit-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:config-bit-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:commands-api:${leafSdkVersion}"
-    api "io.github.dailystruggle:predict-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:server-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:yaml-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:units-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:bit-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:config-bit-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:commands-api:${leafSdkVersion}"
+    api "io.github.leafcraftdev:predict-api:${leafSdkVersion}"
 }
 ```
 

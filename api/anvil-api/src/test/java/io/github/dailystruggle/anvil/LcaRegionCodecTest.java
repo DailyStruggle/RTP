@@ -2692,7 +2692,7 @@ class LcaRegionCodecTest {
             assertNotNull(rawChunkNbt);
             assertTrue(ws.voxelStorage().writeChunkNbtBytes(0, 0, rawChunkNbt) > 0);
             assertNotNull(ws.voxelStorage().readChunkNbtBytes(0, 0));
-            byte[] slabPayload = ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, rawChunkNbt);
+            assertNotNull(ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, rawChunkNbt));
             assertTrue(ws.totalOpenRegionCount() >= 1);
             assertEquals(0L, ws.totalMigratedRegionCount());
             ws.compactOpenRegions(0.0);

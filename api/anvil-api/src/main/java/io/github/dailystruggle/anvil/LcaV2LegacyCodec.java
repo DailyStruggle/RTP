@@ -205,11 +205,22 @@ final class LcaV2LegacyCodec {
             List<LcaSectionCodec.BiomeTemplate> biomeTemplates
     ) {
         LcaSectionCodec.ScratchArena arena = LcaSectionCodec.scratch();
-        byte[] buf = arena.byteStaging;
+        int tmplCount = biomeTemplates == null ? 0 : biomeTemplates.size();
+        int maxNeed = 32 + (localStates.size() * 64) + (localBiomes.size() * 64);
+        for (int i = 0; i < localStates.size(); i++) {
+            maxNeed += localStates.get(i).length() * 3;
+        }
+        for (int i = 0; i < localBiomes.size(); i++) {
+            maxNeed += localBiomes.get(i).length() * 3;
+        }
+        for (int t = 0; t < tmplCount; t++) {
+            LcaSectionCodec.BiomeTemplate tmpl = biomeTemplates.get(t);
+            maxNeed += LcaSectionCodec.maxEncodedBiomeBytes(tmpl.biomeIds, tmpl.rawBiomeDataLongs);
+        }
+        byte[] buf = maxNeed <= arena.byteStaging.length ? arena.byteStaging : new byte[maxNeed];
         int pos = writeSlabLocalEntryListV2(buf, 0, localStates, STATIC_CORE_STATE_TO_ID, true);
         pos = writeSlabLocalEntryListV2(buf, pos, localBiomes, STATIC_CORE_BIOME_TO_ID, false);
 
-        int tmplCount = biomeTemplates == null ? 0 : biomeTemplates.size();
         pos = LcaSectionCodec.writeVarIntToBuf(buf, pos, tmplCount);
         for (int t = 0; t < tmplCount; t++) {
             LcaSectionCodec.BiomeTemplate tmpl = biomeTemplates.get(t);
@@ -319,10 +330,14 @@ final class LcaV2LegacyCodec {
                     }
                     tmplArr[t] = new LcaSectionCodec.BiomeTemplate(null, null, singletonBiomeArr[bDictId], null);
                 } else {
-                    List<String> tmplPal = needBiomes ? new ArrayList<>(bLen) : Collections.emptyList();
+                    List<String> tmplPal = needBiomes
+                            ? new ArrayList<>(bLen == LcaSectionCodec.BIOME_4096_MARKER ? 8 : bLen)
+                            : Collections.emptyList();
                     pos = LcaSectionCodec.decodeSectionBiomePayload(frame, pos, limit, bLen, biomes, !needBiomes, tmplPal, arena);
                     if (needBiomes) {
-                        long[] packedLongs = bLen > 1 ? LcaSectionCodec.packBiomeLongs(arena.biomeCells, bLen) : null;
+                        long[] packedLongs = arena.lastDecodedBiomePaletteLen > 1
+                                ? LcaSectionCodec.packDecodedBiomesFromArena(arena)
+                                : null;
                         tmplArr[t] = new LcaSectionCodec.BiomeTemplate(null, null, tmplPal, packedLongs);
                     }
                 }
@@ -366,6 +381,7 @@ final class LcaV2LegacyCodec {
                 canonicalStates, baseNames, singletons, biomes, singletonBiomes, biomeTemplates);
     }
 
+    @SuppressWarnings("java:S4276")
     static int[] decodeSlabLocalPaletteRuntimeIdsV2(
             byte[] frame,
             int fOff,

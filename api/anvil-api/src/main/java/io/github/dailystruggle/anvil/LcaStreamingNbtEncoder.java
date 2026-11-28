@@ -327,24 +327,23 @@ public final class LcaStreamingNbtEncoder {
         for (int i = 0; i < paletteStates.length; i++) {
             String canonical = paletteStates[i];
             if (localStateMap != null) {
-                Integer locId = localStateMap.get(canonical);
-                if (locId == null) {
-                    locId = localStateList.size();
-                    localStateMap.put(canonical, locId);
-                    localStateList.add(canonical);
+                int locId = localStateMap.computeIfAbsent(canonical, key -> {
+                    int nextId = localStateList.size();
+                    localStateList.add(key);
                     int globalId;
                     if (factoredV3) {
-                        globalId = archive.registerOrGetBlockStateId(canonical);
+                        globalId = archive.registerOrGetBlockStateId(key);
                     } else {
-                        int bracket = canonical.indexOf('[');
+                        int bracket = key.indexOf('[');
                         globalId = -1;
                         if (bracket >= 0
-                                && !LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.containsKey(canonical.substring(bracket))) {
-                            globalId = archive.registerOrGetBlockStateId(canonical);
+                                && !LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.containsKey(key.substring(bracket))) {
+                            globalId = archive.registerOrGetBlockStateId(key);
                         }
                     }
                     localStateGlobalIds.add(globalId);
-                }
+                    return nextId;
+                });
                 out[i] = locId;
             } else {
                 out[i] = archive.registerOrGetBlockStateId(canonical);
@@ -353,6 +352,7 @@ public final class LcaStreamingNbtEncoder {
         return out;
     }
 
+    @SuppressWarnings("java:S1168")
     private static int[] resolveBiomeDictIds(
             LcaRegionWriter.LcaLiveArchive archive,
             String[] biomePalette,
@@ -402,6 +402,8 @@ public final class LcaStreamingNbtEncoder {
         byte[] extBlockTicks = null;
         byte[] extFluidTicks = null;
         byte[] extBlockEntities = null;
+        byte[] extSparsePostProcessing = null;
+        byte[] extDictStructures = null;
         int ppEmptyCount = 0;
         int starlightVer = 0;
         int lowBoundaryFlags = -1;
@@ -542,6 +544,22 @@ public final class LcaStreamingNbtEncoder {
                         extFlags |= LcaV3Codec.EXT_FLAG_COLUMNAR_BLOCK_ENTITIES;
                         continue;
                     }
+                } else if ("PostProcessing".equals(k)) {
+                    byte[] encodedPp = LcaV3Codec.tryEncodeSparsePostProcessingFromNbtSlice(
+                            chunk.sourceBuf, start, end);
+                    if (encodedPp != null) {
+                        extSparsePostProcessing = encodedPp;
+                        extFlags |= LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING;
+                        continue;
+                    }
+                } else if ("structures".equals(k)) {
+                    byte[] encodedSt = LcaV3Codec.tryEncodeDictStructuresFromNbtSlice(
+                            chunk.sourceBuf, start, end, chunkX, chunkZ);
+                    if (encodedSt != null) {
+                        extDictStructures = encodedSt;
+                        extFlags |= LcaV3Codec.EXT_FLAG_DICT_STRUCTURES;
+                        continue;
+                    }
                 }
             }
 
@@ -556,7 +574,6 @@ public final class LcaStreamingNbtEncoder {
             } else {
                 rawOutPos = appendBoundarySectionListTag(
                         arena, "_lca_boundary_low", chunk.lowBoundarySections, chunk.sourceBuf, rawOutPos);
-                rawNbtScratch = arena.nbtOutBuf;
             }
         }
         if (hasVoxelSections && chunk.highBoundarySections != null && !chunk.highBoundarySections.isEmpty()) {
@@ -567,8 +584,11 @@ public final class LcaStreamingNbtEncoder {
             } else {
                 rawOutPos = appendBoundarySectionListTag(
                         arena, "_lca_boundary_high", chunk.highBoundarySections, chunk.sourceBuf, rawOutPos);
-                rawNbtScratch = arena.nbtOutBuf;
             }
+        }
+        if (hasVoxelSections && chunk.hasSectionExtras) {
+            rawOutPos = appendSectionExtrasListTag(
+                    arena, chunk.sectionsByIdx, minSectionY, sectionCount, chunk.sourceBuf, rawOutPos);
         }
 
         byte[] nbtBytes;
@@ -594,7 +614,9 @@ public final class LcaStreamingNbtEncoder {
                 secHmPayloads,
                 extBlockTicks,
                 extFluidTicks,
-                extBlockEntities);
+                extBlockEntities,
+                extSparsePostProcessing,
+                extDictStructures);
     }
 
     private static byte[] appendRawSlice(
@@ -643,9 +665,75 @@ public final class LcaStreamingNbtEncoder {
         ByteBuffer dup = src.duplicate();
         for (BoundarySectionSlice s : slices) {
             int len = s.payloadEnd - s.payloadStart;
+            dup.clear();
             dup.position(s.payloadStart).limit(s.payloadEnd);
             dup.get(buf, dstPos, len);
             dstPos += len;
+        }
+        return dstPos;
+    }
+
+    private static int appendSectionExtrasListTag(
+            LcaSectionCodec.ScratchArena arena,
+            StreamedSection[] sectionsByIdx,
+            int minSectionY,
+            int sectionCount,
+            ByteBuffer src,
+            int dstPos
+    ) {
+        int count = 0;
+        int totalBody = 0;
+        for (int i = 0; i < sectionCount; i++) {
+            StreamedSection sec = sectionsByIdx[i];
+            if (sec == null || sec.blockPalette == null || sec.blockPalette.length == 0
+                    || sec.extraTagRanges == null || sec.extraTagRanges.length == 0) {
+                continue;
+            }
+            count++;
+            totalBody += 6; // TAG_Byte("Y") [5 bytes] + TAG_End [1 byte]
+            for (int r = 0; r < sec.extraTagRanges.length; r += 2) {
+                totalBody += (sec.extraTagRanges[r + 1] - sec.extraTagRanges[r]);
+            }
+        }
+        if (count == 0) {
+            return dstPos;
+        }
+        byte[] nameUtf = "_lca_section_extras".getBytes(StandardCharsets.UTF_8);
+        byte[] buf = arena.ensureNbtCap(dstPos + 3 + nameUtf.length + 5 + totalBody + 16);
+        buf[dstPos++] = Nbt.TAG_LIST;
+        buf[dstPos++] = (byte) ((nameUtf.length >>> 8) & 0xFF);
+        buf[dstPos++] = (byte) (nameUtf.length & 0xFF);
+        System.arraycopy(nameUtf, 0, buf, dstPos, nameUtf.length);
+        dstPos += nameUtf.length;
+        buf[dstPos++] = Nbt.TAG_COMPOUND;
+        buf[dstPos++] = (byte) ((count >>> 24) & 0xFF);
+        buf[dstPos++] = (byte) ((count >>> 16) & 0xFF);
+        buf[dstPos++] = (byte) ((count >>> 8) & 0xFF);
+        buf[dstPos++] = (byte) (count & 0xFF);
+        ByteBuffer dup = src.duplicate();
+        for (int i = 0; i < sectionCount; i++) {
+            StreamedSection sec = sectionsByIdx[i];
+            if (sec == null || sec.blockPalette == null || sec.blockPalette.length == 0
+                    || sec.extraTagRanges == null || sec.extraTagRanges.length == 0) {
+                continue;
+            }
+            // Write TAG_Byte("Y", (byte) (minSectionY + i))
+            buf[dstPos++] = Nbt.TAG_BYTE;
+            buf[dstPos++] = 0;
+            buf[dstPos++] = 1;
+            buf[dstPos++] = 'Y';
+            buf[dstPos++] = (byte) (minSectionY + i);
+            int[] ranges = sec.extraTagRanges;
+            for (int r = 0; r < ranges.length; r += 2) {
+                int start = ranges[r];
+                int end = ranges[r + 1];
+                int len = end - start;
+                dup.clear();
+                dup.position(start).limit(end);
+                dup.get(buf, dstPos, len);
+                dstPos += len;
+            }
+            buf[dstPos++] = Nbt.TAG_END;
         }
         return dstPos;
     }
@@ -747,6 +835,19 @@ public final class LcaStreamingNbtEncoder {
                     if (childType == Nbt.TAG_STRING) {
                         String status = readModifiedUtf8(buf);
                         out.statusOrdinal = LcaRegionReader.encodeStatusOrdinal(status);
+                    } else {
+                        skipPayload(buf, childType, 1);
+                    }
+                    out.recordRootTag(key, tagStart, buf.position(), 0, 0);
+                }
+                case "status" -> {
+                    if (childType == Nbt.TAG_STRING) {
+                        String status = readModifiedUtf8(buf);
+                        if (out.statusOrdinal == LcaSectionCodec.STATUS_ORDINAL_ABSENT) {
+                            out.statusOrdinal = ("minecraft:full".equals(status) || "full".equals(status))
+                                    ? LcaSectionCodec.STATUS_ORDINAL_ABSENT
+                                    : LcaSectionCodec.STATUS_ORDINAL_RESIDUAL;
+                        }
                     } else {
                         skipPayload(buf, childType, 1);
                     }
@@ -916,9 +1017,12 @@ public final class LcaStreamingNbtEncoder {
             boolean hasBlockLightTag = false;
             int starlightSkyState = -1;
             int starlightBlkState = -1;
+            int[] extraRanges = null;
+            int extraRangeLen = 0;
 
             while (true) {
                 requireRemaining(buf, 1, "section child tag");
+                int tagStart = buf.position();
                 byte t = buf.get();
                 if (t == Nbt.TAG_END) {
                     break;
@@ -1020,7 +1124,17 @@ public final class LcaStreamingNbtEncoder {
                             skipPayload(buf, t, 3);
                         }
                     }
-                    default -> skipPayload(buf, t, 3);
+                    default -> {
+                        skipPayload(buf, t, 3);
+                        int tagEnd = buf.position();
+                        if (extraRanges == null) {
+                            extraRanges = new int[4];
+                        } else if (extraRangeLen + 2 > extraRanges.length) {
+                            extraRanges = Arrays.copyOf(extraRanges, extraRanges.length << 1);
+                        }
+                        extraRanges[extraRangeLen++] = tagStart;
+                        extraRanges[extraRangeLen++] = tagEnd;
+                    }
                 }
             }
             int secPayloadEnd = buf.position();
@@ -1029,16 +1143,31 @@ public final class LcaStreamingNbtEncoder {
             }
             int idx = sy - minSectionY;
             if (hasBlockStatesCompound && idx >= 0 && idx < sectionCount) {
-                byte[] resolvedSky = skyLight != null
-                        ? skyLight
-                        : (!hasSkyLightTag && starlightSkyState == 1 ? LcaRegionWriter.ALL_ZERO_LIGHT_2048 : null);
-                byte[] resolvedBlk = blockLight != null
-                        ? blockLight
-                        : (!hasBlockLightTag && starlightBlkState == 1 ? LcaRegionWriter.ALL_ZERO_LIGHT_2048 : null);
+                byte[] resolvedSky;
+                if (skyLight != null) {
+                    resolvedSky = skyLight;
+                } else if (!hasSkyLightTag && starlightSkyState == 1) {
+                    resolvedSky = LcaRegionWriter.ALL_ZERO_LIGHT_2048;
+                } else {
+                    resolvedSky = null;
+                }
+                byte[] resolvedBlk;
+                if (blockLight != null) {
+                    resolvedBlk = blockLight;
+                } else if (!hasBlockLightTag && starlightBlkState == 1) {
+                    resolvedBlk = LcaRegionWriter.ALL_ZERO_LIGHT_2048;
+                } else {
+                    resolvedBlk = null;
+                }
+                int[] trimmedExtras = extraRangeLen > 0 ? Arrays.copyOf(extraRanges, extraRangeLen) : null;
+                if (trimmedExtras != null) {
+                    out.hasSectionExtras = true;
+                }
                 out.sectionsByIdx[idx] = new StreamedSection(
-                        blockPalette, blockData, biomePalette, biomeData, resolvedSky, resolvedBlk);
+                        blockPalette, blockData, biomePalette, biomeData, resolvedSky, resolvedBlk, trimmedExtras);
             } else {
-                if ((starlightSkyState >= 0 && starlightSkyState != 1)
+                if (extraRangeLen > 0
+                        || (starlightSkyState >= 0 && starlightSkyState != 1)
                         || (starlightBlkState >= 0 && starlightBlkState != 1)) {
                     skyMode = -1;
                     blkMode = -1;
@@ -1067,6 +1196,7 @@ public final class LcaStreamingNbtEncoder {
         }
     }
 
+    @SuppressWarnings("java:S1168")
     private static String[] parseBlockStatePaletteList(
             ByteBuffer buf, StringBuilder sb
     ) throws IOException {
@@ -1148,7 +1278,16 @@ public final class LcaStreamingNbtEncoder {
                 }
             }
 
-            String resolvedName = name != null ? name : (id != null ? id : (emptyName != null ? emptyName : AIR_STATE));
+            String resolvedName = name;
+            if (resolvedName == null) {
+                resolvedName = id;
+            }
+            if (resolvedName == null) {
+                resolvedName = emptyName;
+            }
+            if (resolvedName == null) {
+                resolvedName = AIR_STATE;
+            }
             if (propCount == 0) {
                 out[i] = resolvedName;
             } else {
@@ -1167,6 +1306,7 @@ public final class LcaStreamingNbtEncoder {
         return out;
     }
 
+    @SuppressWarnings("java:S1168") // null signals absent/empty biome palette so caller applies fallback
     private static String[] parseBiomePaletteList(ByteBuffer buf) throws IOException {
         requireRemaining(buf, 5, "biomes.palette header");
         byte elemType = buf.get();
@@ -1650,6 +1790,7 @@ public final class LcaStreamingNbtEncoder {
         final long[] biomeData;
         final byte[] skyLight;
         final byte[] blockLight;
+        final int[] extraTagRanges;
 
         StreamedSection(
                 String[] blockPalette,
@@ -1657,7 +1798,8 @@ public final class LcaStreamingNbtEncoder {
                 String[] biomePalette,
                 long[] biomeData,
                 byte[] skyLight,
-                byte[] blockLight
+                byte[] blockLight,
+                int[] extraTagRanges
         ) {
             this.blockPalette = blockPalette;
             this.blockData = blockData;
@@ -1665,6 +1807,7 @@ public final class LcaStreamingNbtEncoder {
             this.biomeData = biomeData;
             this.skyLight = skyLight;
             this.blockLight = blockLight;
+            this.extraTagRanges = extraTagRanges;
         }
     }
 
@@ -1704,6 +1847,7 @@ public final class LcaStreamingNbtEncoder {
         long inhabitedTime;
         int statusOrdinal = LcaRegionReader.encodeStatusOrdinal(null);
         boolean hasVoxelSections;
+        boolean hasSectionExtras;
 
         Integer directXPos;
         Integer directZPos;

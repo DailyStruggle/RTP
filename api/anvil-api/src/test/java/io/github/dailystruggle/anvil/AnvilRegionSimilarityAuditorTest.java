@@ -778,6 +778,77 @@ class AnvilRegionSimilarityAuditorTest {
         assertTrue(md.contains("fluid-to-air seam leaks"));
     }
 
+    @Test
+    @DisplayName("REQ-RTP-S-005: MC 26.4 16x16x16 per-block biome differences off 4x4x4 quartet corners are detected")
+    void auditorDetectsNonCorner26_4PerBlockBiomeDiffs(@TempDir Path tmpDir) throws IOException {
+        int[] refBiomes = new int[4096];
+        int[] candBiomes = new int[4096];
+        // Identical at all 64 4x4x4 quartet corners (including (0,0,0) = desert so both use 16x16x16 storage)
+        refBiomes[BiomePaletteSection.biomeVoxelIndex(0, 0, 0)] = 1;
+        candBiomes[BiomePaletteSection.biomeVoxelIndex(0, 0, 0)] = 1;
+        // Differ only at non-corner voxels: interior (1,0,1) and chunk border (0,0,1)
+        candBiomes[BiomePaletteSection.biomeVoxelIndex(1, 0, 1)] = 1;
+        candBiomes[BiomePaletteSection.biomeVoxelIndex(0, 0, 1)] = 1;
+
+        long[] refPacked = packBiome4096(refBiomes, 2);
+        long[] candPacked = packBiome4096(candBiomes, 2);
+        List<String> biomePal = List.of("minecraft:plains", "minecraft:desert");
+
+        LinkedHashMap<String, Object> refRoot = buildMc264SingleSectionChunk(biomePal, refPacked);
+        LinkedHashMap<String, Object> candRoot = buildMc264SingleSectionChunk(biomePal, candPacked);
+
+        Path refDir = tmpDir.resolve("ref264/region");
+        Path candDir = tmpDir.resolve("cand264/region");
+        Files.createDirectories(refDir);
+        Files.createDirectories(candDir);
+        Files.write(refDir.resolve("r.0.0.mca"), AnvilTestFixtures.writeSingleChunkRegion(refRoot));
+        Files.write(candDir.resolve("r.0.0.mca"), AnvilTestFixtures.writeSingleChunkRegion(candRoot));
+
+        RegionSimilarityAuditor.RegionSimilarityScorecard selfSc =
+                RegionSimilarityAuditor.compareDirectories(refDir, refDir, "ref", "self", 0);
+        assertEquals(100.0, selfSc.exactBiomeQuartetMatchPct(), 1e-6);
+        assertEquals(100.0, selfSc.climateClassQuartetMatchPct(), 1e-6);
+        assertEquals(100.0, selfSc.migrationSeam().borderExactBiomePct(), 1e-6);
+
+        RegionSimilarityAuditor.RegionSimilarityScorecard diffSc =
+                RegionSimilarityAuditor.compareDirectories(refDir, candDir, "ref", "cand", 0);
+        assertEquals(1, diffSc.comparedFullChunks());
+        assertTrue(diffSc.exactBiomeQuartetMatchPct() < 100.0,
+                "Non-corner 16x16x16 biome difference must lower exactBiomeQuartetMatchPct");
+        assertTrue(diffSc.climateClassQuartetMatchPct() < 100.0,
+                "Non-corner 16x16x16 biome climate difference must lower climateClassQuartetMatchPct");
+        assertTrue(diffSc.migrationSeam().borderExactBiomePct() < 100.0,
+                "Non-corner border 16x16x16 biome difference at (0,0,1) must lower borderExactBiomePct");
+    }
+
+    private static LinkedHashMap<String, Object> buildMc264SingleSectionChunk(
+            List<String> biomePalette, long[] packedBiomeData) throws IOException {
+        LinkedHashMap<String, Object> sec = AnvilTestFixtures.sectionWithBiomes(
+                (byte) 0,
+                List.of("minecraft:stone"),
+                null,
+                biomePalette,
+                packedBiomeData);
+        LinkedHashMap<String, Object> root =
+                AnvilTestFixtures.chunkRoot(DataVersionSupport.MC_26_4_DATA_VERSION, new long[37], List.of(sec));
+        root.put("yPos", 0);
+        root.remove("Status");
+        root.put("status", "minecraft:full");
+        return root;
+    }
+
+    private static long[] packBiome4096(int[] cells4096, int paletteSize) {
+        int bits = BiomePaletteSection.biomeBitsPerEntry(paletteSize);
+        int perLong = 64 / bits;
+        int numLongs = BiomePaletteSection.requiredLongs(paletteSize, BiomePaletteSection.CELL_COUNT_16X16X16);
+        long mask = (1L << bits) - 1L;
+        long[] words = new long[numLongs];
+        for (int i = 0; i < BiomePaletteSection.CELL_COUNT_16X16X16; i++) {
+            words[i / perLong] |= (cells4096[i] & mask) << ((i % perLong) * bits);
+        }
+        return words;
+    }
+
     @SuppressWarnings("unchecked")
     private static void mutateSingleSectionBlock(
             LinkedHashMap<String, Object> root, int targetSectionY, int voxelIndex, String newBlockId) {

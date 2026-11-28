@@ -123,7 +123,7 @@ public final class Nbt {
         return readRootCompound(rawUncompressedNbt, 0, rawUncompressedNbt.length);
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "java:S1319"})
     public static LinkedHashMap<String, Object> readRootCompound(
             byte[] rawUncompressedNbt, int offset, int length
     ) throws IOException {

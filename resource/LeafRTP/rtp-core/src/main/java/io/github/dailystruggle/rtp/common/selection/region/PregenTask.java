@@ -911,9 +911,8 @@ final class PregenTask implements Runnable {
             if (state.vert instanceof AbstractVerticalAdjustor<?>) {
                 io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.AdjustResult adj =
                         state.vert.adjustFromProbeWithReason(probe, state.world.name());
-                if (adj != null
-                        && adj.reason()
-                                == io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.ProbeRejectReason.SCAN_MISS) {
+                if (adj.reason()
+                        == io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.ProbeRejectReason.SCAN_MISS) {
                     if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
                         ((MemoryShape<?>) state.shape).addBadChunk(finalL, FailTypes.vert);
                     }
@@ -1166,7 +1165,7 @@ final class PregenTask implements Runnable {
         if (state.world.anvilWorldFolder() == null) {
             return state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk");
         }
-        final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        final long key = (cx & 0xffffffffL) | ((long) cz << 32);
         if (state.world.isChunkLoaded(cx, cz)) {
             RTPChunk<?> cached = state.world.getCachedChunk(key);
             if (cached != null && !cached.isSelfContained()) {
@@ -1432,11 +1431,11 @@ final class PregenTask implements Runnable {
         final boolean readOnlyNow = readOnly() && !unpinnedLoad.get();
         int safe = state.safetyRadius;
         int chunkSafe = (safe <= 0) ? 0 : ((safe + 15) >> 4);
-        int L = chunkSafe * 2 + 1;
+        int gridSize = chunkSafe * 2 + 1;
         int centerChunkX = chunk.x();
         int centerChunkZ = chunk.z();
-        final RTPChunk<?>[] localChunks = new RTPChunk<?>[L * L];
-        localChunks[chunkSafe * L + chunkSafe] = chunk;
+        final RTPChunk<?>[] localChunks = new RTPChunk<?>[gridSize * gridSize];
+        localChunks[chunkSafe * gridSize + chunkSafe] = chunk;
 
         List<CompletableFuture<Long>> neighbourFutures = new ArrayList<>();
         List<int[]> neighbourIdx = new ArrayList<>();
@@ -1445,7 +1444,7 @@ final class PregenTask implements Runnable {
                 if (dx == 0 && dz == 0) continue;
                 int ncx = centerChunkX + dx;
                 int ncz = centerChunkZ + dz;
-                int idx = (dx + chunkSafe) * L + (dz + chunkSafe);
+                int idx = (dx + chunkSafe) * gridSize + (dz + chunkSafe);
                 state.world.recordChunkLoadOrigin("PregenTask.safetyNeighbourGrid");
                 neighbourFutures.add(readOnlyNow
                         ? state.world.getChunkIfReadable(ncx, ncz)
@@ -1456,7 +1455,7 @@ final class PregenTask implements Runnable {
 
         if (neighbourFutures.isEmpty()) {
             // safetyRadius == 0: no neighbours to load, evaluate immediately.
-            evaluateSafety(candidate, localChunks, L, centerChunkX, centerChunkZ, reservation);
+            evaluateSafety(candidate, localChunks, gridSize, centerChunkX, centerChunkZ, reservation);
             return;
         }
 
@@ -1518,7 +1517,7 @@ final class PregenTask implements Runnable {
                         return;
                     }
                     Runnable eval = () -> evaluateSafety(
-                            candidate, localChunks, L, centerChunkX, centerChunkZ, reservation);
+                            candidate, localChunks, gridSize, centerChunkX, centerChunkZ, reservation);
                     if (isFoliaPlatform() && (reservation != null || hasLiveChunk(localChunks))) {
                         // Folia neighbour loads complete off the region thread (ADR-112): live
                         // block reads re-enter the owning region through the budgeted scheduler;
@@ -1792,7 +1791,7 @@ final class PregenTask implements Runnable {
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
                 if (!speculative() && x == 0 && z == 0) {
-                    long centerKey = ((long) ccx & 0xffffffffL) | ((long) ccz << 32);
+                    long centerKey = (ccx & 0xffffffffL) | ((long) ccz << 32);
                     chunks.add(CompletableFuture.completedFuture(centerKey));
                 } else {
                     state.world.recordChunkLoadOrigin("PregenTask.viewDistanceSuccess");

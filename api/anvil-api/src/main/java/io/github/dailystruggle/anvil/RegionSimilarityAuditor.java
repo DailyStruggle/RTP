@@ -18,8 +18,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -38,10 +36,8 @@ import java.util.stream.Stream;
  */
 public final class RegionSimilarityAuditor {
 
-    private static final Logger LOGGER = Logger.getLogger(RegionSimilarityAuditor.class.getName());
-
     private static final Pattern REGION_FILE_PATTERN =
-            Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.([A-Za-z0-9_]+)");
+            Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.(\\w+)");
 
     private static final List<String> EXTENSION_PRIORITY =
             List.of(".lca", ".mca", ".linear", ".b_linear");
@@ -992,33 +988,59 @@ public final class RegionSimilarityAuditor {
         }
 
         private void accumulateSectionBiomes(int syIdx) {
-            String[] refBiomes = refScratch.sectionBiomes[syIdx];
-            String[] candBiomes = candScratch.sectionBiomes[syIdx];
-            for (int q = 0; q < 64; q++) {
-                String rBiome = refBiomes[q];
-                String cBiome = candBiomes[q];
-                ClimateBiomeClass rClim = classifyClimateBiome(rBiome);
-                ClimateBiomeClass cClim = classifyClimateBiome(cBiome);
-
-                totalBiomeQuartets++;
-                boolean exactBiome = rBiome.equals(cBiome);
-                if (exactBiome) {
-                    exactBiomeMatches++;
+            boolean refPerBlock = refScratch.sectionBiomePerBlock[syIdx];
+            boolean candPerBlock = candScratch.sectionBiomePerBlock[syIdx];
+            if (!refPerBlock && !candPerBlock) {
+                String[] refBiomes = refScratch.sectionBiomes[syIdx];
+                String[] candBiomes = candScratch.sectionBiomes[syIdx];
+                for (int q = 0; q < 64; q++) {
+                    int qx = q & 3;
+                    int qz = (q >>> 2) & 3;
+                    boolean isBorder = (qx == 0 || qx == 3 || qz == 0 || qz == 3);
+                    recordBiomeCell(refBiomes[q], candBiomes[q], isBorder);
                 }
-                int qx = q & 3;
-                int qz = (q >>> 2) & 3;
-                if (qx == 0 || qx == 3 || qz == 0 || qz == 3) {
-                    borderBiomeQuartets++;
-                    if (exactBiome) {
-                        borderExactBiomeMatches++;
+                return;
+            }
+
+            String[] refArr = refPerBlock ? refScratch.sectionBiomes4096[syIdx] : refScratch.sectionBiomes[syIdx];
+            String[] candArr = candPerBlock ? candScratch.sectionBiomes4096[syIdx] : candScratch.sectionBiomes[syIdx];
+            int v = 0;
+            for (int ly = 0; ly < 16; ly++) {
+                int qyOff = (ly >>> 2) << 4;
+                for (int lz = 0; lz < 16; lz++) {
+                    int qyzOff = qyOff | ((lz >>> 2) << 2);
+                    boolean borderZ = (lz == 0 || lz == 15);
+                    for (int lx = 0; lx < 16; lx++) {
+                        int q = qyzOff | (lx >>> 2);
+                        String rBiome = refPerBlock ? refArr[v] : refArr[q];
+                        String cBiome = candPerBlock ? candArr[v] : candArr[q];
+                        v++;
+                        recordBiomeCell(rBiome, cBiome, borderZ || lx == 0 || lx == 15);
                     }
                 }
-                if (rClim == cClim) {
-                    climateBiomeMatches++;
-                }
-                refClimates.put(rClim, refClimates.get(rClim) + 1L);
-                candClimates.put(cClim, candClimates.get(cClim) + 1L);
             }
+        }
+
+        private void recordBiomeCell(String rBiome, String cBiome, boolean isBorder) {
+            ClimateBiomeClass rClim = classifyClimateBiome(rBiome);
+            ClimateBiomeClass cClim = classifyClimateBiome(cBiome);
+
+            totalBiomeQuartets++;
+            boolean exactBiome = rBiome.equals(cBiome);
+            if (exactBiome) {
+                exactBiomeMatches++;
+            }
+            if (isBorder) {
+                borderBiomeQuartets++;
+                if (exactBiome) {
+                    borderExactBiomeMatches++;
+                }
+            }
+            if (rClim == cClim) {
+                climateBiomeMatches++;
+            }
+            refClimates.put(rClim, refClimates.get(rClim) + 1L);
+            candClimates.put(cClim, candClimates.get(cClim) + 1L);
         }
 
         private void accumulateChunkStructures(
@@ -1446,6 +1468,7 @@ public final class RegionSimilarityAuditor {
      *             [--format json|markdown] [--json-out P] [--md-out P]}
      * @throws IOException on filesystem read/write failure
      */
+    @SuppressWarnings("java:S106") // CLI stdout/stderr output contract
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
             byte[] usage = ("Usage: RegionSimilarityAuditor <refPath> <candPath> "
@@ -1484,9 +1507,11 @@ public final class RegionSimilarityAuditor {
         Path mdOut = null;
         List<Path> templateSources = new ArrayList<>();
 
-        for (int i = 2; i < args.length; i++) {
+        int i = 2;
+        while (i < args.length) {
             String arg = args[i];
             if (i + 1 >= args.length) {
+                i++;
                 continue;
             }
             switch (arg) {
@@ -1501,6 +1526,7 @@ public final class RegionSimilarityAuditor {
                 default -> {
                 }
             }
+            i++;
         }
         return new CliOptions(
                 refPath,
@@ -1609,8 +1635,7 @@ public final class RegionSimilarityAuditor {
         try {
             return Files.readAllBytes(handle.file());
         } catch (IOException ex) {
-            LOGGER.log(Level.WARNING, "Failed to read region archive " + handle.file(), ex);
-            throw ex;
+            throw new IOException("Failed to read region archive " + handle.file(), ex);
         }
     }
 
@@ -1629,17 +1654,8 @@ public final class RegionSimilarityAuditor {
             }
             return entry;
         } catch (IOException ex) {
-            LOGGER.log(
-                    Level.WARNING,
-                    "Failed to decode chunk (" + localX + "," + localZ + ") in " + handle.file(),
-                    ex);
-            throw ex;
-        } catch (RuntimeException ex) {
-            LOGGER.log(
-                    Level.WARNING,
-                    "Unexpected runtime failure decoding chunk (" + localX + "," + localZ + ") in " + handle.file(),
-                    ex);
-            throw ex;
+            throw new IOException(
+                    "Failed to decode chunk (" + localX + "," + localZ + ") in " + handle.file(), ex);
         }
     }
 
@@ -1745,7 +1761,7 @@ public final class RegionSimilarityAuditor {
     private static boolean recordStructureStarts(
             Map<String, Object> root, Map<String, Integer> structureCounts) {
         Map<String, Object> structures = getStructuresCompound(root);
-        if (structures == null) {
+        if (structures.isEmpty()) {
             return false;
         }
         Object startsObj = structures.get("starts");
@@ -1773,7 +1789,7 @@ public final class RegionSimilarityAuditor {
 
     private static boolean hasStructureReferences(Map<String, Object> root) {
         Map<String, Object> structures = getStructuresCompound(root);
-        if (structures == null) {
+        if (structures.isEmpty()) {
             return false;
         }
         Object refsObj = structures.get("References");
@@ -1794,7 +1810,7 @@ public final class RegionSimilarityAuditor {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> getStructuresCompound(Map<String, Object> root) {
         if (root == null) {
-            return null;
+            return Map.of();
         }
         Object s = root.get("structures");
         if (s == null) {
@@ -1806,7 +1822,7 @@ public final class RegionSimilarityAuditor {
                 s = lvl.get("structures");
             }
         }
-        return (s instanceof Map<?, ?>) ? (Map<String, Object>) s : null;
+        return (s instanceof Map<?, ?>) ? (Map<String, Object>) s : Map.of();
     }
 
     private static final class DecodedChunkScratch {
@@ -1815,6 +1831,8 @@ public final class RegionSimilarityAuditor {
         final boolean[][] sectionIsFlora = new boolean[SECTION_COUNT][4096];
         final String[][] sectionOreFamily = new String[SECTION_COUNT][4096];
         final String[][] sectionBiomes = new String[SECTION_COUNT][64];
+        final String[][] sectionBiomes4096 = new String[SECTION_COUNT][];
+        final boolean[] sectionBiomePerBlock = new boolean[SECTION_COUNT];
 
         final int[] derivedWorldSurfaceY = new int[256];
         final int[] derivedOceanFloorY = new int[256];
@@ -1885,7 +1903,6 @@ public final class RegionSimilarityAuditor {
 
         private void scanSingleColumnTopDown(int colIdx) {
             boolean foundSurface = false;
-            boolean foundOceanFloor = false;
             boolean foundMbnl = false;
 
             for (int yIdx = WORLD_HEIGHT - 1; yIdx >= 0; yIdx--) {
@@ -1906,12 +1923,9 @@ public final class RegionSimilarityAuditor {
                     derivedMotionBlockingNoLeavesY[colIdx] = worldY;
                     foundMbnl = true;
                 }
-                if (!foundOceanFloor && mat != SemanticMaterial.FLUID && !passableCanopy) {
+                if (mat != SemanticMaterial.FLUID && !passableCanopy) {
                     derivedOceanFloorY[colIdx] = worldY;
                     solidCeilingY[colIdx] = worldY;
-                    foundOceanFloor = true;
-                }
-                if (foundSurface && foundMbnl && foundOceanFloor) {
                     return;
                 }
             }
@@ -1970,13 +1984,34 @@ public final class RegionSimilarityAuditor {
         private void decodeBiomeSection(int syIdx, BiomePaletteSection bs) {
             String[] out = sectionBiomes[syIdx];
             if (bs == null || bs.palette().isEmpty()) {
+                sectionBiomePerBlock[syIdx] = false;
                 Arrays.fill(out, DEFAULT_BIOME);
                 return;
             }
             if (bs.palette().size() == 1 || bs.data() == null || bs.data().length == 0) {
+                sectionBiomePerBlock[syIdx] = false;
                 Arrays.fill(out, normalizeResourceId(bs.palette().get(0), DEFAULT_BIOME));
                 return;
             }
+            if (bs.cellsPerAxis() == BiomePaletteSection.CELLS_PER_AXIS_16X16X16) {
+                sectionBiomePerBlock[syIdx] = true;
+                String[] out4096 = sectionBiomes4096[syIdx];
+                if (out4096 == null) {
+                    out4096 = new String[4096];
+                    sectionBiomes4096[syIdx] = out4096;
+                }
+                int v = 0;
+                for (int ly = 0; ly < 16; ly++) {
+                    for (int lz = 0; lz < 16; lz++) {
+                        for (int lx = 0; lx < 16; lx++) {
+                            String raw = bs.biomeIdAt(lx, ly, lz);
+                            out4096[v++] = normalizeResourceId(raw, DEFAULT_BIOME);
+                        }
+                    }
+                }
+                return;
+            }
+            sectionBiomePerBlock[syIdx] = false;
             int q = 0;
             for (int qy = 0; qy < 4; qy++) {
                 for (int qz = 0; qz < 4; qz++) {
@@ -1990,7 +2025,7 @@ public final class RegionSimilarityAuditor {
 
         int[] extractHeightmap(Map<String, Object> root, String requestedType) {
             long[] packed = findHeightmapArray(root, requestedType);
-            if (packed != null && hasNonZeroWord(packed)) {
+            if (hasNonZeroWord(packed)) {
                 int bits = Math.max(9, PackedPaletteDecoder.bitsPerEntry(WORLD_HEIGHT + 1));
                 int entriesPerLong = 64 / bits;
                 long mask = (1L << bits) - 1L;

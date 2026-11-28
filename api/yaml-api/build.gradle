@@ -12,6 +12,8 @@ plugins {
     id 'java-library'
 }
 
+version = '1.0.0'
+
 dependencies {
     api project(':units-api')
     api project(':server-api')

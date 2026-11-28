@@ -89,15 +89,17 @@ Implement the three empirically validated lossless (`L_inf = 0`, `Zero Zstd`) ov
      [... bits 13, 5, 6, 7, 8, 9, 14 (ChunkPatchTail) unchanged per LCA-ICD-1.0 Section 8 ...]
      [If bit 15 (0x8000):
          VarInt extFlags:
-           bit 0 (0x01): HAS_COLUMNAR_BLOCK_TICKS    -> VarInt byteLen + ColumnarTickStream
-           bit 1 (0x02): HAS_COLUMNAR_FLUID_TICKS    -> VarInt byteLen + ColumnarTickStream
-           bit 2 (0x04): HAS_COLUMNAR_BLOCK_ENTITIES -> VarInt byteLen + ColumnarBlockEntitiesStream
-           bits 3..31:   Reserved (non-zero fails closed CBIT T5)
+           bit 0 (0x01): HAS_COLUMNAR_BLOCK_TICKS      -> VarInt byteLen + ColumnarTickStream
+           bit 1 (0x02): HAS_COLUMNAR_FLUID_TICKS      -> VarInt byteLen + ColumnarTickStream
+           bit 2 (0x04): HAS_COLUMNAR_BLOCK_ENTITIES   -> VarInt byteLen + ColumnarBlockEntitiesStream
+           bit 3 (0x08): HAS_SPARSE_POST_PROCESSING    -> VarInt byteLen + SparsePostProcessingStream
+           bit 4 (0x10): HAS_DICT_STRUCTURES           -> VarInt byteLen + DictStructuresStream
+           bits 5..31:   Reserved (non-zero fails closed CBIT T5)
      ]
      [If bit 10 (0x0400): byte[] residualNbtSlice (unprefixed to residualRelEnd)]
      ```
-   - **Invariant Preservation:** Placing `Bit 15` after `Bit 14` leaves `LcaSectionCodec#locateAndDecodeChunkPatchTail` $O(1)$ prefix-skipping untouched, keeps `Bit 10` unambiguously delimited as `[pos .. residualRelEnd)`, and enables Tier 2 bit-rot reverse-scan (`ICD.md` §10.2) to skip all three columnar streams in $O(1)$ via their `VarInt byteLen` prefixes.
-   - **Mutual Exclusion (`CBIT T5`):** Decoders **shall** reject frames where both an empty-list bit in `boilerplateFlags16` and its corresponding `extFlags` bit are set (`bit 1` vs `extFlags bit 0`, `bit 2` vs `extFlags bit 1`, `bit 0` vs `extFlags bit 2`).
+   - **Invariant Preservation:** Placing `Bit 15` after `Bit 14` leaves `LcaSectionCodec#locateAndDecodeChunkPatchTail` $O(1)$ prefix-skipping untouched, keeps `Bit 10` unambiguously delimited as `[pos .. residualRelEnd)`, and enables Tier 2 bit-rot reverse-scan (`ICD.md` §10.2) to skip all five extended streams in $O(1)$ via their `VarInt byteLen` prefixes.
+   - **Mutual Exclusion (`CBIT T5`):** Decoders **shall** reject frames where both an empty-list/structure bit in `boilerplateFlags16` and its corresponding `extFlags` bit are set (`bit 1` vs `extFlags bit 0`, `bit 2` vs `extFlags bit 1`, `bit 0` vs `extFlags bit 2`, `bit 5` vs `extFlags bit 3`, `bit 4` vs `extFlags bit 4`).
 2. **Columnar Scheduled-Tick Stream (`block_ticks` & `fluid_ticks`) with Strict Schema Fallback:**
    - **Strict Vanilla-Schema Validation (`L_inf = 0`):** A tick list **shall** be extracted into `ColumnarTickStream` **if and only if** it is non-empty (`1 <= tickCount <= MAX_TICKS_PER_CHUNK`, cap `65,536` `CBIT T4`) and **every** element is a `TAG_Compound` containing the exact 6 vanilla keys with exact tag types `{i: TAG_String, p: TAG_Int, t: TAG_Int, x: TAG_Int, y: TAG_Int, z: TAG_Int}`. If any element carries extra modded keys or non-`TAG_Int` types (e.g., `TAG_Long`), the encoder **shall** leave that entire list in `Bit 10` (`residualNbtSlice`) untouched.
    - **Overflow-Safe 64-Bit Deltas:** All coordinate and tick deltas (`dx`, `dy`, `dz`, `dt`) **shall** compute 64-bit signed differences `(long) a - (long) b` encoded as unsigned LEB128 **`ZigZagVarLong`** (`(d << 1) ^ (d >> 63)`), eliminating 32-bit signed wraparound near `±2^30` while preserving 1-byte encoding for deltas in `[-64, +63]`.

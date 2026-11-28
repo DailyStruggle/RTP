@@ -1,0 +1,15 @@
+
+# Maven Central mirrors used to download libraries, tried in order.
+# Setting this replaces the default mirror. Libraries from the PaperMC and Leaf repositories
+# are downloaded from those repositories after trying these.
+maven-central-mirrors:
+- https://maven-central.storage-download.googleapis.com/maven2/
+
+# How many times to retry a failed download from the same repository.
+download-retries: 2
+auto-update:
+  # Auto update: on every start, download the newest build of the channel to the updates directory
+  # and use its patches. Updating the loader itself requires replacing the server jar.
+  enabled: false
+  # Auto update channel: stable or experimental.
+  channel: stable

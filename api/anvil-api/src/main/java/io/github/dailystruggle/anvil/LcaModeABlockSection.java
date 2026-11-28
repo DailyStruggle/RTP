@@ -2,6 +2,7 @@ package io.github.dailystruggle.anvil;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
@@ -26,6 +27,7 @@ import java.util.function.IntConsumer;
  * </ul>
  *
  * @governedBy anvil-api-ADR-003
+ * @governedBy anvil-api-ADR-007
  * @governedBy ADR-115
  * @trace REQ-RTP-S-004
  * @trace REQ-RTP-S-005
@@ -65,6 +67,7 @@ public final class LcaModeABlockSection {
         LcaModeABlockSection recent1;
         final int[] scratchInt4096 = new int[SECTION_VOXELS];
 
+        @SuppressWarnings("java:S1168")
         byte[] lookup(LcaModeABlockSection target) {
             if (s0 == target) return b0;
             if (s1 == target) return b1;
@@ -73,6 +76,7 @@ public final class LcaModeABlockSection {
             return null;
         }
 
+        @SuppressWarnings("java:S1168")
         byte[] tryPromote(LcaModeABlockSection target) {
             if (recent0 == target || recent1 == target) {
                 if (recent0 == target) {
@@ -360,6 +364,37 @@ public final class LcaModeABlockSection {
         return sliceValidatedPayload(encoded, payloadStart, endPos, curveId, blockMode, octreeMask64, sortedIds);
     }
 
+    /**
+     * Wraps and validates a pre-encoded standard LCA Mode A Delta-Roaring block payload
+     * ({@link LcaSectionCodec#BLOCK_MODE_DELTA_ROARING} or
+     * {@link LcaSectionCodec#BLOCK_MODE_DELTA_ROARING_FULL_MASK}), such as one emitted directly by
+     * a GPU VRAM packing kernel, with zero CPU re-encoding ({@code anvil-api-ADR-003},
+     * {@code goldleaf-ADR-005}). Returns {@code null} if the payload is invalid or truncated.
+     */
+    public static LcaModeABlockSection fromPreEncodedDeltaRoaring(
+            byte[] buf,
+            int offset,
+            int length,
+            int curveId,
+            int blockMode,
+            long octreeMask64,
+            int[] paletteRuntimeIds
+    ) {
+        if (buf == null || paletteRuntimeIds == null || paletteRuntimeIds.length < 2
+                || offset < 0 || length <= 0 || offset + length > buf.length) {
+            return null;
+        }
+        if (blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                && blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+            return null;
+        }
+        long effectiveMask = (blockMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK)
+                ? -1L
+                : octreeMask64;
+        return sliceValidatedPayload(
+                buf, offset, offset + length, curveId & 3, blockMode, effectiveMask, paletteRuntimeIds.clone());
+    }
+
     private static LcaModeABlockSection sliceValidatedPayload(
             byte[] buf,
             int payloadStart,
@@ -498,6 +533,7 @@ public final class LcaModeABlockSection {
      * <p>Returns {@code null} if inputs are out of bounds so callers can fail closed to standard
      * encoding.</p>
      */
+    @SuppressWarnings("java:S1168")
     public static byte[] encodeFlatBitpackFromSimpleBitStorage(
             int[] paletteRuntimeIds,
             int storageBits,
@@ -925,6 +961,7 @@ public final class LcaModeABlockSection {
         return SECTION_VOXELS;
     }
 
+    @SuppressWarnings("java:S1168")
     private static int[] buildChunkBase(int curveId, long octreeMask64) {
         if (octreeMask64 == -1L || octreeMask64 == 0L) {
             return null;
@@ -1216,10 +1253,8 @@ public final class LcaModeABlockSection {
             int tok = buf[pos++] & 0xFF;
             int adjGap = (tok >>> lBits) & gMax;
             int lenM1 = tok & lMax;
-            if (adjGap == gMax) {
-                if ((buf[pos++] & 0xFF) >= 240) {
-                    pos++;
-                }
+            if (adjGap == gMax && (buf[pos++] & 0xFF) >= 240) {
+                pos++;
             }
             if (lenM1 == lMax) {
                 if (pos < limit && buf[pos] >= 0) {
@@ -1424,5 +1459,863 @@ public final class LcaModeABlockSection {
         x ^= (x >>> 15);
         x *= 0x846ca68b;
         return x ^ (x >>> 16);
+    }
+
+    /**
+     * Zero-copy off-heap slice descriptor over an uncompressed Mode A block section payload inside
+     * a direct {@link ByteBuffer} ({@code anvil-api-ADR-007}). Never allocates or copies the
+     * section's {@code byte[]} payload.
+     */
+    public record OffHeapModeASlice(
+            int curveId,
+            int blockMode,
+            int flatBits,
+            long octreeMask64,
+            int[] paletteRuntimeIds,
+            ByteBuffer slabBuf,
+            int payloadOffset,
+            int payloadLength,
+            short[] containerOffsets,
+            int[] paletteVoxelCounts
+    ) {
+        public OffHeapModeASlice {
+            Objects.requireNonNull(paletteRuntimeIds, "paletteRuntimeIds");
+            Objects.requireNonNull(slabBuf, "slabBuf");
+            Objects.requireNonNull(paletteVoxelCounts, "paletteVoxelCounts");
+            if (paletteVoxelCounts.length != paletteRuntimeIds.length) {
+                throw new IllegalArgumentException(
+                        "paletteVoxelCounts length mismatch: " + paletteVoxelCounts.length
+                                + " != " + paletteRuntimeIds.length);
+            }
+            if (payloadOffset < 0 || payloadLength <= 0 || payloadOffset + payloadLength > slabBuf.capacity()) {
+                throw new IllegalArgumentException(
+                        "Invalid OffHeapModeASlice bounds: off=" + payloadOffset
+                                + " len=" + payloadLength + " cap=" + slabBuf.capacity());
+            }
+        }
+    }
+
+    /**
+     * Zero-copy off-heap Mode A block payload reference for ordered vectored gather writes
+     * ({@code anvil-api-ADR-007}). {@link #slicePayload()} uses absolute {@link ByteBuffer#slice(int, int)}
+     * so concurrent readers on the same backing slab never mutate buffer position or limit.
+     */
+    public record DirectModeASectionRef(
+            int curveId,
+            int blockMode,
+            int flatBits,
+            long octreeMask64,
+            int paletteLength,
+            ByteBuffer payloadBuf,
+            int payloadOffset,
+            int payloadLength
+    ) {
+        public DirectModeASectionRef {
+            Objects.requireNonNull(payloadBuf, "payloadBuf");
+            if (paletteLength < 2 || paletteLength > SECTION_VOXELS) {
+                throw new IllegalArgumentException("Invalid paletteLength: " + paletteLength);
+            }
+            if (payloadOffset < 0 || payloadLength <= 0 || payloadOffset + payloadLength > payloadBuf.capacity()) {
+                throw new IllegalArgumentException(
+                        "Invalid DirectModeASectionRef bounds: off=" + payloadOffset
+                                + " len=" + payloadLength + " cap=" + payloadBuf.capacity());
+            }
+        }
+
+        public ByteBuffer slicePayload() {
+            return payloadBuf.slice(payloadOffset, payloadLength);
+        }
+    }
+
+    /**
+     * Validates and slices an uncompressed Mode A block section directly from an absolute range in
+     * a {@link ByteBuffer} with zero {@code byte[]} allocation or copy ({@code anvil-api-ADR-007}).
+     * Enforces inline {@code CBIT T5/T6/T6b} verification and computes single-pass
+     * {@code paletteVoxelCounts} in L1 cache. Returns {@code null} on uniform sections, unsupported
+     * v3 escapes, or corruption (call {@link #sliceOffHeapFromBufferOrThrow} to propagate
+     * {@link CorruptRegionEntryException} directly).
+     */
+    public static OffHeapModeASlice trySliceOffHeapFromBuffer(
+            ByteBuffer chunkFrame,
+            int start,
+            int limit,
+            int[] palMap
+    ) {
+        try {
+            return sliceOffHeapFromBufferOrThrow(chunkFrame, start, limit, palMap);
+        } catch (CorruptRegionEntryException ex) {
+            return null;
+        }
+    }
+
+    /**
+     * Validates and slices an uncompressed Mode A block section directly from an absolute range in
+     * a {@link ByteBuffer} with zero heap staging copy ({@code anvil-api-ADR-007}). Enforces inline
+     * {@code CBIT T5} (VarInt/bounds), {@code CBIT T6} (run/bitmap cursor bounds), and
+     * {@code CBIT T6b} ({@code octreeOccupancyMask64} syndrome verification) while accumulating
+     * exact per-palette voxel counts in a single sequential pass.
+     *
+     * @throws CorruptRegionEntryException on any {@code CBIT T5/T6/T6b/T7} corruption
+     */
+    public static OffHeapModeASlice sliceOffHeapFromBufferOrThrow(
+            ByteBuffer chunkFrame,
+            int start,
+            int limit,
+            int[] palMap
+    ) throws CorruptRegionEntryException {
+        if (chunkFrame == null || palMap == null || start < 0 || limit <= start + 2 || limit > chunkFrame.capacity()) {
+            throw new CorruptRegionEntryException(
+                    "CBIT T5: Invalid off-heap Mode A slice bounds (" + start + ".." + limit + ")");
+        }
+        int pos = start;
+        int sectionHeader = chunkFrame.get(pos++) & 0xFF;
+        int curveId = (sectionHeader >>> 6) & 3;
+        int blockMode = (sectionHeader >>> 4) & 3;
+        if (blockMode == LcaSectionCodec.BLOCK_MODE_UNIFORM) {
+            return null;
+        }
+        long octreeMask64;
+        if (blockMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+            octreeMask64 = -1L;
+        } else {
+            if (pos + 8 > limit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated octreeOccupancyMask64 in off-heap slice");
+            }
+            octreeMask64 = readLongBEBuffer(chunkFrame, pos);
+            pos += 8;
+        }
+        int paletteLen = readVarIntBuffer(chunkFrame, pos, limit);
+        pos += LcaSectionCodec.varIntLen(paletteLen);
+        if (paletteLen == 0) {
+            // v3 secExtFlags escape (e.g. SEC_EXT_GRAY_BITPLANES) is not a plain Mode A slice.
+            return null;
+        }
+        if (paletteLen < 2 || paletteLen > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T7: Invalid off-heap section paletteLen " + paletteLen);
+        }
+        int[] mappedIds = new int[paletteLen];
+        for (int i = 0; i < paletteLen; i++) {
+            int diskId = readVarIntBuffer(chunkFrame, pos, limit);
+            pos += LcaSectionCodec.varIntLen(diskId);
+            if (diskId < 0 || diskId >= palMap.length) {
+                throw new CorruptRegionEntryException("CBIT T7: Section diskId " + diskId + " >= " + palMap.length);
+            }
+            int runtimeId = palMap[diskId];
+            if (runtimeId < 0 || runtimeId > LcaSectionBacking.MAX_STATE_ID_19) {
+                throw new CorruptRegionEntryException("CBIT T7: Invalid mapped runtimeId " + runtimeId);
+            }
+            mappedIds[i] = runtimeId;
+        }
+        return validateAndSlicePayloadFromBuffer(
+                chunkFrame, pos, limit, curveId, blockMode, octreeMask64, mappedIds, null);
+    }
+
+    /**
+     * Single-pass inline L1-cache-resident validator and voxel-counter over an already-parsed
+     * section's off-heap Mode A block payload. Enforces {@code CBIT T5/T6/T6b/T7} and writes the
+     * exact post-payload byte offset into {@code endPosOut[0]} when provided.
+     */
+    static OffHeapModeASlice validateAndSlicePayloadFromBuffer(
+            ByteBuffer chunkFrame,
+            int payloadStart,
+            int limit,
+            int curveId,
+            int blockMode,
+            long octreeMask64,
+            int[] mappedIds,
+            int[] endPosOut
+    ) throws CorruptRegionEntryException {
+        int paletteLen = mappedIds.length;
+        if (blockMode == LcaSectionCodec.BLOCK_MODE_FLAT_BITPACK) {
+            int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(paletteLen - 1));
+            int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
+            if (flatByteCount <= 0 || payloadStart + flatByteCount > limit) {
+                throw new CorruptRegionEntryException("CBIT T6: Truncated FlatBitPack off-heap payload");
+            }
+            int[] counts = new int[paletteLen];
+            long decodedMask = validateAndCountFlatBitPackBuffer(
+                    chunkFrame, payloadStart, flatByteCount, flatBits, paletteLen, counts);
+            if (decodedMask != octreeMask64) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T6b: FlatBitPack octreeOccupancyMask64 syndrome mismatch (expected=0x"
+                                + Long.toHexString(octreeMask64)
+                                + " actual=0x" + Long.toHexString(decodedMask) + ")");
+            }
+            if (endPosOut != null) {
+                endPosOut[0] = payloadStart + flatByteCount;
+            }
+            return new OffHeapModeASlice(
+                    curveId, blockMode, flatBits, octreeMask64, mappedIds,
+                    chunkFrame, payloadStart, flatByteCount, null, counts);
+        }
+        if (blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                && blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+            throw new CorruptRegionEntryException("CBIT: Unsupported Mode A blockEncodingMode " + blockMode);
+        }
+
+        int[] chunkBase = null;
+        int chunkShift = 0;
+        int chunkMask = 0;
+        int activeVoxels = SECTION_VOXELS;
+        if (octreeMask64 != -1L && octreeMask64 != 0L) {
+            if (curveId == LcaSectionCodec.CURVE_H3) {
+                int k = Long.bitCount(octreeMask64);
+                chunkBase = LcaSectionCodec.scratch().activeOctantBase;
+                long m = octreeMask64;
+                int idx = 0;
+                while (m != 0L) {
+                    chunkBase[idx++] = Long.numberOfTrailingZeros(m) << 6;
+                    m &= (m - 1L);
+                }
+                chunkShift = 6;
+                chunkMask = 63;
+                activeVoxels = k << 6;
+            } else if (curveId == LcaSectionCodec.CURVE_YZX || curveId == LcaSectionCodec.CURVE_Y_H2) {
+                int sCount = 0;
+                for (int octY = 0; octY < 4; octY++) {
+                    if (((octreeMask64 >>> (octY << 4)) & 0xFFFFL) != 0L) {
+                        sCount++;
+                    }
+                }
+                if (sCount < 4) {
+                    chunkBase = LcaSectionCodec.scratch().activeOctantBase;
+                    int idx = 0;
+                    for (int octY = 0; octY < 4; octY++) {
+                        if (((octreeMask64 >>> (octY << 4)) & 0xFFFFL) != 0L) {
+                            chunkBase[idx++] = octY << 10;
+                        }
+                    }
+                    chunkShift = 10;
+                    chunkMask = 1023;
+                    activeVoxels = sCount << 10;
+                }
+            }
+        }
+
+        int[] curveToYzx = LcaSectionCodec.CURVE_TO_YZX[curveId & 3];
+        int minorityCount = paletteLen - 1;
+        short[] offsets = new short[minorityCount];
+        int[] counts = new int[paletteLen];
+        long decodedOctreeMask64 = 0L;
+        int minoritySum = 0;
+        int pos = payloadStart;
+        int[] countOut = new int[1];
+        long[] maskOut = new long[1];
+
+        for (int p = 1; p < paletteLen; p++) {
+            int relOff = pos - payloadStart;
+            if (relOff < 0 || relOff > Short.MAX_VALUE) {
+                throw new CorruptRegionEntryException("CBIT T6: Delta-Roaring container offset overflow: " + relOff);
+            }
+            offsets[p - 1] = (short) relOff;
+            pos = validateAndCountMinorityContainerBuffer(
+                    chunkFrame, pos, limit, activeVoxels, curveId, curveToYzx,
+                    chunkBase, chunkShift, chunkMask, countOut, maskOut);
+            int c = countOut[0];
+            counts[p] = c;
+            minoritySum += c;
+            if (minoritySum > SECTION_VOXELS) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T6: Minority voxel count exceeded 4096 (" + minoritySum + ")");
+            }
+            decodedOctreeMask64 |= maskOut[0];
+        }
+        counts[0] = SECTION_VOXELS - minoritySum;
+        if (decodedOctreeMask64 != octreeMask64) {
+            throw new CorruptRegionEntryException(
+                    "CBIT T6b: Section octreeOccupancyMask64 syndrome mismatch (expected=0x"
+                            + Long.toHexString(octreeMask64)
+                            + " actual=0x" + Long.toHexString(decodedOctreeMask64) + ")");
+        }
+        int payloadLen = pos - payloadStart;
+        if (payloadLen <= 0 || payloadLen > Short.MAX_VALUE) {
+            throw new CorruptRegionEntryException("CBIT T6: Invalid Delta-Roaring payload length: " + payloadLen);
+        }
+        if (endPosOut != null) {
+            endPosOut[0] = pos;
+        }
+        return new OffHeapModeASlice(
+                curveId, blockMode, 0, octreeMask64, mappedIds,
+                chunkFrame, payloadStart, payloadLen, offsets, counts);
+    }
+
+    private static long validateAndCountFlatBitPackBuffer(
+            ByteBuffer buf,
+            int base,
+            int flatByteCount,
+            int flatBits,
+            int paletteLen,
+            int[] counts
+    ) throws CorruptRegionEntryException {
+        int[] yzxToOct = LcaSectionCodec.YZX_TO_OCTANT6;
+        long decodedMask = 0L;
+        if (flatBits == 1) {
+            for (int bIdx = 0; bIdx < 512; bIdx++) {
+                int b = buf.get(base + bIdx) & 0xFF;
+                if (b == 0) {
+                    counts[0] += 8;
+                    continue;
+                }
+                int vBase = bIdx << 3;
+                for (int bit = 0; bit < 8; bit++) {
+                    int val = (b >>> bit) & 1;
+                    counts[val]++;
+                    if (val != 0) {
+                        decodedMask |= 1L << yzxToOct[vBase + bit];
+                    }
+                }
+            }
+            return decodedMask;
+        }
+        if (flatBits == 2) {
+            for (int bIdx = 0; bIdx < 1024; bIdx++) {
+                int b = buf.get(base + bIdx) & 0xFF;
+                if (b == 0) {
+                    counts[0] += 4;
+                    continue;
+                }
+                int vBase = bIdx << 2;
+                for (int k = 0; k < 4; k++) {
+                    int val = (b >>> (k << 1)) & 3;
+                    if (val >= paletteLen) {
+                        throw new CorruptRegionEntryException(
+                                "CBIT T7: FlatBitPack palette index " + val + " >= " + paletteLen);
+                    }
+                    counts[val]++;
+                    if (val != 0) {
+                        decodedMask |= 1L << yzxToOct[vBase + k];
+                    }
+                }
+            }
+            return decodedMask;
+        }
+        if (flatBits == 4) {
+            for (int bIdx = 0; bIdx < 2048; bIdx++) {
+                int b = buf.get(base + bIdx) & 0xFF;
+                if (b == 0) {
+                    counts[0] += 2;
+                    continue;
+                }
+                int vBase = bIdx << 1;
+                int v0 = b & 0x0F;
+                if (v0 >= paletteLen) {
+                    throw new CorruptRegionEntryException(
+                            "CBIT T7: FlatBitPack palette index " + v0 + " >= " + paletteLen);
+                }
+                counts[v0]++;
+                if (v0 != 0) {
+                    decodedMask |= 1L << yzxToOct[vBase];
+                }
+                int v1 = (b >>> 4) & 0x0F;
+                if (v1 >= paletteLen) {
+                    throw new CorruptRegionEntryException(
+                            "CBIT T7: FlatBitPack palette index " + v1 + " >= " + paletteLen);
+                }
+                counts[v1]++;
+                if (v1 != 0) {
+                    decodedMask |= 1L << yzxToOct[vBase + 1];
+                }
+            }
+            return decodedMask;
+        }
+        if (flatBits == 8) {
+            for (int v = 0; v < SECTION_VOXELS; v++) {
+                int val = buf.get(base + v) & 0xFF;
+                if (val >= paletteLen) {
+                    throw new CorruptRegionEntryException(
+                            "CBIT T7: FlatBitPack palette index " + val + " >= " + paletteLen);
+                }
+                counts[val]++;
+                if (val != 0) {
+                    decodedMask |= 1L << yzxToOct[v];
+                }
+            }
+            return decodedMask;
+        }
+        int mask = (1 << flatBits) - 1;
+        int limit = base + flatByteCount;
+        int bitPos = 0;
+        for (int v = 0; v < SECTION_VOXELS; v++) {
+            int absOff = base + (bitPos >>> 3);
+            int bitOff = bitPos & 7;
+            int word = buf.get(absOff) & 0xFF;
+            if (absOff + 1 < limit) {
+                word |= (buf.get(absOff + 1) & 0xFF) << 8;
+            }
+            if (absOff + 2 < limit) {
+                word |= (buf.get(absOff + 2) & 0xFF) << 16;
+            }
+            if (absOff + 3 < limit) {
+                word |= (buf.get(absOff + 3) & 0xFF) << 24;
+            }
+            int val = (word >>> bitOff) & mask;
+            if (val >= paletteLen) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T7: FlatBitPack palette index " + val + " >= " + paletteLen);
+            }
+            counts[val]++;
+            if (val != 0) {
+                decodedMask |= 1L << yzxToOct[v];
+            }
+            bitPos += flatBits;
+        }
+        return decodedMask;
+    }
+
+    private static long readLongBEBuffer(ByteBuffer buf, int off) {
+        return ((long) (buf.get(off) & 0xFF) << 56)
+                | ((long) (buf.get(off + 1) & 0xFF) << 48)
+                | ((long) (buf.get(off + 2) & 0xFF) << 40)
+                | ((long) (buf.get(off + 3) & 0xFF) << 32)
+                | ((long) (buf.get(off + 4) & 0xFF) << 24)
+                | ((long) (buf.get(off + 5) & 0xFF) << 16)
+                | ((long) (buf.get(off + 6) & 0xFF) << 8)
+                | ((long) (buf.get(off + 7) & 0xFF));
+    }
+
+    private static int readVarIntBuffer(ByteBuffer buf, int pos, int limit) throws CorruptRegionEntryException {
+        int val = 0;
+        int shift = 0;
+        while (pos < limit) {
+            int b = buf.get(pos++) & 0xFF;
+            val |= (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) {
+                return val;
+            }
+            shift += 7;
+            if (shift > 28) {
+                throw new CorruptRegionEntryException("CBIT T5: VarInt overflow in off-heap Mode A slice");
+            }
+        }
+        throw new CorruptRegionEntryException("CBIT T5: Truncated VarInt in off-heap Mode A slice");
+    }
+
+    /** L1-resident octant LUTs (`2.5 KiB` total) for O(octants) inline CBIT T6b verification across all 4 curves. */
+    private static final byte[] Y_H2_BLOCK16_TO_OCTANT6 = new byte[256];
+    private static final byte[] YZX_BLOCK4_TO_OCTANT6 = new byte[1024];
+    private static final byte[] XZY_BLOCK4_TO_OCTANT6 = new byte[1024];
+    private static final long[] Y_SLAB_OCTANT_MASK = new long[4];
+    private static final long[] YZ_ROW_OCTANT_MASK = new long[16];
+    private static final long[] XZ_COL_OCTANT_MASK = new long[16];
+
+    static {
+        for (int b = 0; b < 256; b++) {
+            int h = b << 4;
+            int oct = LcaSectionCodec.YZX_TO_OCTANT6[LcaSectionCodec.CURVE_TO_YZX[LcaSectionCodec.CURVE_Y_H2][h]];
+            Y_H2_BLOCK16_TO_OCTANT6[b] = (byte) oct;
+            Y_SLAB_OCTANT_MASK[h >>> 10] |= 1L << oct;
+        }
+        for (int b = 0; b < 1024; b++) {
+            int h = b << 2;
+            int yzxOct = LcaSectionCodec.YZX_TO_OCTANT6[h];
+            YZX_BLOCK4_TO_OCTANT6[b] = (byte) yzxOct;
+            YZ_ROW_OCTANT_MASK[((h >>> 10) << 2) | ((h >>> 6) & 3)] |= 1L << yzxOct;
+
+            int xzyOct = LcaSectionCodec.YZX_TO_OCTANT6[LcaSectionCodec.CURVE_TO_YZX[LcaSectionCodec.CURVE_XZY][h]];
+            XZY_BLOCK4_TO_OCTANT6[b] = (byte) xzyOct;
+            XZ_COL_OCTANT_MASK[((h >>> 10) << 2) | ((h >>> 6) & 3)] |= 1L << xzyOct;
+        }
+    }
+
+    private static long octantBitForCurvePos(int curveId, int h) {
+        return switch (curveId) {
+            case LcaSectionCodec.CURVE_H3 -> 1L << (h >>> 6);
+            case LcaSectionCodec.CURVE_Y_H2 -> 1L << (Y_H2_BLOCK16_TO_OCTANT6[h >>> 4] & 0x3F);
+            case LcaSectionCodec.CURVE_YZX -> 1L << (YZX_BLOCK4_TO_OCTANT6[h >>> 2] & 0x3F);
+            default -> 1L << (XZY_BLOCK4_TO_OCTANT6[h >>> 2] & 0x3F);
+        };
+    }
+
+    private static long octantMaskForBitmapWord64(int curveId, int baseH, long bits64) {
+        if (curveId == LcaSectionCodec.CURVE_H3) {
+            return 1L << (baseH >>> 6);
+        }
+        if (curveId == LcaSectionCodec.CURVE_Y_H2) {
+            int b = baseH >>> 4;
+            long mask = 0L;
+            if ((bits64 & 0x0000_0000_0000_FFFFL) != 0L) {
+                mask |= 1L << (Y_H2_BLOCK16_TO_OCTANT6[b] & 0x3F);
+            }
+            if ((bits64 & 0x0000_0000_FFFF_0000L) != 0L) {
+                mask |= 1L << (Y_H2_BLOCK16_TO_OCTANT6[b + 1] & 0x3F);
+            }
+            if ((bits64 & 0x0000_FFFF_0000_0000L) != 0L) {
+                mask |= 1L << (Y_H2_BLOCK16_TO_OCTANT6[b + 2] & 0x3F);
+            }
+            if ((bits64 & 0xFFFF_0000_0000_0000L) != 0L) {
+                mask |= 1L << (Y_H2_BLOCK16_TO_OCTANT6[b + 3] & 0x3F);
+            }
+            return mask;
+        }
+        byte[] lut = (curveId == LcaSectionCodec.CURVE_YZX) ? YZX_BLOCK4_TO_OCTANT6 : XZY_BLOCK4_TO_OCTANT6;
+        int b = baseH >>> 2;
+        long mask = 0L;
+        long m = bits64;
+        for (int n = 0; m != 0L; n++, m >>>= 4) {
+            if ((m & 0xFL) != 0L) {
+                mask |= 1L << (lut[b + n] & 0x3F);
+            }
+        }
+        return mask;
+    }
+
+    static long octantMaskForRun(
+            int cursor,
+            int runEnd,
+            int curveId,
+            int[] curveToYzx,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask
+    ) {
+        if (curveId == LcaSectionCodec.CURVE_H3) {
+            if (chunkBase == null) {
+                int sOct = cursor >>> 6;
+                int eOct = (runEnd - 1) >>> 6;
+                return (-1L >>> (63 - (eOct - sOct))) << sOct;
+            }
+            int sRank = cursor >>> 6;
+            int eRank = (runEnd - 1) >>> 6;
+            long mask = 0L;
+            for (int r = sRank; r <= eRank; r++) {
+                mask |= 1L << (chunkBase[r] >>> 6);
+            }
+            return mask;
+        }
+        if (curveId == LcaSectionCodec.CURVE_Y_H2) {
+            long mask = 0L;
+            int c = cursor;
+            while (c < runEnd) {
+                int h = (chunkBase != null) ? (chunkBase[c >>> chunkShift] | (c & chunkMask)) : c;
+                if ((c & 0xFF) == 0 && c + 256 <= runEnd) {
+                    mask |= Y_SLAB_OCTANT_MASK[h >>> 10];
+                    c += 256;
+                } else {
+                    mask |= 1L << (Y_H2_BLOCK16_TO_OCTANT6[h >>> 4] & 0x3F);
+                    c = (c | 15) + 1;
+                }
+            }
+            return mask;
+        }
+        if (curveId == LcaSectionCodec.CURVE_YZX) {
+            long mask = 0L;
+            int c = cursor;
+            while (c < runEnd) {
+                int h = (chunkBase != null) ? (chunkBase[c >>> chunkShift] | (c & chunkMask)) : c;
+                if ((c & 0xFF) == 0 && c + 256 <= runEnd) {
+                    mask |= Y_SLAB_OCTANT_MASK[h >>> 10];
+                    c += 256;
+                } else if ((c & 15) == 0 && c + 16 <= runEnd) {
+                    mask |= YZ_ROW_OCTANT_MASK[((h >>> 10) << 2) | ((h >>> 6) & 3)];
+                    c += 16;
+                } else {
+                    mask |= 1L << (YZX_BLOCK4_TO_OCTANT6[h >>> 2] & 0x3F);
+                    c = (c | 3) + 1;
+                }
+            }
+            return mask;
+        }
+        // CURVE_XZY: every 4 consecutive Y voxels share one octant; 16-voxel Y columns span 4 octants
+        long mask = 0L;
+        int c = cursor;
+        while (c < runEnd) {
+            int h = (chunkBase != null) ? (chunkBase[c >>> chunkShift] | (c & chunkMask)) : c;
+            if ((c & 15) == 0 && c + 16 <= runEnd) {
+                mask |= XZ_COL_OCTANT_MASK[((h >>> 10) << 2) | ((h >>> 6) & 3)];
+                c += 16;
+            } else {
+                mask |= 1L << (XZY_BLOCK4_TO_OCTANT6[h >>> 2] & 0x3F);
+                c = (c | 3) + 1;
+            }
+        }
+        return mask;
+    }
+
+    private static int validateAndCountMinorityContainerBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int activeVoxels,
+            int curveId,
+            int[] curveToYzx,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask,
+            int[] countOut,
+            long[] maskOut
+    ) throws CorruptRegionEntryException {
+        if (pos + 2 > limit) {
+            throw new CorruptRegionEntryException("CBIT T6: Truncated minority container header");
+        }
+        int word16 = ((buf.get(pos) & 0xFF) << 8) | (buf.get(pos + 1) & 0xFF);
+        pos += 2;
+        int tag = (word16 >>> 14) & 3;
+        int countOrIdx = word16 & 0x3FFF;
+        return switch (tag) {
+            case LcaSectionCodec.TAG_SINGLETON -> validateSingletonContainerBuffer(
+                    buf, pos, limit, countOrIdx, activeVoxels, curveId, curveToYzx,
+                    chunkBase, chunkShift, chunkMask, countOut, maskOut);
+            case LcaSectionCodec.TAG_BITMAP -> validateBitmapContainerBuffer(
+                    buf, pos, limit, countOrIdx, activeVoxels, curveId,
+                    chunkBase, chunkShift, chunkMask, countOut, maskOut);
+            case LcaSectionCodec.TAG_DELTA_ARRAY -> validateDeltaArrayContainerBuffer(
+                    buf, pos, limit, countOrIdx, activeVoxels, curveId,
+                    chunkBase, chunkShift, chunkMask, countOut, maskOut);
+            default -> validateDeltaRunContainerBuffer(
+                    buf, pos, limit, countOrIdx, activeVoxels, curveId, curveToYzx,
+                    chunkBase, chunkShift, chunkMask, countOut, maskOut);
+        };
+    }
+
+    private static int validateSingletonContainerBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int countOrIdx,
+            int activeVoxels,
+            int curveId,
+            int[] curveToYzx,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask,
+            int[] countOut,
+            long[] maskOut
+    ) throws CorruptRegionEntryException {
+        int subTag = (countOrIdx >>> 12) & 3;
+        int idx12 = countOrIdx & 0x0FFF;
+        if (subTag == 0) {
+            if (idx12 >= activeVoxels) {
+                throw new CorruptRegionEntryException("CBIT T6: Singleton index out of bounds: " + idx12);
+            }
+            int h = (chunkBase != null) ? (chunkBase[idx12 >>> chunkShift] | (idx12 & chunkMask)) : idx12;
+            countOut[0] = 1;
+            maskOut[0] = octantBitForCurvePos(curveId, h);
+            return pos;
+        }
+        if (subTag == 1 || subTag == 2) {
+            int runLen;
+            if (subTag == 1) {
+                if (pos >= limit) {
+                    throw new CorruptRegionEntryException("CBIT T6: Truncated 1B single-run");
+                }
+                runLen = (buf.get(pos++) & 0xFF) + 2;
+            } else {
+                if (pos + 2 > limit) {
+                    throw new CorruptRegionEntryException("CBIT T6: Truncated 2B single-run");
+                }
+                runLen = (((buf.get(pos) & 0xFF) << 8) | (buf.get(pos + 1) & 0xFF)) + 2;
+                pos += 2;
+            }
+            if (idx12 + runLen > activeVoxels) {
+                throw new CorruptRegionEntryException("CBIT T6: Single-run overflow: " + (idx12 + runLen));
+            }
+            countOut[0] = runLen;
+            maskOut[0] = octantMaskForRun(
+                    idx12, idx12 + runLen, curveId, curveToYzx, chunkBase, chunkShift, chunkMask);
+            return pos;
+        }
+        if (pos + 2 > limit) {
+            throw new CorruptRegionEntryException("CBIT T6: Truncated two-run singleton header");
+        }
+        int lens = buf.get(pos++) & 0xFF;
+        int runLen0 = (lens >>> 4) + 1;
+        int runLen1 = (lens & 0x0F) + 1;
+        int adjGap = buf.get(pos++) & 0xFF;
+        if (adjGap >= 240) {
+            if (pos >= limit) {
+                throw new CorruptRegionEntryException("CBIT T6: Truncated 2B two-run gap");
+            }
+            adjGap = ((adjGap & 0x0F) << 8) | (buf.get(pos++) & 0xFF);
+        }
+        int end0 = idx12 + runLen0;
+        int start1 = end0 + 1 + adjGap;
+        int end1 = start1 + runLen1;
+        if (idx12 < 0 || end0 > activeVoxels || start1 < 0 || end1 > activeVoxels) {
+            throw new CorruptRegionEntryException("CBIT T6: Two-run index out of bounds: " + end1);
+        }
+        countOut[0] = runLen0 + runLen1;
+        maskOut[0] = octantMaskForRun(idx12, end0, curveId, curveToYzx, chunkBase, chunkShift, chunkMask)
+                | octantMaskForRun(start1, end1, curveId, curveToYzx, chunkBase, chunkShift, chunkMask);
+        return pos;
+    }
+
+    private static int validateBitmapContainerBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int countOrIdx,
+            int activeVoxels,
+            int curveId,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask,
+            int[] countOut,
+            long[] maskOut
+    ) throws CorruptRegionEntryException {
+        int count = 0;
+        long mask = 0L;
+        if (countOrIdx == 512 || (countOrIdx & 0x1000) != 0) {
+            int byteLen = (countOrIdx == 512) ? 512 : (countOrIdx & 0x0FFF);
+            if ((byteLen & 7) != 0 || (byteLen << 3) > activeVoxels || pos + byteLen > limit) {
+                throw new CorruptRegionEntryException("CBIT T6: Truncated or invalid TAG_BITMAP container");
+            }
+            int wordCount = byteLen >>> 3;
+            for (int w = 0; w < wordCount; w++) {
+                long bits64 = readLongBEBuffer(buf, pos);
+                pos += 8;
+                if (bits64 == 0L) {
+                    continue;
+                }
+                count += Long.bitCount(bits64);
+                int baseC = w << 6;
+                int baseH = (chunkBase != null)
+                        ? (chunkBase[baseC >>> chunkShift] | (baseC & chunkMask))
+                        : baseC;
+                mask |= octantMaskForBitmapWord64(curveId, baseH, bits64);
+            }
+            countOut[0] = count;
+            maskOut[0] = mask;
+            return pos;
+        }
+        int nonZeroWords = countOrIdx;
+        int payBytes = 8 + (nonZeroWords << 3);
+        if (nonZeroWords < 1 || nonZeroWords > 64 || pos + payBytes > limit) {
+            throw new CorruptRegionEntryException("CBIT T6: Truncated Word-Masked TAG_BITMAP container");
+        }
+        long wordMask64 = readLongBEBuffer(buf, pos);
+        pos += 8;
+        if (Long.bitCount(wordMask64) != nonZeroWords) {
+            throw new CorruptRegionEntryException("CBIT T6: Word-Masked TAG_BITMAP popcount mismatch");
+        }
+        int maxWords = activeVoxels >>> 6;
+        while (wordMask64 != 0L) {
+            int w = Long.numberOfTrailingZeros(wordMask64);
+            wordMask64 &= (wordMask64 - 1L);
+            if (w >= maxWords) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T6: Word-Masked TAG_BITMAP word out of bounds: " + w);
+            }
+            long bits64 = readLongBEBuffer(buf, pos);
+            pos += 8;
+            if (bits64 == 0L) {
+                continue;
+            }
+            count += Long.bitCount(bits64);
+            int baseC = w << 6;
+            int baseH = (chunkBase != null)
+                    ? (chunkBase[baseC >>> chunkShift] | (baseC & chunkMask))
+                    : baseC;
+            mask |= octantMaskForBitmapWord64(curveId, baseH, bits64);
+        }
+        countOut[0] = count;
+        maskOut[0] = mask;
+        return pos;
+    }
+
+    private static int validateDeltaArrayContainerBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int countOrIdx,
+            int activeVoxels,
+            int curveId,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask,
+            int[] countOut,
+            long[] maskOut
+    ) throws CorruptRegionEntryException {
+        int cursor = 0;
+        long mask = 0L;
+        for (int r = 0; r < countOrIdx; r++) {
+            if (pos >= limit) {
+                throw new CorruptRegionEntryException("CBIT T6: Truncated TAG_DELTA_ARRAY");
+            }
+            int adjGap = buf.get(pos++) & 0xFF;
+            if (adjGap >= 240) {
+                if (pos >= limit) {
+                    throw new CorruptRegionEntryException("CBIT T6: Truncated 2-byte TAG_DELTA_ARRAY gap");
+                }
+                adjGap = ((adjGap & 0x0F) << 8) | (buf.get(pos++) & 0xFF);
+            }
+            cursor += (r == 0) ? adjGap : (adjGap + 1);
+            if (cursor < 0 || cursor >= activeVoxels) {
+                throw new CorruptRegionEntryException("CBIT T6: TAG_DELTA_ARRAY cursor overflow: " + cursor);
+            }
+            int c = cursor++;
+            int h = (chunkBase != null) ? (chunkBase[c >>> chunkShift] | (c & chunkMask)) : c;
+            mask |= octantBitForCurvePos(curveId, h);
+        }
+        countOut[0] = countOrIdx;
+        maskOut[0] = mask;
+        return pos;
+    }
+
+    private static int validateDeltaRunContainerBuffer(
+            ByteBuffer buf,
+            int pos,
+            int limit,
+            int countOrIdx,
+            int activeVoxels,
+            int curveId,
+            int[] curveToYzx,
+            int[] chunkBase,
+            int chunkShift,
+            int chunkMask,
+            int[] countOut,
+            long[] maskOut
+    ) throws CorruptRegionEntryException {
+        int subMode = (countOrIdx >>> 12) & 3;
+        int runCount = countOrIdx & 0x0FFF;
+        int lBits = 4 - subMode;
+        int gMax = (1 << (4 + subMode)) - 1;
+        int lMax = (1 << lBits) - 1;
+        int cursor = 0;
+        int count = 0;
+        long mask = 0L;
+        for (int r = 0; r < runCount; r++) {
+            if (pos >= limit) {
+                throw new CorruptRegionEntryException("CBIT T6: Truncated TAG_DELTA_RUN");
+            }
+            int tok = buf.get(pos++) & 0xFF;
+            int adjGap = (tok >>> lBits) & gMax;
+            int lenM1 = tok & lMax;
+            if (adjGap == gMax) {
+                if (pos >= limit) {
+                    throw new CorruptRegionEntryException("CBIT T6: Truncated 1-byte TAG_DELTA_RUN gap");
+                }
+                int b0 = buf.get(pos++) & 0xFF;
+                if (b0 < 240) {
+                    adjGap += b0;
+                } else {
+                    if (pos >= limit) {
+                        throw new CorruptRegionEntryException("CBIT T6: Truncated 2-byte TAG_DELTA_RUN gap");
+                    }
+                    adjGap += ((b0 & 0x0F) << 8) | (buf.get(pos++) & 0xFF);
+                }
+            }
+            if (lenM1 == lMax) {
+                if (pos < limit && buf.get(pos) >= 0) {
+                    lenM1 += buf.get(pos++);
+                } else {
+                    int extra = readVarIntBuffer(buf, pos, limit);
+                    pos += LcaSectionCodec.varIntLen(extra);
+                    lenM1 += extra;
+                }
+            }
+            cursor += (r == 0) ? adjGap : (adjGap + 1);
+            int runLen = lenM1 + 1;
+            int runEnd = cursor + runLen;
+            if (cursor < 0 || runEnd > activeVoxels) {
+                throw new CorruptRegionEntryException(
+                        "CBIT T6: Delta-Roaring run cursor exceeded " + activeVoxels + " (" + runEnd + ")");
+            }
+            count += runLen;
+            mask |= octantMaskForRun(cursor, runEnd, curveId, curveToYzx, chunkBase, chunkShift, chunkMask);
+            cursor = runEnd;
+        }
+        countOut[0] = count;
+        maskOut[0] = mask;
+        return pos;
     }
 }

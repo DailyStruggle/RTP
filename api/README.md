@@ -69,7 +69,7 @@ Every module in the catalog upholds four shared architectural guarantees:
 
 ## Standalone Consumption (Maven Central & JitPack)
 
-Standalone plugin and mod authors can pull individual SDK modules from **Maven Central** (`io.github.dailystruggle:<module>:<version>`) or **JitPack** (`com.github.DailyStruggle.RTP:<module>:<tag>`):
+Standalone plugin and mod authors can pull individual SDK modules from **Maven Central** (`io.github.leafcraftdev:<module>:<version>`) or **JitPack** (`com.github.LeafCraftDev.LeafSDK:<module>:<tag>`):
 
 ### Gradle (`build.gradle`)
 
@@ -81,15 +81,15 @@ repositories {
 
 dependencies {
     // Maven Central coordinates
-    implementation 'io.github.dailystruggle:server-api:3.3.1'
-    implementation 'io.github.dailystruggle:yaml-api:3.3.1'
-    implementation 'io.github.dailystruggle:units-api:3.3.1'
-    implementation 'io.github.dailystruggle:bit-api:3.3.1'
-    implementation 'io.github.dailystruggle:config-bit-api:3.3.1'
-    implementation 'io.github.dailystruggle:predict-api:3.3.1'
+    implementation 'io.github.leafcraftdev:server-api:1.0.0'
+    implementation 'io.github.leafcraftdev:yaml-api:1.0.0'
+    implementation 'io.github.leafcraftdev:units-api:1.0.0'
+    implementation 'io.github.leafcraftdev:bit-api:1.0.0'
+    implementation 'io.github.leafcraftdev:config-bit-api:1.0.0'
+    implementation 'io.github.leafcraftdev:predict-api:1.0.0'
 
     // Or via JitPack tag / branch snapshot
-    // implementation 'com.github.DailyStruggle.RTP:predict-api:3.3.1'
+    // implementation 'com.github.LeafCraftDev.LeafSDK:predict-api:1.0.0'
 }
 ```
 

@@ -186,7 +186,7 @@ class LcaV3FormatAndBenchmarkTest {
         assertThrows(CorruptRegionEntryException.class,
                 () -> LcaV3Codec.validateExtFlags(0x8002, 0x01, LcaRegionReader.LCA_FORMAT_VERSION_V3));
         assertThrows(CorruptRegionEntryException.class,
-                () -> LcaV3Codec.validateExtFlags(0x8000, 0x08, LcaRegionReader.LCA_FORMAT_VERSION_V3));
+                () -> LcaV3Codec.validateExtFlags(0x8000, 0x20, LcaRegionReader.LCA_FORMAT_VERSION_V3));
     }
 
     @Test
@@ -302,39 +302,39 @@ class LcaV3FormatAndBenchmarkTest {
             double v3FullBNbtUs = measureReadNbtBytesUs(v3FullB, coords, sweeps);
 
             int n = coords.size();
-            System.out.printf(Locale.ROOT, "\n--- Fixture: %s (%d chunks, .mca = %,d B) ---\n",
+            System.out.printf(Locale.ROOT, "%n--- Fixture: %s (%d chunks, .mca = %,d B) ---%n",
                     regionNames.get(r), n, mca.length);
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %10s | %8s | %9s | %10s | %11s | %11s\n",
+                    "  %-24s | %10s | %8s | %9s | %10s | %11s | %11s%n",
                     "Format", "Size (B)", "vs .mca", "vs v2", "Enc us/chk", "DOM Rd us", "NBT Rd us");
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %9s | %10s | %11.2f | %11s\n",
+                    "  %-24s | %,10d | %7.2f%% | %9s | %10s | %11.2f | %11s%n",
                     ".mca (Zlib)", mca.length, 100.0, "-", "-", mcaReadUs, "-");
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s%n",
                     "v2 Mode A (0-LZ)", v2A.length, 100.0 * v2A.length / mca.length, 0.0,
                     tV2AEnc / 1000.0 / n, v2AReadUs, "-");
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s%n",
                     "v3-Fast Mode A", v3FastA.length, 100.0 * v3FastA.length / mca.length,
                     100.0 * (v3FastA.length - v2A.length) / v2A.length,
                     tV3FastAEnc / 1000.0 / n, v3FastAReadUs, "-");
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11s%n",
                     "v3-Full Mode A (Eik+B1)", v3FullA.length, 100.0 * v3FullA.length / mca.length,
                     100.0 * (v3FullA.length - v2A.length) / v2A.length,
                     tV3FullAEnc / 1000.0 / n, v3FullAReadUs, "-");
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f%n",
                     "v2 Mode B (LCD2)", v2B.length, 100.0 * v2B.length / mca.length, 0.0,
                     tV2BEnc / 1000.0 / n, v2BReadUs, v2BNbtUs);
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f%n",
                     "v3-Fast Mode B", v3FastB.length, 100.0 * v3FastB.length / mca.length,
                     100.0 * (v3FastB.length - v2B.length) / v2B.length,
                     tV3FastBEnc / 1000.0 / n, v3FastBReadUs, v3FastBNbtUs);
             System.out.printf(Locale.ROOT,
-                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f\n",
+                    "  %-24s | %,10d | %7.2f%% | %8.2f%% | %10.2f | %11.2f | %11.2f%n",
                     "v3-Full Mode B (Eik+B1)", v3FullB.length, 100.0 * v3FullB.length / mca.length,
                     100.0 * (v3FullB.length - v2B.length) / v2B.length,
                     tV3FullBEnc / 1000.0 / n, v3FullBReadUs, v3FullBNbtUs);
@@ -388,21 +388,21 @@ class LcaV3FormatAndBenchmarkTest {
         double v3ColEikBViewUs = measureReadViewUs(v3ColEikB, coords, sweeps);
         double v3FullBViewUs = measureReadViewUs(v3FullB, coords, sweeps);
 
-        System.out.printf(Locale.ROOT, "\n--- Live 26.3 Overworld Sample (%d chunks across 8 strided regions) ---\n", n);
-        System.out.printf(Locale.ROOT, "  v2 Mode A:             %,10d B\n", v2A.length);
-        System.out.printf(Locale.ROOT, "  v3-Fast Mode A:        %,10d B (%+.2f%% vs v2)\n",
+        System.out.printf(Locale.ROOT, "%n--- Live 26.3 Overworld Sample (%d chunks across 8 strided regions) ---%n", n);
+        System.out.printf(Locale.ROOT, "  v2 Mode A:             %,10d B%n", v2A.length);
+        System.out.printf(Locale.ROOT, "  v3-Fast Mode A:        %,10d B (%+.2f%% vs v2)%n",
                 v3FastA.length, 100.0 * (v3FastA.length - v2A.length) / v2A.length);
-        System.out.printf(Locale.ROOT, "  v3-Full Mode A:        %,10d B (%+.2f%% vs v2)\n",
+        System.out.printf(Locale.ROOT, "  v3-Full Mode A:        %,10d B (%+.2f%% vs v2)%n",
                 v3FullA.length, 100.0 * (v3FullA.length - v2A.length) / v2A.length);
-        System.out.printf(Locale.ROOT, "  v2 Mode B:             %,10d B | NBT Rd: %6.2f us | View Rd (skipLight): %5.2f us\n",
+        System.out.printf(Locale.ROOT, "  v2 Mode B:             %,10d B | NBT Rd: %6.2f us | View Rd (skipLight): %5.2f us%n",
                 v2B.length, v2BNbtUs, v2BViewUs);
-        System.out.printf(Locale.ROOT, "  v3-Columnar Mode B:    %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us\n",
+        System.out.printf(Locale.ROOT, "  v3-Columnar Mode B:    %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us%n",
                 v3ColB.length, 100.0 * (v3ColB.length - v2B.length) / v2B.length, v3ColBNbtUs, v3ColBViewUs);
-        System.out.printf(Locale.ROOT, "  v3-Col+RankEx Mode B:  %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us\n",
+        System.out.printf(Locale.ROOT, "  v3-Col+RankEx Mode B:  %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us%n",
                 v3FastB.length, 100.0 * (v3FastB.length - v2B.length) / v2B.length, v3FastBNbtUs, v3FastBViewUs);
-        System.out.printf(Locale.ROOT, "  v3-Col+EikB1 Mode B:   %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us\n",
+        System.out.printf(Locale.ROOT, "  v3-Col+EikB1 Mode B:   %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us%n",
                 v3ColEikB.length, 100.0 * (v3ColEikB.length - v2B.length) / v2B.length, v3ColEikBNbtUs, v3ColEikBViewUs);
-        System.out.printf(Locale.ROOT, "  v3-Full Mode B:        %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us\n",
+        System.out.printf(Locale.ROOT, "  v3-Full Mode B:        %,10d B (%+.2f%% vs v2) | NBT Rd: %6.2f us | View Rd: %5.2f us%n",
                 v3FullB.length, 100.0 * (v3FullB.length - v2B.length) / v2B.length, v3FullBNbtUs, v3FullBViewUs);
     }
 
@@ -606,13 +606,13 @@ class LcaV3FormatAndBenchmarkTest {
         };
 
         System.out.printf(Locale.ROOT,
-                "\n================ [WARMED 64-CHUNK ENCODE & DECODE vs .MCA ZLIB: %s (sink=%d)] ================\n",
+                "%n================ [WARMED 64-CHUNK ENCODE & DECODE vs .MCA ZLIB: %s (sink=%d)] ================%n",
                 label, sink);
         System.out.printf(Locale.ROOT,
-                "  %-26s | %10s | %7s | %10s | %10s | %10s | %10s | %10s\n",
+                "  %-26s | %10s | %7s | %10s | %10s | %10s | %10s | %10s%n",
                 "Format", "Size (B)", "vs .mca", "DOM Save", "Strm Save", "RawNBT Rd", "DOM Rd", "View Rd");
         System.out.printf(Locale.ROOT,
-                "  %-26s | %,10d | %6.2f%% | %7.2f us | %7.2f us | %7.2f us | %7.2f us | %7.2f us\n",
+                "  %-26s | %,10d | %6.2f%% | %7.2f us | %7.2f us | %7.2f us | %7.2f us | %7.2f us%n",
                 "Vanilla .mca (Zlib)", benchMca.length, 100.0,
                 mcaDomSaveUs, mcaStreamSaveUs, mcaRawNbtRdUs, mcaDomRdUs, mcaViewRdUs);
 
@@ -651,7 +651,7 @@ class LcaV3FormatAndBenchmarkTest {
             });
 
             System.out.printf(Locale.ROOT,
-                    "  %-26s | %,10d | %6.2f%% | %7.2f us | %7.2f us | %7.2f us | %7.2f us | %7.2f us\n",
+                    "  %-26s | %,10d | %6.2f%% | %7.2f us | %7.2f us | %7.2f us | %7.2f us | %7.2f us%n",
                     names[k], regionBytes.length, 100.0 * regionBytes.length / benchMca.length,
                     domSaveUs, streamSaveUs, rawNbtRdUs, domRdUs, viewRdUs);
         }
@@ -759,7 +759,7 @@ class LcaV3FormatAndBenchmarkTest {
         return out;
     }
 
-    private static byte[] readMcaRawNbtBytes(byte[] mca, int rx, int rz) throws IOException, DataFormatException {
+    private static byte[] readMcaRawNbtBytes(byte[] mca, int rx, int rz) throws DataFormatException {
         int hOff = ((rx & 31) + ((rz & 31) << 5)) * 4;
         int loc = ((mca[hOff] & 0xFF) << 24)
                 | ((mca[hOff + 1] & 0xFF) << 16)
@@ -935,16 +935,16 @@ class LcaV3FormatAndBenchmarkTest {
         }
 
         System.out.printf(Locale.ROOT,
-                "\n================ [PRODUCTION LCD2 TIERS: 64-chunk overworld_mountain (sink=%d)] ================\n",
+                "%n================ [PRODUCTION LCD2 TIERS: 64-chunk overworld_mountain (sink=%d)] ================%n",
                 sink);
         System.out.printf(Locale.ROOT,
-                "  %-32s | %9s | %10s | %7s | %8s | %10s | %10s | %8s\n",
+                "  %-32s | %9s | %10s | %7s | %8s | %10s | %10s | %8s%n",
                 "LCD2 Production Tier", "Body (B)", "Est.LCA(B)", "vs .mca", "vs Exh", "LCD2 Enc", "LCD2 Dec", "Enc Spdp");
         for (int vIdx = 0; vIdx < variantNames.length; vIdx++) {
             double vsMcaPct = 100.0 * alignedRegionBytes[vIdx] / benchMca.length;
             double vsExhPct = 100.0 * (alignedRegionBytes[vIdx] - alignedRegionBytes[0]) / alignedRegionBytes[0];
             System.out.printf(Locale.ROOT,
-                    "  %-32s | %,9d | %,10d | %6.2f%% | %+6.2f%% | %7.2f us | %7.2f us | %6.2fx\n",
+                    "  %-32s | %,9d | %,10d | %6.2f%% | %+6.2f%% | %7.2f us | %7.2f us | %6.2fx%n",
                     variantNames[vIdx], rawBodyBytes[vIdx], alignedRegionBytes[vIdx],
                     vsMcaPct, vsExhPct, encUsArr[vIdx], decUsArr[vIdx], encUsArr[0] / Math.max(0.01, encUsArr[vIdx]));
         }
@@ -998,7 +998,7 @@ class LcaV3FormatAndBenchmarkTest {
                     int activeVoxels = LcaSectionCodec.populateCompactedCurvePaletteIdx(
                             yzxOrd, curveId, octreeMask64, arena.curvePaletteIdx);
                     int grayLen = LcaV3Codec.tryEncodeAdjacencyGrayBitplanes(
-                            arena.curvePaletteIdx, activeVoxels, pLen, sortedGlobalIds, remapped, arena, grayBuf);
+                            arena.curvePaletteIdx, activeVoxels, pLen, sortedGlobalIds, remapped, grayBuf);
                     assertTrue(grayLen > 0, "Expected valid Gray bitplane payload for pLen=" + pLen);
                     assertEquals(sortedGlobalIds[0], remapped[0], "Dominant palette[0] must remain pinned");
 

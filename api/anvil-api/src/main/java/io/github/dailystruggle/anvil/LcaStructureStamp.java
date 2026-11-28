@@ -159,7 +159,7 @@ public record LcaStructureStamp(
             throw new IllegalArgumentException(
                     "chunkRadius out of bounds: (" + chunkRadiusX + ", " + chunkRadiusZ + ")");
         }
-        projection = Objects.requireNonNull(projection, "projection");
+        Objects.requireNonNull(projection, "projection");
         statePalette = List.copyOf(Objects.requireNonNull(statePalette, "statePalette"));
 
         List<ChunkStampSlice> sortedSlices = new ArrayList<>(Objects.requireNonNull(chunkSlices, "chunkSlices"));
@@ -238,10 +238,10 @@ public record LcaStructureStamp(
             if (rule.probability() <= 0.0f) {
                 continue;
             }
-            long h = worldSeed ^ rule.salt() ^ ((long) i * 0x9E3779B97F4A7C15L);
-            h ^= (long) worldX * 0xBF58476D1CE4E5B9L;
-            h ^= (long) worldY * 0x94D049BB133111EBL;
-            h ^= (long) worldZ * 0xD6E8FEB86659FD93L;
+            long h = worldSeed ^ rule.salt() ^ (i * 0x9E3779B97F4A7C15L);
+            h ^= worldX * 0xBF58476D1CE4E5B9L;
+            h ^= worldY * 0x94D049BB133111EBL;
+            h ^= worldZ * 0xD6E8FEB86659FD93L;
             h = (h ^ (h >>> 30)) * 0xBF58476D1CE4E5B9L;
             h = (h ^ (h >>> 27)) * 0x94D049BB133111EBL;
             h = h ^ (h >>> 31);

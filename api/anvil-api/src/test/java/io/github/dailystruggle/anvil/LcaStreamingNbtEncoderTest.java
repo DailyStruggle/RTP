@@ -2,6 +2,7 @@ package io.github.dailystruggle.anvil;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -537,8 +538,8 @@ class LcaStreamingNbtEncoderTest {
         byte[] rawNbt = Nbt.writeNamedRoot("", root);
         LcaRegionWriter.LcaLiveArchive archive =
                 LcaRegionWriter.createEmptyLiveArchive(regionX, regionZ, -4, 24, dv, false);
-        byte[] slab = LcaStreamingNbtEncoder.encodeChunkSlab(
-                archive, regionX, regionZ, ByteBuffer.wrap(rawNbt));
+        assertNotNull(LcaStreamingNbtEncoder.encodeChunkSlab(
+                archive, regionX, regionZ, ByteBuffer.wrap(rawNbt)));
 
         Path storageDir = tempDir.resolve("starlight-inline-full");
         try (LcaRegionFileStorage storage = new LcaRegionFileStorage(storageDir, false)) {
@@ -563,6 +564,99 @@ class LcaStreamingNbtEncoderTest {
             org.junit.jupiter.api.Assertions.assertFalse(
                     fastAir.containsKey("starlight.skylight_state"),
                     "Open-sky inline uniform air section must not emit starlight.skylight_state=1");
+        }
+    }
+
+    @Test
+    void multiBoundarySectionsEncodeBitIdenticallyAndRoundTrip() throws IOException {
+        int dv = 5006;
+        int cx = 4;
+        int cz = -5;
+        int regionX = cx >> 5;
+        int regionZ = cz >> 5;
+
+        LinkedHashMap<String, Object> root = buildChunkRoot(dv, true, cx, cz, false);
+        @SuppressWarnings("unchecked")
+        List<Object> sections = ((Nbt.NbtList) root.get("sections")).items;
+
+        // Place an in-range light-only section (Y = -2, no block_states -> routed to highBoundarySections)
+        // between in-range voxel sections Y = -4 and Y = 0, and add non-adjacent low/high boundary sections.
+        LinkedHashMap<String, Object> inRangeLightOnlySec = new LinkedHashMap<>();
+        inRangeLightOnlySec.put("Y", (byte) -2);
+        byte[] midSkyPattern = new byte[2048];
+        Arrays.fill(midSkyPattern, (byte) 0x33);
+        inRangeLightOnlySec.put("SkyLight", midSkyPattern);
+        sections.add(2, inRangeLightOnlySec); // between Y = -4 (idx 1) and Y = 0 (idx 2 -> 3)
+
+        // Add a second low-boundary section (Y = -6) non-adjacent to existing Y = -5 (< minSectionY = -4)
+        LinkedHashMap<String, Object> extraLowSec = new LinkedHashMap<>();
+        extraLowSec.put("Y", (byte) -6);
+        byte[] lowSkyPattern = new byte[2048];
+        Arrays.fill(lowSkyPattern, (byte) 0x21);
+        extraLowSec.put("SkyLight", lowSkyPattern);
+        sections.add(extraLowSec);
+
+        // Add two high-boundary sections (Y = 20 and Y = 21, both >= minSectionY + sectionCount = 20)
+        LinkedHashMap<String, Object> highSecA = new LinkedHashMap<>();
+        highSecA.put("Y", (byte) 20);
+        byte[] highSkyA = new byte[2048];
+        Arrays.fill(highSkyA, (byte) 0xFE);
+        highSecA.put("SkyLight", highSkyA);
+        sections.add(highSecA);
+
+        LinkedHashMap<String, Object> highSecB = new LinkedHashMap<>();
+        highSecB.put("Y", (byte) 21);
+        byte[] highBlkB = new byte[2048];
+        Arrays.fill(highBlkB, (byte) 0x45);
+        highSecB.put("BlockLight", highBlkB);
+        sections.add(highSecB);
+
+        byte[] rawNbt = Nbt.writeNamedRoot("", root);
+
+        LcaRegionWriter.LcaLiveArchive refArchive =
+                LcaRegionWriter.createEmptyLiveArchive(regionX, regionZ, -4, 24, dv, false);
+        LcaRegionWriter.LcaLiveArchive streamArchive =
+                LcaRegionWriter.createEmptyLiveArchive(regionX, regionZ, -4, 24, dv, false);
+
+        LinkedHashMap<String, Object> parsedRef = Nbt.readRootCompound(rawNbt);
+        byte[] expectedSlab = refArchive.encodeChunkPayloadForSlab(cx & 31, cz & 31, parsedRef);
+        byte[] actualSlab = LcaStreamingNbtEncoder.encodeChunkSlab(
+                streamArchive, regionX, regionZ, ByteBuffer.wrap(rawNbt));
+
+        assertArrayEquals(
+                expectedSlab,
+                actualSlab,
+                "Multi-boundary-section streaming slab must match reference encoder bit-for-bit");
+
+        // Also verify offset-wrapped (non-zero position) ByteBuffer + full storage round-trip
+        byte[] padded = new byte[rawNbt.length + 23];
+        int offset = 11;
+        System.arraycopy(rawNbt, 0, padded, offset, rawNbt.length);
+        ByteBuffer offsetBuf = ByteBuffer.wrap(padded, offset, rawNbt.length);
+
+        Path storageDir = tempDir.resolve("multi-boundary-sections");
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(storageDir, false)) {
+            byte[] storageSlab = storage.encodeChunkNbtForRegionSlab(regionX, regionZ, offsetBuf);
+            storage.commitPreEncodedChunkSlab(cx, cz, ByteBuffer.wrap(storageSlab));
+
+            byte[] roundTrip = storage.readChunkNbtBytes(cx, cz);
+            LinkedHashMap<String, Object> decoded = Nbt.readRootCompound(roundTrip);
+            Map<Integer, Map<String, Object>> byY = new LinkedHashMap<>();
+            for (Object item : ((Nbt.NbtList) decoded.get("sections")).items) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sm = (Map<String, Object>) item;
+                byY.put(((Number) sm.get("Y")).intValue(), sm);
+            }
+
+            assertNotNull(byY.get(-6), "Low boundary section Y=-6 must survive round-trip");
+            assertArrayEquals(lowSkyPattern, (byte[]) byY.get(-6).get("SkyLight"));
+            assertNotNull(byY.get(-5), "Low boundary section Y=-5 must survive round-trip");
+            assertNotNull(byY.get(-2), "In-range light-only section Y=-2 must survive round-trip");
+            assertArrayEquals(midSkyPattern, (byte[]) byY.get(-2).get("SkyLight"));
+            assertNotNull(byY.get(20), "High boundary section Y=20 must survive round-trip");
+            assertArrayEquals(highSkyA, (byte[]) byY.get(20).get("SkyLight"));
+            assertNotNull(byY.get(21), "High boundary section Y=21 must survive round-trip");
+            assertArrayEquals(highBlkB, (byte[]) byY.get(21).get("BlockLight"));
         }
     }
 }

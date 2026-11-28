@@ -15,6 +15,8 @@ import java.util.UUID;
 /**
  * Ephemeral session state for an admin navigating the Setup Wizard.
  * Tracks user selections across each stage before compiling into a prefab recipe.
+ *
+ * @governedBy leafrtp-ADR-024, ADR-038
  */
 public final class SetupSession {
 

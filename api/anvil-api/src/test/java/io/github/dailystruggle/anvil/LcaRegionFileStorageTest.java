@@ -1769,11 +1769,7 @@ class LcaRegionFileStorageTest {
             // Compare each section's biomes and light against full NBT decode
             byte[] fullNbtBytes = reader.readChunkNbtBytes(8, 9);
             assertNotNull(fullNbtBytes);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> fullRoot = (Map<String, Object>) Nbt.readNamedRoot(fullNbtBytes).value;
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> fullSections =
-                    (List<Map<String, Object>>) (List<?>) ((Nbt.NbtList) fullRoot.get("sections")).items;
+            assertNotNull(Nbt.readNamedRoot(fullNbtBytes).value);
 
             for (int sIdx = 0; sIdx < biomeCounts.length; sIdx++) {
                 int targetY = -4 + sIdx;
@@ -2433,11 +2429,25 @@ class LcaRegionFileStorageTest {
             Map<String, Object> bs3 = (Map<String, Object>) byY.get(-1).get("block_states");
             assertEquals(3, ((Nbt.NbtList) bs3.get("palette")).items.size());
 
-            // Section y=0 (hot SimpleBitStorage 9-state 4-bit 1:1 copy)
+            // Section y=0 (hot SimpleBitStorage 9-state 4-bit: verify exact 4,096-voxel state parity after Mode A frequency sort)
             @SuppressWarnings("unchecked")
             Map<String, Object> bs4 = (Map<String, Object>) byY.get(0).get("block_states");
-            assertEquals(9, ((Nbt.NbtList) bs4.get("palette")).items.size());
-            org.junit.jupiter.api.Assertions.assertArrayEquals(s4Longs, (long[]) bs4.get("data"));
+            Nbt.NbtList decodedPal4 = (Nbt.NbtList) bs4.get("palette");
+            assertEquals(9, decodedPal4.items.size());
+            long[] decodedData4 = (long[]) bs4.get("data");
+            assertEquals(256, decodedData4.length);
+            for (int w = 0; w < 256; w++) {
+                long expWord = s4Longs[w];
+                long actWord = decodedData4[w];
+                for (int s = 0; s < 16; s++) {
+                    int expIdx = (int) ((expWord >>> (s << 2)) & 0xFL);
+                    int actIdx = (int) ((actWord >>> (s << 2)) & 0xFL);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> actEntry = (Map<String, Object>) decodedPal4.items.get(actIdx);
+                    assertEquals(blockPalettes[4][expIdx], actEntry.get("Name"),
+                            "Mismatch at voxel " + ((w << 4) | s));
+                }
+            }
         }
     }
 

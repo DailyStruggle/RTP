@@ -406,7 +406,7 @@ class WeightedParityEvaluatorTest {
                         Map.of(),
                         Map.of());
         assertEquals(ParityGateVerdict.EXACT_MATCH, legacySc.weightedParity().verdict());
-        assertEquals(FeatureDomain.CRITICAL_FUNCTIONAL.basePenaltyWeight(), 250.0, 1e-6);
+        assertEquals(250.0, FeatureDomain.CRITICAL_FUNCTIONAL.basePenaltyWeight(), 1e-6);
         assertEquals(
                 0L,
                 legacySc.weightedParity()

@@ -97,8 +97,14 @@ public interface RegionFileReader {
             return false;
         }
         Object statusObj = root.get("Status");
+        if (statusObj == null) {
+            statusObj = root.get("status");
+        }
         if (statusObj == null && root.get("Level") instanceof java.util.Map<?, ?> lvl) {
             statusObj = lvl.get("Status");
+            if (statusObj == null) {
+                statusObj = lvl.get("status");
+            }
         }
         if (statusObj instanceof String status && !status.isEmpty()) {
             String norm = status.toLowerCase(java.util.Locale.ROOT);
@@ -156,7 +162,7 @@ public interface RegionFileReader {
         return bySection;
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "java:S1168"})
     private static java.util.List<java.util.Map<String, Object>> extractSectionList(
             java.util.Map<String, Object> root) {
         Object sectionsObj = root.get("sections");
@@ -204,9 +210,14 @@ public interface RegionFileReader {
             java.util.Map<String, Object> blockStates, int dataVersion) {
         java.util.List<java.util.Map<String, Object>> paletteList = new java.util.ArrayList<>();
         Object palObj = blockStates.get("palette");
-        java.util.List<?> raw = palObj instanceof Nbt.NbtList nl
-                ? nl.items
-                : (palObj instanceof java.util.List<?> l ? l : java.util.List.of());
+        java.util.List<?> raw;
+        if (palObj instanceof Nbt.NbtList nl) {
+            raw = nl.items;
+        } else if (palObj instanceof java.util.List<?> l) {
+            raw = l;
+        } else {
+            raw = java.util.List.of();
+        }
         for (Object el : raw) {
             if (el instanceof java.util.Map<?, ?> pm) {
                 paletteList.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(
@@ -262,12 +273,11 @@ public interface RegionFileReader {
             if (currentCanonical.equals(targetCanonical)) {
                 continue;
             }
-            Integer targetPalIdx = indexByCanonical.get(targetCanonical);
-            if (targetPalIdx == null) {
-                targetPalIdx = paletteList.size();
-                paletteList.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(targetCanonical, dataVersion));
-                indexByCanonical.put(targetCanonical, targetPalIdx);
-            }
+            int targetPalIdx = indexByCanonical.computeIfAbsent(targetCanonical, key -> {
+                int newIdx = paletteList.size();
+                paletteList.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(key, dataVersion));
+                return newIdx;
+            });
             yzx[voxelIdx] = targetPalIdx;
             sectionModified = true;
         }

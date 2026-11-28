@@ -32,7 +32,8 @@ public final class LcaSectionBacking {
     public static final int STAGE_LINEAR_16 = 1;
     public static final int STAGE_HASH_64 = 2;
     public static final int STAGE_SPARSE_HASH_EXT = 3;
-    @Deprecated
+    /** @deprecated Use {@link #STAGE_SPARSE_HASH_EXT}. */
+    @Deprecated(since = "3.3.3", forRemoval = false)
     public static final int STAGE_BULK_4096 = STAGE_SPARSE_HASH_EXT;
 
     public static final int LINEAR_16_CAPACITY = 16;
@@ -52,7 +53,7 @@ public final class LcaSectionBacking {
     public static final int DEFAULT_AIMD_ADDITIVE_INCREMENT = 16;
     public static final int MAX_AIMD_EDIT_SCORE = 1_048_576;
 
-    private static final ThreadLocal<int[]> THREAD_LOCAL_EPHEMERAL_VOXELS =
+    static final ThreadLocal<int[]> THREAD_LOCAL_EPHEMERAL_VOXELS =
             ThreadLocal.withInitial(() -> new int[BULK_4096_CAPACITY]);
 
     private static final OverlayTable EMPTY_OVERLAY = new OverlayTable();
@@ -69,6 +70,7 @@ public final class LcaSectionBacking {
         THREAD_LOCAL_WORD_MASKS_64.remove();
         THREAD_DECODE_YZX_4096.remove();
         THREAD_ENCODE_SCRATCH.remove();
+        LcaOffHeapModeAView.clearThreadLocalScratch();
     }
 
     private static int[] decodeYzx4096Scratch() {
@@ -390,15 +392,9 @@ public final class LcaSectionBacking {
             int uniformId = (paletteStateIds != null && paletteStateIds.length > 0)
                     ? Math.max(0, paletteStateIds[0])
                     : 0;
-            int nonEmpty = initialNonEmptyCount >= 0
-                    ? initialNonEmptyCount
-                    : (nonEmptyPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
-            int tickingBlocks = initialTickingBlockCount >= 0
-                    ? initialTickingBlockCount
-                    : (tickingBlockPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
-            int tickingFluids = initialTickingFluidCount >= 0
-                    ? initialTickingFluidCount
-                    : (tickingFluidPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
+            int nonEmpty = resolveUniformCount(initialNonEmptyCount, nonEmptyPredicate, uniformId);
+            int tickingBlocks = resolveUniformCount(initialTickingBlockCount, tickingBlockPredicate, uniformId);
+            int tickingFluids = resolveUniformCount(initialTickingFluidCount, tickingFluidPredicate, uniformId);
             return new LcaSectionBacking(
                     EMPTY_BYTES,
                     uniformId,
@@ -445,15 +441,9 @@ public final class LcaSectionBacking {
         CompactBaseIndex idx = CompactBaseIndex.fromVoxelsSinglePass(voxels, skyConst4, blkConst4);
         if (idx == null) {
             int uniformId = Math.max(0, voxels[0]);
-            int nonEmpty = initialNonEmptyCount >= 0
-                    ? initialNonEmptyCount
-                    : (nonEmptyPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
-            int tickingBlocks = initialTickingBlockCount >= 0
-                    ? initialTickingBlockCount
-                    : (tickingBlockPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
-            int tickingFluids = initialTickingFluidCount >= 0
-                    ? initialTickingFluidCount
-                    : (tickingFluidPredicate.test(uniformId) ? BULK_4096_CAPACITY : 0);
+            int nonEmpty = resolveUniformCount(initialNonEmptyCount, nonEmptyPredicate, uniformId);
+            int tickingBlocks = resolveUniformCount(initialTickingBlockCount, tickingBlockPredicate, uniformId);
+            int tickingFluids = resolveUniformCount(initialTickingFluidCount, tickingFluidPredicate, uniformId);
             return new LcaSectionBacking(
                     EMPTY_BYTES,
                     uniformId,
@@ -1139,6 +1129,93 @@ public final class LcaSectionBacking {
     }
 
     /**
+     * Constructs a zero-copy off-heap Mode A {@link LcaSectionBacking} directly over a validated
+     * {@link LcaModeABlockSection.OffHeapModeASlice} (`anvil-api-ADR-007`), computing exact
+     * {@code nonEmptyBlockCount}, {@code tickingBlockCount}, and {@code tickingFluidCount} in
+     * {@code O(paletteSize)} from {@link LcaModeABlockSection.OffHeapModeASlice#paletteVoxelCounts()}
+     * with zero 4,096-voxel scan and zero heap {@code byte[]} copy.
+     */
+    public static LcaSectionBacking fromOffHeapModeASlice(
+            LcaModeABlockSection.OffHeapModeASlice slice,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate) {
+        Objects.requireNonNull(slice, "slice");
+        Objects.requireNonNull(nonEmptyPredicate, "nonEmptyPredicate");
+        Objects.requireNonNull(tickingBlockPredicate, "tickingBlockPredicate");
+        Objects.requireNonNull(tickingFluidPredicate, "tickingFluidPredicate");
+        int[] pal = slice.paletteRuntimeIds();
+        int[] counts = slice.paletteVoxelCounts();
+        int nonEmpty = 0;
+        int tickingBlock = 0;
+        int tickingFluid = 0;
+        for (int i = 0; i < pal.length; i++) {
+            int c = counts[i];
+            if (c <= 0) {
+                continue;
+            }
+            int stateId = pal[i];
+            if (nonEmptyPredicate.test(stateId)) {
+                nonEmpty += c;
+            }
+            if (tickingBlockPredicate.test(stateId)) {
+                tickingBlock += c;
+            }
+            if (tickingFluidPredicate.test(stateId)) {
+                tickingFluid += c;
+            }
+        }
+        if (pal.length <= 1) {
+            int uniformId = pal.length == 1 ? pal[0] : 0;
+            return new LcaSectionBacking(
+                    EMPTY_BYTES,
+                    uniformId,
+                    null,
+                    nonEmpty,
+                    tickingBlock,
+                    tickingFluid,
+                    nonEmptyPredicate,
+                    tickingBlockPredicate,
+                    tickingFluidPredicate,
+                    null);
+        }
+        return new LcaSectionBacking(
+                new LcaOffHeapModeAView(slice),
+                nonEmpty,
+                tickingBlock,
+                tickingFluid,
+                nonEmptyPredicate,
+                tickingBlockPredicate,
+                tickingFluidPredicate);
+    }
+
+    private LcaSectionBacking(
+            LcaOffHeapModeAView offHeapView,
+            int nonEmptyBlockCount,
+            int tickingBlockCount,
+            int tickingFluidCount,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate) {
+        this.nonEmptyPredicate = Objects.requireNonNull(nonEmptyPredicate, "nonEmptyPredicate");
+        this.tickingBlockPredicate = Objects.requireNonNull(tickingBlockPredicate, "tickingBlockPredicate");
+        this.tickingFluidPredicate = Objects.requireNonNull(tickingFluidPredicate, "tickingFluidPredicate");
+        this.defaultBaseFrameDecoder = null;
+        this.committedState = new SectionSnapshotState(
+                null,
+                offHeapView.majorityStateId(),
+                null,
+                offHeapView,
+                null,
+                0L,
+                1L);
+        this.activeOverlay = EMPTY_OVERLAY;
+        this.nonEmptyBlockCount = nonEmptyBlockCount;
+        this.tickingBlockCount = tickingBlockCount;
+        this.tickingFluidCount = tickingFluidCount;
+    }
+
+    /**
      * Installs an optional callback invoked whenever a coordinate's random-ticking status changes
      * (used by Paper/Folia {@code Moonrise} {@code SimpleRandomTickList} adapters).
      */
@@ -1365,9 +1442,12 @@ public final class LcaSectionBacking {
             int priorInFrozen = (frozen != null && (snap.frozenOctantMask & (1L << octant)) != 0L)
                     ? frozen.getStateId(pos)
                     : -1;
+            IntUnaryOperator effectiveDecoder = baseFrameDecoder != null
+                    ? baseFrameDecoder
+                    : this.defaultBaseFrameDecoder;
             previousStateId = priorInFrozen >= 0
                     ? priorInFrozen
-                    : decodeFromBaseFrame(pos, snap, baseFrameDecoder != null ? baseFrameDecoder : this.defaultBaseFrameDecoder);
+                    : decodeFromBaseFrame(pos, snap, effectiveDecoder);
         }
         this.lastMutatedTick = currentTick;
         recordEditScoreIncrement(this.aimdAdditiveIncrement);
@@ -1472,6 +1552,9 @@ public final class LcaSectionBacking {
             if (idx != null && this.defaultBaseFrameDecoder == null) {
                 return idx.lookupUnmasked(pos);
             }
+            if (snap.offHeapView != null && this.defaultBaseFrameDecoder == null) {
+                return snap.offHeapView.getStateId(pos);
+            }
             return decodeFromBaseFrame(pos, snap, this.defaultBaseFrameDecoder);
         }
         return getStateId(x, y, z, this.defaultBaseFrameDecoder);
@@ -1560,6 +1643,11 @@ public final class LcaSectionBacking {
             return;
         }
 
+        if (snap.offHeapView != null && activeDirty == 0 && frozenDirty == 0) {
+            snap.offHeapView.forEachMatchingCoordinate(stateIdPredicate, pos12Consumer);
+            return;
+        }
+
         int[] voxels = materializeStateIdsInternal(null, null);
         int lastId = -1;
         boolean lastMatch = false;
@@ -1578,7 +1666,7 @@ public final class LcaSectionBacking {
     /**
      * Evaluates {@code stateIdPredicate} against the distinct block state IDs present in this
      * section in $O(|P| + |\text{dirty}|)$ time (`1..20` palette entries) without materializing
-     * 4,096 voxels when backed by {@link CompactBaseIndex}.
+     * 4,096 voxels when backed by {@link CompactBaseIndex} or {@link LcaOffHeapModeAView}.
      */
     public boolean testMaybeHas(IntPredicate stateIdPredicate) {
         Objects.requireNonNull(stateIdPredicate, "stateIdPredicate");
@@ -1619,6 +1707,44 @@ public final class LcaSectionBacking {
                 }
             }
             return overwritten < BULK_4096_CAPACITY && stateIdPredicate.test(snap.uniformStateId);
+        }
+
+        final LcaOffHeapModeAView offHeapView = snap.offHeapView;
+        if (offHeapView != null) {
+            if (activeDirty == 0 && frozenDirty == 0) {
+                return offHeapView.testMaybeHas(stateIdPredicate);
+            }
+            int[] remCounts = offHeapView.paletteVoxelCounts().clone();
+            if (frozenDirty == 0) {
+                boolean[] matched = new boolean[1];
+                active.forEachEntry((pos12, stateId19) -> {
+                    if (!matched[0] && stateIdPredicate.test(stateId19)) {
+                        matched[0] = true;
+                    }
+                    int baseOrd = offHeapView.queryVoxelOrdinal(pos12);
+                    remCounts[baseOrd]--;
+                });
+                if (matched[0]) {
+                    return true;
+                }
+            } else {
+                int[] merged = exportMergedDirtyOverlayEntries();
+                for (int entry : merged) {
+                    int stateId19 = unpackStateId19(entry);
+                    if (stateIdPredicate.test(stateId19)) {
+                        return true;
+                    }
+                    int baseOrd = offHeapView.queryVoxelOrdinal(unpackPos12(entry));
+                    remCounts[baseOrd]--;
+                }
+            }
+            int[] pal = offHeapView.paletteRuntimeIds();
+            for (int i = 0; i < pal.length; i++) {
+                if (remCounts[i] > 0 && stateIdPredicate.test(pal[i])) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         final CompactBaseIndex idx = resolveTransientOrHydratedIndex(snap);
@@ -1681,7 +1807,8 @@ public final class LcaSectionBacking {
 
     /**
      * Reports exact {@code (stateId19, count)} pairs for all states present in this section in
-     * $O(|P| + |\text{dirty}|)$ time when backed by {@link CompactBaseIndex}.
+     * $O(|P| + |\text{dirty}|)$ time when backed by {@link CompactBaseIndex} or
+     * {@link LcaOffHeapModeAView}.
      */
     public void forEachStateCount(IntPairConsumer stateIdAndCountConsumer) {
         Objects.requireNonNull(stateIdAndCountConsumer, "stateIdAndCountConsumer");
@@ -1694,6 +1821,51 @@ public final class LcaSectionBacking {
         if (snap.isUniformBase() && activeDirty == 0 && frozenDirty == 0) {
             stateIdAndCountConsumer.accept(snap.uniformStateId, BULK_4096_CAPACITY);
             return;
+        }
+
+        final LcaOffHeapModeAView offHeapView = snap.offHeapView;
+        if (offHeapView != null) {
+            if (activeDirty == 0 && frozenDirty == 0) {
+                offHeapView.forEachStateCount(stateIdAndCountConsumer);
+                return;
+            }
+            if ((activeDirty + frozenDirty) <= HASH_64_MAX_LOAD) {
+                int[] basePal = offHeapView.paletteRuntimeIds();
+                int[] baseCounts = offHeapView.paletteVoxelCounts();
+                int baseLen = basePal.length;
+                int maxExtra = activeDirty + frozenDirty;
+                int[] stateIds = Arrays.copyOf(basePal, baseLen + maxExtra);
+                int[] counts = Arrays.copyOf(baseCounts, baseLen + maxExtra);
+                int[] lenBox = {baseLen};
+                OverlayEntryConsumer applyDelta = (pos12, newStateId) -> {
+                    int oldOrd = offHeapView.queryVoxelOrdinal(pos12);
+                    counts[oldOrd]--;
+                    int curLen = lenBox[0];
+                    for (int i = 0; i < curLen; i++) {
+                        if (stateIds[i] == newStateId) {
+                            counts[i]++;
+                            return;
+                        }
+                    }
+                    stateIds[curLen] = newStateId;
+                    counts[curLen] = 1;
+                    lenBox[0] = curLen + 1;
+                };
+                if (frozenDirty == 0) {
+                    active.forEachEntry(applyDelta);
+                } else {
+                    for (int entry : exportMergedDirtyOverlayEntries()) {
+                        applyDelta.accept(unpackPos12(entry), unpackStateId19(entry));
+                    }
+                }
+                int finalLen = lenBox[0];
+                for (int i = 0; i < finalLen; i++) {
+                    if (counts[i] > 0) {
+                        stateIdAndCountConsumer.accept(stateIds[i], counts[i]);
+                    }
+                }
+                return;
+            }
         }
 
         final CompactBaseIndex idx = (activeDirty + frozenDirty) <= HASH_64_MAX_LOAD
@@ -1766,6 +1938,20 @@ public final class LcaSectionBacking {
         Objects.requireNonNull(pos12AndStateIdConsumer, "pos12AndStateIdConsumer");
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
         SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        if (snap.offHeapView != null) {
+            if (!snap.offHeapView.forEachNonMajorityVoxel(pos12AndStateIdConsumer)) {
+                return false;
+            }
+            OverlayTable frozen = snap.frozenOverlay;
+            if (frozen != null && frozen.dirtyCount() > 0) {
+                frozen.forEachEntry(pos12AndStateIdConsumer::accept);
+            }
+            if (active != null && active.dirtyCount() > 0) {
+                active.forEachEntry(pos12AndStateIdConsumer::accept);
+            }
+            this.ephemeralCopyCount.incrementAndGet();
+            return true;
+        }
         byte[] base = snap.baseFrame;
         CompactBaseIndex idx = resolveTransientOrHydratedIndex(snap);
         if (base != null && base.length > 0 && idx == null) {
@@ -1813,6 +1999,8 @@ public final class LcaSectionBacking {
 
         if (snap.compactIndex != null && baseFrameDecoder == null) {
             snap.compactIndex.scatterInto(out);
+        } else if (snap.offHeapView != null && baseFrameDecoder == null) {
+            snap.offHeapView.materializeStateIds(out);
         } else if (snap.isUniformBase()) {
             Arrays.fill(out, 0, BULK_4096_CAPACITY, uniform);
         } else if (decoder != null) {
@@ -1854,6 +2042,55 @@ public final class LcaSectionBacking {
 
         if (snap.isUniformBase() && activeDirty == 0 && frozenDirty == 0) {
             return 1 + varIntByteSize(snap.uniformStateId);
+        }
+
+        final LcaOffHeapModeAView offHeapView = snap.offHeapView;
+        if (offHeapView != null) {
+            if (activeDirty == 0 && frozenDirty == 0) {
+                return offHeapView.computeCleanVanillaSerializedSize(globalPaletteBits);
+            }
+            if ((activeDirty + frozenDirty) <= HASH_64_MAX_LOAD) {
+                int[] basePal = offHeapView.paletteRuntimeIds();
+                int[] baseCounts = offHeapView.paletteVoxelCounts();
+                int baseLen = basePal.length;
+                int maxExtra = activeDirty + frozenDirty;
+                int[] stateIds = Arrays.copyOf(basePal, baseLen + maxExtra);
+                int[] counts = Arrays.copyOf(baseCounts, baseLen + maxExtra);
+                int[] lenBox = {baseLen};
+                OverlayEntryConsumer applyDelta = (pos12, newStateId) -> {
+                    int oldOrd = offHeapView.queryVoxelOrdinal(pos12);
+                    counts[oldOrd]--;
+                    int curLen = lenBox[0];
+                    for (int i = 0; i < curLen; i++) {
+                        if (stateIds[i] == newStateId) {
+                            counts[i]++;
+                            return;
+                        }
+                    }
+                    stateIds[curLen] = newStateId;
+                    counts[curLen] = 1;
+                    lenBox[0] = curLen + 1;
+                };
+                if (frozenDirty == 0) {
+                    active.forEachEntry(applyDelta);
+                } else {
+                    for (int entry : exportMergedDirtyOverlayEntries()) {
+                        applyDelta.accept(unpackPos12(entry), unpackStateId19(entry));
+                    }
+                }
+                int finalLen = lenBox[0];
+                int distinctCount = 0;
+                int singleStateId = snap.uniformStateId;
+                int paletteVarIntBytes = 0;
+                for (int i = 0; i < finalLen; i++) {
+                    if (counts[i] > 0) {
+                        distinctCount++;
+                        singleStateId = stateIds[i];
+                        paletteVarIntBytes += varIntByteSize(stateIds[i]);
+                    }
+                }
+                return computeVanillaSizeFromPaletteStats(distinctCount, singleStateId, paletteVarIntBytes, globalPaletteBits);
+            }
         }
 
         final CompactBaseIndex idx = (activeDirty + frozenDirty) <= HASH_64_MAX_LOAD
@@ -1991,6 +2228,11 @@ public final class LcaSectionBacking {
             return;
         }
 
+        if (snap.offHeapView != null && activeDirty == 0 && frozenDirty == 0) {
+            snap.offHeapView.writeCleanVanillaPalettedContainer(globalPaletteBits, sink);
+            return;
+        }
+
         CompactBaseIndex idx = (activeDirty == 0 && frozenDirty == 0)
                 ? resolveTransientOrHydratedIndex(snap)
                 : snap.compactIndex;
@@ -2081,11 +2323,19 @@ public final class LcaSectionBacking {
             int shift = 0;
             int limit = Math.min(BULK_4096_CAPACITY, pos + valuesPerLong);
             while (pos < limit) {
-                word |= ((long) values4096[pos++] & mask) << shift;
+                word |= (values4096[pos++] & mask) << shift;
                 shift += bits;
             }
             sink.writeLong(word);
         }
+    }
+
+    private static int resolveUniformCount(
+            int initialCount, IntPredicate predicate, int uniformId) {
+        if (initialCount >= 0) {
+            return initialCount;
+        }
+        return predicate.test(uniformId) ? BULK_4096_CAPACITY : 0;
     }
 
     /**
@@ -2093,6 +2343,7 @@ public final class LcaSectionBacking {
      * section has zero uncompacted overlay entries ({@code dirtyCount == 0 && frozenOverlay == null}),
      * or {@code null} when the section currently holds uncompacted mutations.
      */
+    @SuppressWarnings("java:S1168") // null signals dirty or unmaterialized wire slice per public API contract
     public byte[] cleanVanillaWireSlice(int globalPaletteBits) {
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
         if (active != null && active.dirtyCount() != 0) {
@@ -2104,6 +2355,9 @@ public final class LcaSectionBacking {
         }
         if (snap.compactIndex != null) {
             return snap.compactIndex.getOrBuildCleanVanillaWireSlice(globalPaletteBits);
+        }
+        if (snap.offHeapView != null) {
+            return snap.offHeapView.buildCleanVanillaWireSlice(globalPaletteBits);
         }
         if (snap.isUniformBase()) {
             return snap.getOrBuildUniformWireSlice();
@@ -2121,6 +2375,7 @@ public final class LcaSectionBacking {
      * Returns an already pre-built clean vanilla wire slice if present on the current committed
      * state (`O(1)`, zero allocation), or {@code null} if dirty or not yet materialized.
      */
+    @SuppressWarnings("java:S1168") // null signals dirty or unmaterialized wire slice per O(1) peek contract
     public byte[] peekPrebuiltCleanVanillaWireSlice(int globalPaletteBits) {
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
         if (active != null && active.dirtyCount() != 0) {
@@ -2190,6 +2445,9 @@ public final class LcaSectionBacking {
         if (snap.compactIndex != null && baseFrameDecoder == null) {
             return snap.compactIndex.lookup(pos12);
         }
+        if (snap.offHeapView != null && baseFrameDecoder == null) {
+            return snap.offHeapView.getStateId(pos12);
+        }
         byte[] baseFrame = snap.baseFrame;
         int uniformStateId = snap.uniformStateId;
         if (snap.isUniformBase()) {
@@ -2201,6 +2459,9 @@ public final class LcaSectionBacking {
         }
         if (snap.compactIndex != null) {
             return snap.compactIndex.lookup(pos12);
+        }
+        if (snap.offHeapView != null) {
+            return snap.offHeapView.getStateId(pos12);
         }
         if (baseFrame != null && baseFrame.length >= BULK_4096_CAPACITY) {
             return baseFrame[pos12 & MAX_POS_12] & 0xFF;
@@ -2252,6 +2513,7 @@ public final class LcaSectionBacking {
                     current.baseFrame,
                     current.uniformStateId,
                     current.compactIndex,
+                    current.offHeapView,
                     frozenToInstall,
                     frozenToInstall.octantMask(),
                     nextEpoch);
@@ -2259,7 +2521,7 @@ public final class LcaSectionBacking {
             if (COMMITTED_STATE.compareAndSet(this, current, nextState)) {
                 ACTIVE_OVERLAY.setRelease(this, EMPTY_OVERLAY);
                 return new CompactionSnapshot(
-                        nextState.resolveBaseFrameBytes(),
+                        nextState.offHeapView != null ? EMPTY_BYTES : nextState.resolveBaseFrameBytes(),
                         nextState.uniformStateId,
                         frozenToInstall,
                         nextEpoch);
@@ -2365,6 +2627,8 @@ public final class LcaSectionBacking {
             current.compactIndex.scatterInto(voxels);
             skyConst4 = (current.compactIndex.packedLightByte >>> 4) & 0xF;
             blkConst4 = current.compactIndex.packedLightByte & 0xF;
+        } else if (current.offHeapView != null) {
+            current.offHeapView.materializeStateIds(voxels);
         } else if (current.baseFrame != null && current.baseFrame.length >= BULK_4096_CAPACITY) {
             for (int i = 0; i < BULK_4096_CAPACITY; i++) {
                 voxels[i] = current.baseFrame[i] & 0xFF;
@@ -2418,6 +2682,7 @@ public final class LcaSectionBacking {
                     current.baseFrame,
                     current.uniformStateId,
                     current.compactIndex,
+                    current.offHeapView,
                     current.frozenOverlay,
                     current.frozenOctantMask,
                     unloadedEpoch);
@@ -2537,7 +2802,55 @@ public final class LcaSectionBacking {
         if (snap.compactIndex != null) {
             return snap.compactIndex.estimatedFootprintBytes();
         }
+        if (snap.offHeapView != null) {
+            return snap.offHeapView.estimatedFootprintBytes();
+        }
         return snap.baseFrame != null ? snap.baseFrame.length : 0;
+    }
+
+    /**
+     * Returns {@code true} when this section is backed directly by a zero-copy off-heap Mode A
+     * {@link LcaModeABlockSection.OffHeapModeASlice} (`anvil-api-ADR-007`).
+     */
+    public boolean isOffHeapModeABacked() {
+        return ((SectionSnapshotState) COMMITTED_STATE.getAcquire(this)).offHeapView != null;
+    }
+
+    /**
+     * Returns the runtime state-ID palette array of the underlying off-heap Mode A slice, or
+     * {@code null} when this section is not off-heap Mode A backed.
+     */
+    @SuppressWarnings("java:S1168")
+    public int[] offHeapPaletteRuntimeIds() {
+        LcaOffHeapModeAView view = ((SectionSnapshotState) COMMITTED_STATE.getAcquire(this)).offHeapView;
+        return view != null ? view.paletteRuntimeIds() : null;
+    }
+
+    /**
+     * Returns the single-pass per-palette-entry voxel counts of the underlying off-heap Mode A
+     * slice, or {@code null} when this section is not off-heap Mode A backed.
+     */
+    @SuppressWarnings("java:S1168")
+    public int[] offHeapPaletteVoxelCounts() {
+        LcaOffHeapModeAView view = ((SectionSnapshotState) COMMITTED_STATE.getAcquire(this)).offHeapView;
+        return view != null ? view.paletteVoxelCounts() : null;
+    }
+
+    /**
+     * Exports a zero-copy {@link LcaModeABlockSection.DirectModeASectionRef} suitable for gather
+     * write-back when this section is clean ({@code dirtyCount == 0 && frozenOverlay == null}) and
+     * backed directly by an off-heap Mode A slice; returns {@code null} otherwise.
+     */
+    public LcaModeABlockSection.DirectModeASectionRef toDirectModeASectionRef() {
+        OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
+        if (active != null && active.dirtyCount() != 0) {
+            return null;
+        }
+        SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        if (snap.frozenOverlay != null && snap.frozenOverlay.dirtyCount() != 0) {
+            return null;
+        }
+        return snap.offHeapView != null ? snap.offHeapView.toDirectModeASectionRef() : null;
     }
 
     public int uniformStateId() {
@@ -2561,7 +2874,7 @@ public final class LcaSectionBacking {
 
     /**
      * Returns {@code true} when this section is a clean non-uniform 3D slab holding only its compact
-     * {@code .lca} {@code baseFrame} ({@code compactIndex == null}).
+     * {@code .lca} {@code baseFrame} or off-heap Mode A slice ({@code compactIndex == null}).
      */
     public boolean isColdBaseFrameOnly() {
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
@@ -2572,7 +2885,8 @@ public final class LcaSectionBacking {
         if (snap.frozenOverlay != null && snap.frozenOverlay.dirtyCount() != 0) {
             return false;
         }
-        return snap.compactIndex == null && snap.baseFrame != null && snap.baseFrame.length > 0;
+        return snap.compactIndex == null
+                && (snap.offHeapView != null || (snap.baseFrame != null && snap.baseFrame.length > 0));
     }
 
     /**
@@ -2823,9 +3137,8 @@ public final class LcaSectionBacking {
             int totalMinority = BULK_4096_CAPACITY - majorityCount;
             boolean useByteOrdinals = paletteStateIds.length <= 256;
             boolean nibblePacked = paletteStateIds.length <= 16;
-            byte[] ordinalsByte = useByteOrdinals
-                    ? new byte[nibblePacked ? ((totalMinority + 1) >>> 1) : totalMinority]
-                    : null;
+            int ordinalByteLen = nibblePacked ? ((totalMinority + 1) >>> 1) : totalMinority;
+            byte[] ordinalsByte = useByteOrdinals ? new byte[ordinalByteLen] : null;
             short[] ordinalsShort = useByteOrdinals ? null : new short[totalMinority];
 
             long[] tempWordMasks = THREAD_LOCAL_WORD_MASKS_64.get();
@@ -3045,9 +3358,8 @@ public final class LcaSectionBacking {
 
             boolean useByteOrdinals = paletteStateIds.length <= 256;
             boolean nibblePacked = paletteStateIds.length <= 16;
-            byte[] ordinalsByte = useByteOrdinals
-                    ? new byte[nibblePacked ? ((runningRank + 1) >>> 1) : runningRank]
-                    : null;
+            int ordinalByteLen = nibblePacked ? ((runningRank + 1) >>> 1) : runningRank;
+            byte[] ordinalsByte = useByteOrdinals ? new byte[ordinalByteLen] : null;
             short[] ordinalsShort = useByteOrdinals ? null : new short[runningRank];
 
             cursor = bodyStartCursor;
@@ -3207,9 +3519,8 @@ public final class LcaSectionBacking {
             short[] wordRankOffsets = new short[nonUniformWords];
             boolean useByteOrdinals = paletteLen <= 256;
             boolean nibblePacked = paletteLen <= 16;
-            byte[] ordinalsByte = useByteOrdinals
-                    ? new byte[nibblePacked ? ((totalMinority + 1) >>> 1) : totalMinority]
-                    : null;
+            int ordinalByteLen = nibblePacked ? ((totalMinority + 1) >>> 1) : totalMinority;
+            byte[] ordinalsByte = useByteOrdinals ? new byte[ordinalByteLen] : null;
             short[] ordinalsShort = useByteOrdinals ? null : new short[totalMinority];
 
             int runningRank = 0;
@@ -3395,9 +3706,12 @@ public final class LcaSectionBacking {
         }
 
         int estimatedFootprintBytes() {
-            int ordBytes = this.minorityOrdinalsByte != null
-                    ? this.minorityOrdinalsByte.length
-                    : (this.minorityOrdinalsShort != null ? this.minorityOrdinalsShort.length * 2 : 0);
+            int ordBytes = 0;
+            if (this.minorityOrdinalsByte != null) {
+                ordBytes = this.minorityOrdinalsByte.length;
+            } else if (this.minorityOrdinalsShort != null) {
+                ordBytes = this.minorityOrdinalsShort.length * 2;
+            }
             return 32
                     + (this.paletteStateIds.length * 8)
                     + (this.minorityBitmasks.length * 10)
@@ -3593,6 +3907,7 @@ public final class LcaSectionBacking {
         final byte[] baseFrame;
         final int uniformStateId;
         final CompactBaseIndex compactIndex;
+        final LcaOffHeapModeAView offHeapView;
         final OverlayTable frozenOverlay;
         final long frozenOctantMask;
         final long chunkEpoch;
@@ -3605,16 +3920,30 @@ public final class LcaSectionBacking {
                 OverlayTable frozenOverlay,
                 long frozenOctantMask,
                 long chunkEpoch) {
+            this(baseFrame, uniformStateId, compactIndex, null, frozenOverlay, frozenOctantMask, chunkEpoch);
+        }
+
+        SectionSnapshotState(
+                byte[] baseFrame,
+                int uniformStateId,
+                CompactBaseIndex compactIndex,
+                LcaOffHeapModeAView offHeapView,
+                OverlayTable frozenOverlay,
+                long frozenOctantMask,
+                long chunkEpoch) {
             this.baseFrame = baseFrame;
             this.uniformStateId = uniformStateId;
             this.compactIndex = compactIndex;
+            this.offHeapView = offHeapView;
             this.frozenOverlay = frozenOverlay;
             this.frozenOctantMask = frozenOctantMask;
             this.chunkEpoch = chunkEpoch;
         }
 
         boolean isUniformBase() {
-            return this.compactIndex == null && (this.baseFrame == null || this.baseFrame.length == 0);
+            return this.offHeapView == null
+                    && this.compactIndex == null
+                    && (this.baseFrame == null || this.baseFrame.length == 0);
         }
 
         byte[] resolveBaseFrameBytes() {
@@ -3623,6 +3952,9 @@ public final class LcaSectionBacking {
             }
             if (this.compactIndex != null) {
                 return this.compactIndex.getOrEncodeBaseFrame();
+            }
+            if (this.offHeapView != null) {
+                return this.offHeapView.resolveLazyCompactBaseFrame();
             }
             return EMPTY_BYTES;
         }

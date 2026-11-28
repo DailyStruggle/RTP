@@ -656,7 +656,9 @@ public final class AnvilReader implements RegionFileReader {
             if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
-            if ("Status".equals(name) && type == Nbt.TAG_STRING) return Nbt.SelectiveFilter.Decision.KEEP;
+            if (("Status".equals(name) || "status".equals(name)) && type == Nbt.TAG_STRING) {
+                return Nbt.SelectiveFilter.Decision.KEEP;
+            }
             // Position guard for sector-only reads (verifyPosition).
             if ("xPos".equals(name) || "zPos".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
             return Nbt.SelectiveFilter.Decision.SKIP;
@@ -932,7 +934,11 @@ public final class AnvilReader implements RegionFileReader {
      * Roots without {@code Status} count as complete.
      */
     public static boolean isIncompleteChunk(Map<String, Object> root) {
-        Object status = (root == null) ? null : root.get("Status");
+        if (root == null) return false;
+        Object status = root.get("Status");
+        if (!(status instanceof String)) {
+            status = root.get("status");
+        }
         if (!(status instanceof String s)) return false;
         return !("minecraft:full".equals(s) || "full".equals(s));
     }
@@ -948,7 +954,8 @@ public final class AnvilReader implements RegionFileReader {
      * <p>The biome container has the same wire shape as {@code block_states} except:
      * (1) {@code palette[i]} is a bare {@code TAG_String} (namespaced identifier)
      * rather than a compound with a {@code Name} field, and (2) the packed {@code data}
-     * array is 64 cells (4×4×4) rather than 4096 blocks - see ADR-016 (biome) section 3.
+     * array stores either 64 cells (4×4×4 quartets, MC 1.18–26.3) or 4,096 per-block
+     * cells (16×16×16, MC 26.4+) — see ADR-016 (biome) section 3 and {@link BiomePaletteSection}.
      */
     @SuppressWarnings("unchecked")
     private static BiomePaletteSection biomeSectionFromCompound(Object raw) {

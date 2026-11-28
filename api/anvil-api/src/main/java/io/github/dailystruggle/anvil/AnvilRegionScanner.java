@@ -111,10 +111,7 @@ public final class AnvilRegionScanner {
 
     private static Path resolveRegionFolder(Path worldFolder, String dimensionSubpath) {
         if (worldFolder == null) return null;
-        if (dimensionSubpath == null || dimensionSubpath.isEmpty()) {
-            return worldFolder.resolve("region");
-        }
-        return worldFolder.resolve(dimensionSubpath).resolve("region");
+        return RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath);
     }
 
     /**

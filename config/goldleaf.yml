@@ -47,6 +47,7 @@ storage:
   cold-chunk-min-inhabited-ticks: 200
   cold-chunk-min-revisits: 2
   cold-chunk-ignore-natural-ticks: false
+  region-file-idle-timeout-seconds: 0
 network:
   lca-net-v1-enabled: false
   require-lca-client: false
@@ -78,6 +79,13 @@ worldgen:
   secure-seed:
     enabled: false
     allow-unsafe-migration: false
+  smt-headroom-pacing: false
+  directional-chunk-priority:
+    enabled: true
+    look-bias: 0.45
+    velocity-bias: 0.75
+    inner-radial-radius: 2
+    yaw-reprioritize-degrees: 25.0
 protocols:
   servux-enabled: false
   servux-max-structure-radius: 128

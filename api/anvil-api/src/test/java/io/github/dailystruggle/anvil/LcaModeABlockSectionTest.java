@@ -504,7 +504,7 @@ class LcaModeABlockSectionTest {
         assertNotEquals(f1, f3);
         assertNotEquals(f1, f4);
         assertNotEquals(f1, f5);
-        assertNotEquals(f1, "other");
+        assertNotEquals("other", f1);
         assertTrue(f1.toString().contains("FlatBitPackSection"));
 
         // LcaDecodedChunkMeta.DecodedSectionMeta
@@ -566,7 +566,7 @@ class LcaModeABlockSectionTest {
         assertNotEquals(s1, new LcaDecodedChunkMeta.DecodedSectionMeta(
                 0, new int[] {0, 1}, new long[] {10L, 20L}, LcaDecodedChunkMeta.LIGHT_ARRAY, new byte[] {1, 2}, 2,
                 LcaDecodedChunkMeta.LIGHT_UNINIT_ZERO, null, 9));
-        assertNotEquals(s1, "other");
+        assertNotEquals("other", s1);
         assertTrue(s1.toString().contains("DecodedSectionMeta"));
 
         // LcaDecodedChunkMeta
@@ -586,7 +586,7 @@ class LcaModeABlockSectionTest {
         assertEquals(m1, m2);
         assertEquals(m1.hashCode(), m2.hashCode());
         assertNotEquals(m1, mDiff);
-        assertNotEquals(m1, "other");
+        assertNotEquals("other", m1);
         assertTrue(m1.hasIsLightOn());
         assertTrue(m1.hasStarlightVersion());
         assertTrue(m1.hasResidualNbt());
@@ -629,7 +629,342 @@ class LcaModeABlockSectionTest {
         assertEquals(rm1, rm2);
         assertEquals(rm1.hashCode(), rm2.hashCode());
         assertNotEquals(rm1, rm3);
-        assertNotEquals(rm1, "other");
+        assertNotEquals("other", rm1);
         assertTrue(rm1.toString().contains("RawChunkFrameWithMetadata"));
+    }
+
+    @Test
+    @DisplayName("fromPreEncodedDeltaRoaring and encodeSectionModeAPassthroughToBuf enforce compact Delta-Roaring and Gray-Planes")
+    void preEncodedDeltaRoaringAndModeAPassthroughGuardrail() {
+        // Build a realistic Overworld surface section: 75% air, 20% stone, 4% dirt, 1% grass_block
+        int[] voxels = new int[4096];
+        for (int ly = 0; ly < 16; ly++) {
+            for (int lz = 0; lz < 16; lz++) {
+                for (int lx = 0; lx < 16; lx++) {
+                    int yzx = (ly << 8) | (lz << 4) | lx;
+                    if (ly < 3) {
+                        voxels[yzx] = 10; // stone
+                    } else if (ly == 3) {
+                        voxels[yzx] = (lx == 5 && lz == 7) ? 30 : 20; // dirt + 1 grass
+                    } else {
+                        voxels[yzx] = 1; // air (majority)
+                    }
+                }
+            }
+        }
+        LcaModeABlockSection encoded = LcaModeABlockSection.encodeFromRuntimeVoxels(voxels);
+        assertNotNull(encoded);
+        assertTrue(
+                encoded.blockMode() == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                        || encoded.blockMode() == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK);
+
+        // 1. Verify fromPreEncodedDeltaRoaring validates and wraps raw payload directly
+        LcaModeABlockSection wrapped = LcaModeABlockSection.fromPreEncodedDeltaRoaring(
+                encoded.blockPayloadRaw(),
+                0,
+                encoded.blockPayloadRaw().length,
+                encoded.curveId(),
+                encoded.blockMode(),
+                encoded.octreeMask64(),
+                encoded.paletteRuntimeIds());
+        assertSectionMatchesVoxels(wrapped, voxels);
+        assertNull(LcaModeABlockSection.fromPreEncodedDeltaRoaring(
+                encoded.blockPayloadRaw(), 0, 1, encoded.curveId(), encoded.blockMode(),
+                encoded.octreeMask64(), encoded.paletteRuntimeIds()));
+        assertNull(LcaModeABlockSection.fromPreEncodedDeltaRoaring(
+                encoded.blockPayloadRaw(), 0, encoded.blockPayloadRaw().length, encoded.curveId(),
+                LcaSectionCodec.BLOCK_MODE_FLAT_BITPACK, encoded.octreeMask64(), encoded.paletteRuntimeIds()));
+
+        // 2. Build realistic non-constant sky light (top layers lit=15, bottom layers dark=0) and block light (1 torch)
+        byte[] skyLight = new byte[2048];
+        byte[] blkLight = new byte[2048];
+        for (int ly = 0; ly < 16; ly++) {
+            int sVal = ly >= 4 ? 15 : 0;
+            for (int lz = 0; lz < 16; lz++) {
+                for (int lx = 0; lx < 16; lx += 2) {
+                    int yzx = (ly << 8) | (lz << 4) | lx;
+                    int bVal0 = (ly == 4 && lx == 8 && lz == 8) ? 14 : 0;
+                    int bVal1 = (ly == 4 && lx == 8 && lz == 8) ? 13 : 0;
+                    skyLight[yzx >>> 1] = (byte) ((sVal << 4) | sVal);
+                    blkLight[yzx >>> 1] = (byte) ((bVal1 << 4) | bVal0);
+                }
+            }
+        }
+
+        // 3. Verify encodeSectionModeAPassthroughToBuf from rawBlockDataLongs (CPU worldgen path)
+        //    NEVER regresses to uncompressed FLAT_BITPACK or RAW_2048B light on compressible sections.
+        int[] blockDictIds = {10, 20, 30, 1}; // unsorted palette (air is at index 3, not 0)
+        long[] rawBlockLongs = new long[256];
+        for (int yzx = 0; yzx < 4096; yzx++) {
+            int palIdx = voxels[yzx] == 10 ? 0 : (voxels[yzx] == 20 ? 1 : (voxels[yzx] == 30 ? 2 : 3));
+            rawBlockLongs[yzx >>> 4] |= ((long) palIdx) << ((yzx & 15) << 2);
+        }
+        byte[] dst = new byte[8192];
+        LcaSectionCodec.ScratchArena arena = LcaSectionCodec.scratch();
+        int len = LcaSectionCodec.encodeSectionModeAPassthroughToBuf(
+                blockDictIds, null, null, 0, false, 0L, rawBlockLongs,
+                new int[] {0}, null, skyLight, blkLight, 0, -1, arena, dst, 0);
+        assertTrue(len > 0 && len < 600,
+                "Mode A passthrough must stay compact (Delta-Roaring + Gray-Planes), got " + len + " B");
+        int hdr = dst[0] & 0xFF;
+        int blkMode = (hdr >>> 4) & 3;
+        int skyMode = (hdr >>> 2) & 3;
+        int blklMode = hdr & 3;
+        assertTrue(
+                blkMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                        || blkMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK,
+                "Compressible Mode A section must NOT emit FLAT_BITPACK, got blockMode=" + blkMode);
+        assertEquals(LcaSectionCodec.LIGHT_MODE_GRAY_PLANES, skyMode,
+                "Compressible sky light must emit LIGHT_MODE_GRAY_PLANES, not LIGHT_MODE_RAW");
+        assertEquals(LcaSectionCodec.LIGHT_MODE_GRAY_PLANES, blklMode,
+                "Compressible block light must emit LIGHT_MODE_GRAY_PLANES, not LIGHT_MODE_RAW");
+        // Verify caller's blockDictIds was not mutated
+        assertArrayEquals(new int[] {10, 20, 30, 1}, blockDictIds);
+    }
+
+    @Test
+    @DisplayName("encodeCompactResidualTailV3 round-trips O(1) heightmaps, columnar ticks, compact boundaries, and empty PostProcessing")
+    void compactResidualTailV3RoundTrip() throws Exception {
+        // 4 realistic 37-long heightmaps (2 identical, 1 near-identical with +1 delta, 1 slightly shifted)
+        long[] hmBase = new long[37];
+        long[] hmDelta = new long[37];
+        for (int c = 0; c < 256; c++) {
+            int val = 128 + ((c & 15) >> 2);
+            int w = c / 7;
+            int s = c % 7;
+            hmBase[w] |= ((long) val) << (s * 9);
+            hmDelta[w] |= ((long) (val + (c == 42 ? 2 : 0))) << (s * 9);
+        }
+        String[] hmKeys = {
+            "MOTION_BLOCKING_NO_LEAVES", "MOTION_BLOCKING", "WORLD_SURFACE", "OCEAN_FLOOR"
+        };
+        long[][] hmLongs = {hmBase, hmBase.clone(), hmDelta, hmBase.clone()};
+
+        // 8 block ticks + 2 fluid ticks
+        String[] btIds = new String[8];
+        int[] btX = new int[8], btY = new int[8], btZ = new int[8], btT = new int[8], btP = new int[8];
+        for (int i = 0; i < 8; i++) {
+            btIds[i] = (i % 2 == 0) ? "minecraft:water" : "minecraft:grass_block";
+            btX[i] = 32 + i;
+            btY[i] = 64 + i;
+            btZ[i] = 48 + i;
+            btT[i] = 5 + i;
+            btP[i] = 0;
+        }
+        String[] ftIds = {"minecraft:water", "minecraft:lava"};
+        int[] ftX = {33, 34}, ftY = {60, 12}, ftZ = {49, 50}, ftT = {2, 10}, ftP = {0, 1};
+
+        int lowFlags = LcaRegionWriter.encodeCompactBoundaryLightFlags(
+                null, 1, new byte[2048], 2);
+        assertEquals(1 | (1 << 2), lowFlags);
+        byte[] nonUniform = new byte[2048];
+        nonUniform[17] = 0x55;
+        assertEquals(-1, LcaRegionWriter.encodeCompactBoundaryLightFlags(null, 1, nonUniform, 2));
+
+        byte[] compactTail = LcaRegionWriter.encodeCompactResidualTailV3(
+                2, 3, true, true, false, 10, 24, lowFlags, -1,
+                hmKeys, hmLongs,
+                btIds, btX, btY, btZ, btT, btP,
+                ftIds, ftX, ftY, ftZ, ftT, ftP,
+                null);
+        // Raw NBT for 4 heightmaps (1,184 B) + 10 ticks (~750 B) + 24 empty PostProcessing (~120 B)
+        // + 2,048 B boundary light would be > 4,100 B; compact O(1) tail must be < 250 B.
+        assertTrue(compactTail.length < 250,
+                "Compact LCA-ICD-3.0 residual tail should be < 250 B, got " + compactTail.length);
+
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("lca-compact-tail-test");
+        try {
+            try (LcaRegionFileStorage storage = new LcaRegionFileStorage(dir, false)) {
+                String[][] blockPal = new String[24][];
+                String[][] biomePal = new String[24][];
+                for (int s = 0; s < 24; s++) {
+                    blockPal[s] = new String[] {"minecraft:air"};
+                    biomePal[s] = new String[] {"minecraft:plains"};
+                }
+                storage.writeFreshChunkDirectModeA(
+                        2, 3, 3953, 100L, 50L, "minecraft:full",
+                        blockPal, new LcaModeABlockSection[24], new byte[24][], new int[24],
+                        null, null, null, new long[24][], biomePal, new long[24][],
+                        new byte[24][], new byte[24][], compactTail);
+                storage.flush();
+                LcaRegionReader.RawChunkFrameWithDirectMeta paired =
+                        storage.readRawChunkFrameWithDirectMeta(2, 3, s -> 0);
+                assertNotNull(paired);
+                LcaDecodedChunkMeta meta = paired.directMeta();
+                assertNotNull(meta);
+                assertTrue(meta.hasStarlightVersion());
+                assertEquals(10, meta.starlightLightVersion());
+                assertEquals(24, meta.postProcessingCount());
+                assertEquals(4, meta.heightmapCodes().length);
+                assertArrayEquals(hmBase, meta.heightmapLongs()[0]);
+                assertArrayEquals(hmBase, meta.heightmapLongs()[1]);
+                assertArrayEquals(hmDelta, meta.heightmapLongs()[2]);
+                assertArrayEquals(hmBase, meta.heightmapLongs()[3]);
+                // Verify boundary section Y=-5 was decoded from 1-byte compact flags
+                assertTrue(meta.sections().length >= 1 && meta.sections()[0].sectionY() == -5);
+                // Verify columnar ticks were decoded back into residualNbtBytes
+                assertTrue(meta.hasResidualNbt());
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> parsedResidual =
+                        (java.util.Map<String, Object>) Nbt.readNamedRoot(meta.residualNbtBytes()).value;
+                Object btObj = parsedResidual.get("block_ticks");
+                assertTrue(btObj instanceof Nbt.NbtList && ((Nbt.NbtList) btObj).items.size() == 8);
+                Object ftObj = parsedResidual.get("fluid_ticks");
+                assertTrue(ftObj instanceof Nbt.NbtList && ((Nbt.NbtList) ftObj).items.size() == 2);
+            }
+        } finally {
+            try (var walk = java.nio.file.Files.walk(dir)) {
+                walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("EXT_FLAG_SPARSE_POST_PROCESSING and EXT_FLAG_DICT_STRUCTURES round-trip losslessly and fail closed")
+    void sparsePostProcessingAndDictStructuresRoundTripAndFailClosed() throws Exception {
+        // Build realistic sparse PostProcessing (3 active sections out of 24, including negative/high short edge cases)
+        short[][] sparsePp = new short[24][];
+        sparsePp[2] = new short[] {0, 17, 18, 256, 4095};
+        sparsePp[9] = new short[] {(short) 0x8001, 42, (short) 0xFFFF};
+        sparsePp[23] = new short[] {123};
+
+        // Build realistic nested structures compound (jigsaw + mineshaft children + BB int[6] + references + custom key)
+        LinkedHashMap<String, Object> structures = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> starts = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> mineshaft = new LinkedHashMap<>();
+        mineshaft.put("id", "minecraft:mineshaft");
+        mineshaft.put("ChunkX", 5);
+        mineshaft.put("ChunkZ", -3);
+        List<Object> children = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            LinkedHashMap<String, Object> piece = new LinkedHashMap<>();
+            piece.put("id", "minecraft:mineshaft_corridor");
+            piece.put("GD", i);
+            piece.put("O", i & 3);
+            piece.put("BB", new int[] {80 + i * 4, 24, -48 + i * 3, 85 + i * 4, 29, -43 + i * 3});
+            piece.put("hps", (byte) (i & 1));
+            piece.put("hr", (byte) 0);
+            piece.put("sc", (byte) 1);
+            piece.put("Num", i + 2);
+            piece.put("custom_mod_tag", "custom:vault_room_" + (i % 3));
+            children.add(piece);
+        }
+        mineshaft.put("Children", new Nbt.NbtList(Nbt.TAG_COMPOUND, children));
+        starts.put("minecraft:mineshaft", mineshaft);
+        structures.put("starts", starts);
+        LinkedHashMap<String, Object> refs = new LinkedHashMap<>();
+        refs.put("minecraft:mineshaft", new long[] {(5L & 0xFFFFFFFFL) | ((-3L) << 32)});
+        structures.put("references", refs);
+
+        byte[] rawStructNbt = Nbt.writeNamedRoot("", structures);
+        byte[] compactTail = LcaRegionWriter.encodeCompactResidualTailV3(
+                5, -3, true, false, true, 10, -1, -1, -1,
+                null, null,
+                new String[0], null, null, null, null, null,
+                new String[0], null, null, null, null, null,
+                sparsePp, rawStructNbt, null);
+
+        // Expect dramatic O(1) reduction vs raw NBT (structures alone is > 1,300 B + PostProcessing > 140 B)
+        assertTrue(rawStructNbt.length > 1000, "Test fixture raw structures should be > 1000 B, got " + rawStructNbt.length);
+        assertTrue(compactTail.length < rawStructNbt.length / 2,
+                "Dictionary structures + sparse PostProcessing tail (" + compactTail.length
+                        + " B) must be < 50% of raw structures NBT (" + rawStructNbt.length + " B)");
+
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("lca-dict-struct-pp-test");
+        try {
+            try (LcaRegionFileStorage storage = new LcaRegionFileStorage(dir, false)) {
+                String[][] blockPal = new String[24][];
+                String[][] biomePal = new String[24][];
+                for (int s = 0; s < 24; s++) {
+                    blockPal[s] = new String[] {"minecraft:air"};
+                    biomePal[s] = new String[] {"minecraft:plains"};
+                }
+                storage.writeFreshChunkDirectModeA(
+                        5, -3, 3953, 200L, 75L, "minecraft:full",
+                        blockPal, new LcaModeABlockSection[24], new byte[24][], new int[24],
+                        null, null, null, new long[24][], biomePal, new long[24][],
+                        new byte[24][], new byte[24][], compactTail);
+                storage.flush();
+
+                // 1) Verify direct-meta fast NBT decode path (GoldLeaf reload path)
+                LcaRegionReader.RawChunkFrameWithDirectMeta paired =
+                        storage.readRawChunkFrameWithDirectMeta(5, -3, s -> 0);
+                assertNotNull(paired);
+                LcaDecodedChunkMeta meta = paired.directMeta();
+                assertNotNull(meta);
+                assertTrue(meta.hasResidualNbt());
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> parsedDirect =
+                        (java.util.Map<String, Object>) Nbt.readNamedRoot(meta.residualNbtBytes()).value;
+                verifyDecodedPpAndStructures(parsedDirect, sparsePp, mineshaft);
+
+                // 2) Verify full map decode path (LcaRegionReader#readChunk)
+                byte[] fullNbt = storage.readChunkNbtBytes(5, -3);
+                assertNotNull(fullNbt);
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> parsedFull =
+                        (java.util.Map<String, Object>) Nbt.readNamedRoot(fullNbt).value;
+                verifyDecodedPpAndStructures(parsedFull, sparsePp, mineshaft);
+            }
+        } finally {
+            try (var walk = java.nio.file.Files.walk(dir)) {
+                walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+
+        // 3) Fail-closed CBIT T5 validation guards
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaV3Codec.validateExtFlags(32, LcaV3Codec.EXT_FLAG_SPARSE_POST_PROCESSING, 3));
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaV3Codec.validateExtFlags(16, LcaV3Codec.EXT_FLAG_DICT_STRUCTURES, 3));
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaV3Codec.validateExtFlags(0, 0x20, 3));
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaV3Codec.decodeSparsePostProcessingToList(new byte[] {24, 1, 24}, 0, 3));
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaV3Codec.decodeDictStructuresToMap(new byte[] {0, 8, (byte) 0x7F, (byte) 0x05}, 0, 4, 0, 0));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void verifyDecodedPpAndStructures(
+            java.util.Map<String, Object> root, short[][] expectedPp, java.util.Map<String, Object> expectedMineshaft) {
+        Object ppObj = root.get("PostProcessing");
+        assertTrue(ppObj instanceof Nbt.NbtList, "Missing PostProcessing list");
+        Nbt.NbtList outer = (Nbt.NbtList) ppObj;
+        assertEquals(24, outer.items.size());
+        for (int s = 0; s < 24; s++) {
+            Nbt.NbtList sub = (Nbt.NbtList) outer.items.get(s);
+            if (expectedPp[s] == null) {
+                assertTrue(sub.items.isEmpty(), "Expected empty PostProcessing at section " + s);
+            } else {
+                assertEquals(expectedPp[s].length, sub.items.size(), "Short count mismatch at section " + s);
+                for (int i = 0; i < expectedPp[s].length; i++) {
+                    assertEquals(expectedPp[s][i], ((Short) sub.items.get(i)).shortValue());
+                }
+            }
+        }
+
+        Object stObj = root.get("structures");
+        assertTrue(stObj instanceof java.util.Map<?, ?>, "Missing structures compound");
+        java.util.Map<String, Object> stMap = (java.util.Map<String, Object>) stObj;
+        java.util.Map<String, Object> stStarts = (java.util.Map<String, Object>) stMap.get("starts");
+        java.util.Map<String, Object> decMs = (java.util.Map<String, Object>) stStarts.get("minecraft:mineshaft");
+        assertEquals("minecraft:mineshaft", decMs.get("id"));
+        assertEquals(5, decMs.get("ChunkX"));
+        assertEquals(-3, decMs.get("ChunkZ"));
+        Nbt.NbtList decChildren = (Nbt.NbtList) decMs.get("Children");
+        Nbt.NbtList expChildren = (Nbt.NbtList) expectedMineshaft.get("Children");
+        assertEquals(expChildren.items.size(), decChildren.items.size());
+        for (int i = 0; i < expChildren.items.size(); i++) {
+            java.util.Map<String, Object> expP = (java.util.Map<String, Object>) expChildren.items.get(i);
+            java.util.Map<String, Object> decP = (java.util.Map<String, Object>) decChildren.items.get(i);
+            assertArrayEquals((int[]) expP.get("BB"), (int[]) decP.get("BB"), "BB mismatch at piece " + i);
+            assertEquals(expP.get("custom_mod_tag"), decP.get("custom_mod_tag"));
+            assertEquals(expP.get("GD"), decP.get("GD"));
+        }
+        java.util.Map<String, Object> decRefs = (java.util.Map<String, Object>) stMap.get("references");
+        assertArrayEquals(
+                new long[] {(5L & 0xFFFFFFFFL) | ((-3L) << 32)},
+                (long[]) decRefs.get("minecraft:mineshaft"));
     }
 }

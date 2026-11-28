@@ -122,6 +122,7 @@ class VolumetricParticleRendererTest {
         // Surface viewer far above in the same X/Z column -> zero aperture points
         List<Vector3d> farSurface = GeometryPointGenerator.generatePlaneProjectedAperture(
                 farmHull, new Vector3d(106, 70, 206), 8.0, 4.0, 1.0);
+        assertTrue(farSurface.isEmpty());
         // Viewer 2 blocks outside -X plane near bottom-front edge -> localized aperture points <= 32
         Vector3d nearWest = new Vector3d(98.0, -49.0, 202.0);
         List<Vector3d> aperture = GeometryPointGenerator.generatePlaneProjectedAperture(

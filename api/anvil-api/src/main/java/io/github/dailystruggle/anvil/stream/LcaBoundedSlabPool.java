@@ -700,8 +700,8 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
             if (trackedInflight) {
                 inflightL2Spills.remove(key, slab);
             }
-            LOG.log(java.util.logging.Level.WARNING,
-                    "[LcaBoundedSlabPool] Failed serializing L2 slab for " + key + ": " + e.getMessage(), e);
+            LOG.log(java.util.logging.Level.WARNING, e,
+                    () -> "[LcaBoundedSlabPool] Failed serializing L2 slab for " + key + ": " + e.getMessage());
             return;
         }
         if (diskBytes.length > config.maxDiskCacheBytes()) {
@@ -731,8 +731,8 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
                 if (trackedInflight) {
                     inflightL2Spills.remove(key, slab);
                 }
-                LOG.log(java.util.logging.Level.WARNING,
-                        "[LcaBoundedSlabPool] Failed writing L2 spill file " + file + ": " + e.getMessage(), e);
+                LOG.log(java.util.logging.Level.WARNING, e,
+                        () -> "[LcaBoundedSlabPool] Failed writing L2 spill file " + file + ": " + e.getMessage());
                 return;
             }
             boolean superseded = false;
@@ -800,8 +800,8 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         try {
             Files.deleteIfExists(path);
         } catch (IOException e) {
-            LOG.log(java.util.logging.Level.WARNING,
-                    "[LcaBoundedSlabPool] Failed deleting L2 slab file " + path + ": " + e.getMessage(), e);
+            LOG.log(java.util.logging.Level.WARNING, e,
+                    () -> "[LcaBoundedSlabPool] Failed deleting L2 slab file " + path + ": " + e.getMessage());
         }
     }
 
@@ -914,8 +914,8 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
                         }
                     }
                 } catch (IOException e) {
-                    LOG.log(java.util.logging.Level.WARNING,
-                            "[LcaBoundedSlabPool] Failed reading L2 slab file " + file + ": " + e.getMessage(), e);
+                    LOG.log(java.util.logging.Level.WARNING, e,
+                            () -> "[LcaBoundedSlabPool] Failed reading L2 slab file " + file + ": " + e.getMessage());
                 }
             }
 

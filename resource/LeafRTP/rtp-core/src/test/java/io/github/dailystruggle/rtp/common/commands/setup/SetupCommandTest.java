@@ -458,7 +458,7 @@ class SetupCommandTest {
 
     @Test
     @DisplayName("SetupConfirmCmd and SetupStatusCmd offload baseline disk I/O to async scheduler")
-    void testSetupConfirmAndStatusOffloadBaselineIoToAsyncScheduler(@org.junit.jupiter.api.io.TempDir java.io.File tempDir) throws Exception {
+    void testSetupConfirmAndStatusOffloadBaselineIoToAsyncScheduler(@org.junit.jupiter.api.io.TempDir java.io.File tempDir) {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir);
         try {

@@ -331,7 +331,7 @@ public final class ColumnProbeCoalescer implements AutoCloseable {
       } catch (Throwable t) {
         results[i] = t;
       } finally {
-        square.closed = true;
+        square.squareClosed = true;
       }
     }
   }
@@ -344,7 +344,7 @@ public final class ColumnProbeCoalescer implements AutoCloseable {
     final LcaRegionReader.FileSession lcaSession;
     final boolean isLca;
     final Map<ChunkKey, ChunkColumnProbe> decoded;
-    boolean closed;
+    boolean squareClosed;
 
     DrainSquare(Request r, AnvilRegionByteCache.Lease lease, AnvilSectorReader.Session session,
                 LcaRegionReader.FileSession lcaSession, boolean isLca,
@@ -359,7 +359,7 @@ public final class ColumnProbeCoalescer implements AutoCloseable {
 
     @Override
     public ChunkColumnProbe chunk(int dx, int dz) {
-      if (closed || Math.abs(dx) > MAX_RADIUS || Math.abs(dz) > MAX_RADIUS) return null;
+      if (squareClosed || Math.abs(dx) > MAX_RADIUS || Math.abs(dz) > MAX_RADIUS) return null;
       int lcx = Math.floorMod(r.cx(), 32) + dx, lcz = Math.floorMod(r.cz(), 32) + dz;
       if (lcx < 0 || lcz < 0 || lcx > 31 || lcz > 31) return null;
       ChunkKey k = new ChunkKey(lcx, lcz, r.minY(), r.maxY());

@@ -26,18 +26,20 @@ spotless {
 
 def rtpGroup = 'io.github.dailystruggle'
 def leafGroup = 'io.github.leafcraftdev'
+def rtpVersion = providers.gradleProperty('version').get()
+def leafVersion = providers.gradleProperty('leafVersion').get()
 def rtpModulePaths = [
         ':',
         ':rtp-api',
         ':rtp-core',
         ':rtp-plugin',
+        ':rtp-neoforge',
 ] as Set
 
 allprojects {
-    group = (rtpModulePaths.contains(project.path) || project.path.startsWith(':addons:'))
-            ? rtpGroup
-            : leafGroup
-    version = providers.gradleProperty('version').get()
+    def isRtpModule = rtpModulePaths.contains(project.path) || project.path.startsWith(':addons:')
+    group = isRtpModule ? rtpGroup : leafGroup
+    version = isRtpModule ? rtpVersion : leafVersion
 
     // ENTERPRISE_READINESS.md Item 40: Reproducible builds.
     // Ensure deterministic byte-for-byte JAR/ZIP creation across build environments.
@@ -952,11 +954,13 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                                 : ('LeafCraftDev API module: ' + project.name)
                         url = isRtpModule
                                 ? 'https://github.com/DailyStruggle/RTP'
-                                : 'https://github.com/LeafCraftDev/MC'
+                                : 'https://github.com/LeafCraftDev/LeafSDK'
                         licenses {
                             license {
-                                name = 'GPL-3.0'
-                                url  = 'https://www.gnu.org/licenses/gpl-3.0.txt'
+                                name = isRtpModule ? 'GPL-3.0' : 'MIT'
+                                url  = isRtpModule
+                                        ? 'https://www.gnu.org/licenses/gpl-3.0.txt'
+                                        : 'https://opensource.org/licenses/MIT'
                             }
                         }
                         developers {
@@ -968,13 +972,13 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                         scm {
                             connection = isRtpModule
                                     ? 'scm:git:https://github.com/DailyStruggle/RTP.git'
-                                    : 'scm:git:https://github.com/LeafCraftDev/MC.git'
+                                    : 'scm:git:https://github.com/LeafCraftDev/LeafSDK.git'
                             developerConnection = isRtpModule
                                     ? 'scm:git:ssh://git@github.com/DailyStruggle/RTP.git'
-                                    : 'scm:git:ssh://git@github.com/LeafCraftDev/MC.git'
+                                    : 'scm:git:ssh://git@github.com/LeafCraftDev/LeafSDK.git'
                             url = isRtpModule
                                     ? 'https://github.com/DailyStruggle/RTP'
-                                    : 'https://github.com/LeafCraftDev/MC'
+                                    : 'https://github.com/LeafCraftDev/LeafSDK'
                         }
                     }
                 }
@@ -1011,7 +1015,7 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                     }
                     maven {
                         name = 'LeafCraftDevPackages'
-                        url = 'https://maven.pkg.github.com/LeafCraftDev/MC'
+                        url = 'https://maven.pkg.github.com/LeafCraftDev/LeafSDK'
                         credentials {
                             username = ghUser
                             password = ghKey
@@ -1075,6 +1079,50 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
                 useInMemoryPgpKeys(signingKey, signingPassword)
                 sign publishing.publications.mavenJava
             }
+        }
+    }
+}
+
+def existingPublishedProjects = publishedModulePaths.findAll { findProject(it) != null }.collect { project(it) }
+def existingLeafSdkProjects = existingPublishedProjects.findAll { it.group.toString() == leafGroup }
+def existingRtpApiProjects = existingPublishedProjects.findAll { it.group.toString() == rtpGroup }
+
+tasks.register('publishAllToCentralStaging') {
+    group = 'publishing'
+    description = 'Stages all present published API and platform-common modules into build/central-staging/.'
+    dependsOn existingPublishedProjects.collect { "${it.path}:publishMavenJavaPublicationToCentralStagingRepository" }
+}
+
+tasks.register('publishLeafSdkToCentralStaging') {
+    group = 'publishing'
+    description = 'Stages all present io.github.leafcraftdev SDK and platform-common modules into build/central-staging/.'
+    dependsOn existingLeafSdkProjects.collect { "${it.path}:publishMavenJavaPublicationToCentralStagingRepository" }
+}
+
+tasks.register('publishRtpApiToCentralStaging') {
+    group = 'publishing'
+    description = 'Stages all present io.github.dailystruggle RTP API modules into build/central-staging/.'
+    dependsOn existingRtpApiProjects.collect { "${it.path}:publishMavenJavaPublicationToCentralStagingRepository" }
+}
+
+tasks.register('publishAllToMavenLocal') {
+    group = 'publishing'
+    description = 'Publishes all present published API and platform-common modules to Maven Local (~/.m2).'
+    dependsOn existingPublishedProjects.collect { "${it.path}:publishToMavenLocal" }
+}
+
+tasks.register('publishLeafSdkToMavenLocal') {
+    group = 'publishing'
+    description = 'Publishes all present io.github.leafcraftdev SDK and platform-common modules to Maven Local (~/.m2).'
+    dependsOn existingLeafSdkProjects.collect { "${it.path}:publishToMavenLocal" }
+}
+
+tasks.register('printPublishedCoordinates') {
+    group = 'publishing'
+    description = 'Prints gradlePath|group|artifactId|version for every present published module.'
+    doLast {
+        existingPublishedProjects.each { p ->
+            println "${p.path}|${p.group}|${p.name}|${p.version}"
         }
     }
 }

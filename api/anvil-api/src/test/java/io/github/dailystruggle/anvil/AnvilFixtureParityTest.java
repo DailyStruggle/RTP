@@ -57,7 +57,8 @@ class AnvilFixtureParityTest {
             "1_20_R1, 3465, 2",
             "1_21_R1, 4671, 2",
             "26_1_R1, 4788, 2",
-            "26_3_R1, 5023, 4"
+            "26_3_R1, 5023, 4",
+            "26_4_R1, 5131, 2"
     })
     @DisplayName("Real region files decode via AnvilReader at the expected DataVersion (REQ-RTP-S-005)")
     void realFixtureDecodesAtExpectedDataVersion(String dirName, int expectedDataVersion, int compression)
@@ -80,7 +81,7 @@ class AnvilFixtureParityTest {
     }
 
     @ParameterizedTest(name = "real fixture {0} decodes terrain")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1"})
+    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1", "26_4_R1"})
     @DisplayName("Real generated chunk decodes to non-air blocks in the column probe and the chunk view (S-004)")
     void realFixtureDecodesTerrain(String dirName) throws IOException {
         // Structure checks alone pass a decoder that drops every section; the scan then reads
@@ -145,8 +146,86 @@ class AnvilFixtureParityTest {
         assertTrue(sawSolid, "terrain-stage proto-chunk should decode to stone");
     }
 
+    @Test
+    @DisplayName("Real 26.4-pre-1 lowercase status proto-chunks are UNKNOWN across .mca and .lca while full chunks decode with verbatim casing (S-004)")
+    void real26_4ProtoChunksAndLowercaseStatusParity(@TempDir Path tempDir) throws IOException {
+        byte[] mcaBytes = loadRealFixture("26_4_R1");
+        LcaRegionReader.register();
+
+        Path mcaWorld = Files.createDirectories(tempDir.resolve("mca_26_4"));
+        Path mcaRegionFile = Files.write(Files.createDirectories(mcaWorld.resolve("region")).resolve("r.0.0.mca"), mcaBytes);
+
+        for (int cz : new int[] {0, 1}) {
+            AnvilReader.ChunkEntry full = AnvilReader.readChunkEntry(mcaBytes, 0, cz);
+            assertNotNull(full);
+            assertEquals("minecraft:full", full.root.get("status"));
+            assertNull(full.root.get("Status"), "MC 26.4 uses lowercase status key");
+            assertTrue(!AnvilReader.isIncompleteChunk(full.root));
+            assertTrue(RegionFileReader.isFullChunkRoot(full.root));
+            assertNotNull(AnvilReader.readColumnProbe(mcaBytes, 0, cz, -64, 319));
+            assertNotNull(AnvilSectorReader.readColumnProbe(mcaRegionFile, 0, cz, -64, 319));
+            assertNotEquals(Verdict.UNKNOWN,
+                    AnvilPrefilter.probeSyncDetailed(mcaWorld, "", 0, cz, Set.of()).verdict());
+        }
+
+        int[] protoXs = {5, 6, 7};
+        String[] protoStatuses = {"minecraft:terrain", "minecraft:noise_biomes", "minecraft:structure_starts"};
+        for (int i = 0; i < protoXs.length; i++) {
+            int cx = protoXs[i];
+            AnvilReader.ChunkEntry proto = AnvilReader.readChunkEntry(mcaBytes, cx, 0);
+            assertNotNull(proto, "fixture must carry proto-chunk (" + cx + ",0)");
+            assertEquals(protoStatuses[i], proto.root.get("status"));
+            assertTrue(AnvilReader.isIncompleteChunk(proto.root));
+            assertTrue(!RegionFileReader.isFullChunkRoot(proto.root));
+            assertNull(AnvilReader.readColumnProbe(mcaBytes, cx, 0, -64, 319));
+            assertNull(AnvilSectorReader.readColumnProbe(mcaRegionFile, cx, 0, -64, 319));
+            assertEquals(Verdict.UNKNOWN,
+                    AnvilPrefilter.probeSyncDetailed(mcaWorld, "", cx, 0, Set.of()).verdict());
+        }
+
+        for (boolean modeB : new boolean[] {false, true}) {
+            byte[] lcaBytes = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, modeB);
+            assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V3, LcaSectionCodec.readUint16BE(lcaBytes, 0x08));
+            Path lcaWorld = Files.createDirectories(tempDir.resolve("lca_26_4_" + (modeB ? "modeB" : "modeA")));
+            Path lcaFile = Files.write(Files.createDirectories(lcaWorld.resolve("region")).resolve("r.0.0.lca"), lcaBytes);
+            assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V3, LcaRegionWriter.peekFormatVersion(lcaFile));
+
+            for (int cz : new int[] {0, 1}) {
+                AnvilReader.ChunkEntry fullMap = LcaRegionReader.INSTANCE.readChunk(lcaBytes, 0, cz);
+                assertNotNull(fullMap);
+                assertEquals("minecraft:full", fullMap.root.get("status"));
+                assertNull(fullMap.root.get("Status"), "lowercase status must not synthesize uppercase Status");
+                LinkedHashMap<String, Object> fullDirect =
+                        Nbt.readRootCompound(LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, 0, cz));
+                assertEquals("minecraft:full", fullDirect.get("status"));
+                assertNull(fullDirect.get("Status"));
+                assertNotNull(LcaRegionReader.readColumnProbe(lcaBytes, 0, cz, -64, 319));
+                assertNotNull(LcaRegionReader.readChunkView(lcaBytes, 0, cz));
+                assertNotEquals(Verdict.UNKNOWN,
+                        AnvilPrefilter.probeSyncDetailed(lcaWorld, "", 0, cz, Set.of()).verdict());
+            }
+
+            for (int i = 0; i < protoXs.length; i++) {
+                int cx = protoXs[i];
+                AnvilReader.ChunkEntry protoMap = LcaRegionReader.INSTANCE.readChunk(lcaBytes, cx, 0);
+                assertNotNull(protoMap);
+                assertEquals(protoStatuses[i], protoMap.root.get("status"));
+                assertNull(protoMap.root.get("Status"));
+                LinkedHashMap<String, Object> protoDirect =
+                        Nbt.readRootCompound(LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, cx, 0));
+                assertEquals(protoStatuses[i], protoDirect.get("status"));
+                assertNull(protoDirect.get("Status"));
+                assertNull(LcaRegionReader.readColumnProbe(lcaBytes, cx, 0, -64, 319));
+                assertNull(LcaRegionReader.readTerrainProbe(lcaBytes, lcaBytes.length, cx, 0, -64, 319));
+                assertNull(LcaRegionReader.readChunkView(lcaBytes, cx, 0));
+                assertEquals(Verdict.UNKNOWN,
+                        AnvilPrefilter.probeSyncDetailed(lcaWorld, "", cx, 0, Set.of()).verdict());
+            }
+        }
+    }
+
     @ParameterizedTest(name = "real fixture {0} survives semantic round-trip")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1"})
+    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1", "26_4_R1"})
     @DisplayName("Real root → NBT write → NBT re-read is structurally lossless")
     void realRootSurvivesSemanticRoundTrip(String dirName) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
